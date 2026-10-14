@@ -1,0 +1,187 @@
+{
+  "_version": "1.65.0",
+  "sap.app": {
+    "id": "aem.suite.testcases",
+    "type": "application",
+    "i18n": {
+      "bundleUrl": "i18n/i18n.properties",
+      "supportedLocales": [
+        ""
+      ],
+      "fallbackLocale": ""
+    },
+    "applicationVersion": {
+      "version": "1.0.0"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "dataSources": {
+      "mainService": {
+        "uri": "/odata/v4/test/",
+        "type": "OData",
+        "settings": {
+          "odataVersion": "4.0"
+        }
+      }
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "intent": {
+          "semanticObject": "TestCases",
+          "action": "manage",
+          "title": "{{appTitle}}",
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          }
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "flexEnabled": false,
+    "dependencies": {
+      "minUI5Version": "1.148.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.fe.templates": {},
+        "sap.ui.codeeditor": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "aem.suite.testcases.i18n.i18n",
+          "supportedLocales": [
+            ""
+          ],
+          "fallbackLocale": ""
+        }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": {
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      }
+    },
+    "routing": {
+      "config": {},
+      "routes": [
+        {
+          "pattern": ":?query:",
+          "name": "TestCasesList",
+          "target": "TestCasesList"
+        },
+        {
+          "pattern": "TestCases({key}):?query:",
+          "name": "TestCasesObjectPage",
+          "target": "TestCasesObjectPage"
+        }
+      ],
+      "targets": {
+        "TestCasesList": {
+          "type": "Component",
+          "id": "TestCasesList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/TestCases",
+              "variantManagement": "Page",
+              "initialLoad": "Enabled",
+              "navigation": {
+                "TestCases": {
+                  "detail": {
+                    "route": "TestCasesObjectPage"
+                  }
+                }
+              },
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "type": "ResponsiveTable",
+                    "selectionMode": "Multi"
+                  },
+                  "actions": {
+                    "runSelected": {
+                      "press": "aem.suite.testcases.ext.TestCaseActions.runSelected",
+                      "text": "Run…",
+                      "requiresSelection": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TestCasesObjectPage": {
+          "type": "Component",
+          "id": "TestCasesObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "editableHeaderContent": false,
+              "contextPath": "/TestCases",
+              "content": {
+                "header": {
+                  "actions": {
+                    "runThis": {
+                      "press": "aem.suite.testcases.ext.TestCaseActions.runFromObjectPage",
+                      "text": "Run…",
+                      "visible": "{= ${IsActiveEntity} === true }"
+                    },
+                    "preview": {
+                      "press": "aem.suite.testcases.ext.TestCaseActions.preview",
+                      "text": "Preview"
+                    }
+                  }
+                },
+                "body": {
+                  "sections": {
+                    "message": {
+                      "template": "aem.suite.testcases.ext.MessageSection",
+                      "title": "Message",
+                      "position": {
+                        "placement": "Before",
+                        "anchor": "AdvancedSection"
+                      }
+                    },
+                    "payload": {
+                      "template": "aem.suite.testcases.ext.PayloadSection",
+                      "title": "Payload",
+                      "position": {
+                        "placement": "After",
+                        "anchor": "message"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "sap.fiori": {
+    "registrationIds": [],
+    "archeType": "transactional"
+  }
+}

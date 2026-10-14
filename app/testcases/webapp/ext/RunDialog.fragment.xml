@@ -1,0 +1,73 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m">
+  <Dialog
+    title="Run {run>/label}"
+    contentWidth="34rem"
+    resizable="true"
+    draggable="true">
+    <content>
+      <VBox class="sapUiSmallMargin" visible="{= !${run>/runId} }">
+        <Text text="Select the brokers to run against. Each selected test case is published once per broker." class="sapUiSmallMarginBottom" />
+        <List
+          id="brokerList"
+          mode="MultiSelect"
+          includeItemInSelection="true"
+          noDataText="No active brokers - maintain brokers first"
+          updateFinished=".onBrokersLoaded"
+          selectionChange=".onBrokerSelection"
+          items="{path: '/Brokers', sorter: {path: 'name'}, templateShareable: false}">
+          <StandardListItem
+            title="{name}"
+            description="{msgVpn} · {credentialMode}"
+            info="{lastConnectionStatus}"
+            infoState="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />
+        </List>
+        <VBox visible="{= ${run>/credentials}.length > 0 }" class="sapUiSmallMarginTop">
+          <Title text="Passwords (used for this run only, not stored)" level="H6" />
+          <List items="{path: 'run>/credentials', templateShareable: false}" showSeparators="None">
+            <CustomListItem>
+              <HBox alignItems="Center" class="sapUiTinyMarginTopBottom">
+                <Label text="{run>name} ({run>username})" width="16rem" />
+                <Input
+                  type="Password"
+                  value="{run>password}"
+                  valueLiveUpdate="true"
+                  valueState="{= ${run>missing} &amp;&amp; !${run>password} ? 'Error' : 'None' }"
+                  placeholder="Password"
+                  width="14rem"
+                  submit=".onPrimary" />
+              </HBox>
+            </CustomListItem>
+          </List>
+        </VBox>
+      </VBox>
+      <VBox class="sapUiSmallMargin" visible="{= !!${run>/runId} }">
+        <ObjectStatus
+          text="{= ${run>/finished} ? 'Finished' : 'Running…' }"
+          state="{= ${run>/finished} ? (${run>/failed} > 0 ? 'Error' : 'Success') : 'Information' }"
+          icon="{= ${run>/finished} ? (${run>/failed} > 0 ? 'sap-icon://error' : 'sap-icon://sys-enter-2') : 'sap-icon://pending' }"
+          class="sapMObjectStatusLarge sapUiSmallMarginBottom" />
+        <ProgressIndicator
+          percentValue="{= ${run>/total} ? Math.round(${run>/done} * 100 / ${run>/total}) : 0 }"
+          displayValue="{run>/done} / {run>/total}"
+          state="{= ${run>/failed} > 0 ? 'Error' : 'Success' }"
+          showValue="true" />
+        <HBox class="sapUiSmallMarginTop">
+          <ObjectNumber number="{run>/passed}" unit="passed" state="Success" class="sapUiMediumMarginEnd" />
+          <ObjectNumber number="{run>/failed}" unit="failed / error" state="{= ${run>/failed} > 0 ? 'Error' : 'None' }" />
+        </HBox>
+      </VBox>
+    </content>
+    <beginButton>
+      <Button
+        text="{= ${run>/runId} ? 'Open Results' : 'Run' }"
+        type="Emphasized"
+        enabled="{= !${run>/starting} }"
+        press=".onPrimary" />
+    </beginButton>
+    <endButton>
+      <Button text="Close" press=".onClose" />
+    </endButton>
+  </Dialog>
+</core:FragmentDefinition>

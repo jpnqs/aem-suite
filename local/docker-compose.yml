@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  solace:
+    image: solace/solace-pubsub-standard:latest
+    container_name: solace-broker
+    hostname: solace
+    ports:
+      - "8080:8080" # Solace PubSub+ Manager / Web UI / SEMP API
+      - "55555:55555" # Native Solace messaging protocol (SMF)
+      - "1883:1883" # MQTT
+      - "5672:5672" # AMQP
+      - "9000:9000" # WebSocket
+    shm_size: '1gb' # Required shared memory size for Solace data plane
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    environment:
+      - username_admin_globalaccesslevel=admin
+      - username_admin_password=admin

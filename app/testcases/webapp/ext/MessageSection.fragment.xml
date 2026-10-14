@@ -1,0 +1,28 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m">
+  <VBox
+    core:require="{handler: 'aem/suite/testcases/ext/MessageSection'}"
+    width="100%">
+    <Label text="Topic" required="true" design="Bold" />
+    <TextArea
+      value="{topic}"
+      visible="{ui>/isEditable}"
+      width="100%"
+      rows="2"
+      growing="true"
+      growingMaxLines="8"
+      placeholder="e.g. acme/orders/\{\{region\}\}/created/v1/\{\{uuid\}\}"
+      liveChange="handler.onTopicLiveChange"
+      change="handler.onTopicChange" />
+    <Text text="{topic}" visible="{= !${ui>/isEditable} }" wrapping="true" renderWhitespace="true" />
+
+    <Label text="Name" class="sapUiSmallMarginTop" />
+    <Input
+      value="{name}"
+      visible="{ui>/isEditable}"
+      width="100%"
+      placeholder="Empty = topic" />
+    <Text text="{name}" visible="{= !${ui>/isEditable} }" wrapping="true" />
+  </VBox>
+</core:FragmentDefinition>

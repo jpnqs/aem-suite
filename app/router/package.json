@@ -1,0 +1,13 @@
+{
+  "name": "approuter",
+  "private": true,
+  "dependencies": {
+    "@sap/approuter": "^23"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node node_modules/@sap/approuter/approuter.js"
+  }
+}

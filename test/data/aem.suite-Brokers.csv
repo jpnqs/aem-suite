@@ -1,0 +1,3 @@
+ID;name;description;credentialMode;destinationName;url;msgVpn;username;clientNamePrefix;connectTimeoutMs;active
+b1000000-0000-4000-8000-000000000001;local-docker;Local Solace PubSub+ in Docker (container solace-broker, SMF port 55555);DIRECT;;tcp://localhost:55555;default;default;aem-suite;5000;true
+b1000000-0000-4000-8000-000000000002;aem-dev (destination);"Example for DESTINATION mode - provide destination ""aem-dev"" and activate";DESTINATION;aem-dev;;;;aem-suite;10000;false

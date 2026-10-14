@@ -1,0 +1,90 @@
+_schema-version: 3.3.0
+ID: aem-suite
+version: 1.0.0
+description: "Test suite for SAP Advanced Event Mesh brokers"
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+        - node scripts/build-ui.js
+modules:
+  - name: aem-suite-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      # live subscriptions are held in memory -> keep a single instance (see README)
+      instances: 1
+      memory: 512M
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: aem-suite-auth
+      - name: aem-suite-db
+      - name: aem-suite-destination
+
+  - name: aem-suite-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: aem-suite-db
+
+  - name: aem-suite
+    type: approuter.nodejs
+    path: app/router
+    build-parameters:
+      builder: npm
+      ignore:
+        - default-env.json
+    parameters:
+      keep-existing-routes: true
+      disk-quota: 256M
+      memory: 256M
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api # must be used in xs-app.json as well
+          url: ~{srv-url}
+          forwardAuthToken: true
+          timeout: 120000
+      - name: aem-suite-auth
+    provides:
+      - name: app-api
+        properties:
+          app-protocol: ${protocol}
+          app-uri: ${default-uri}
+
+resources:
+  - name: aem-suite-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: aem-suite-${org}-${space}
+        tenant-mode: dedicated
+        oauth2-configuration:
+          redirect-uris:
+            - https://*.${default-domain}/**
+  - name: aem-suite-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: aem-suite-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite

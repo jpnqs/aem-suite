@@ -1,0 +1,8 @@
+{
+  "name": "aem-suite-testcases",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "ui5 build --clean-dest --dest dist"
+  }
+}

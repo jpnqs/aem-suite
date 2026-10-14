@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEM Test Suite</title>
+  <script>
+    window["sap-ushell-config"] = {
+      defaultRenderer: "fiori2",
+      renderers: { fiori2: { componentData: { config: { enableSearch: false, rootIntent: "Shell-home" } } } },
+      applications: {
+        "TestCases-manage": {
+          title: "Test Cases",
+          description: "Maintain and run test cases",
+          icon: "sap-icon://test",
+          additionalInformation: "SAPUI5.Component=aem.suite.testcases",
+          applicationType: "URL",
+          url: "./testcases/"
+        },
+        "TestRuns-display": {
+          title: "Test Runs",
+          description: "Results per broker",
+          icon: "sap-icon://kpi-managing-my-area",
+          additionalInformation: "SAPUI5.Component=aem.suite.runs",
+          applicationType: "URL",
+          url: "./runs/"
+        },
+        "Subscriber-display": {
+          title: "Live Subscriber",
+          description: "Watch topics and queues live",
+          icon: "sap-icon://feeder-arrow",
+          additionalInformation: "SAPUI5.Component=aem.suite.subscriber",
+          applicationType: "URL",
+          url: "./subscriber/"
+        },
+        "SavedMessages-display": {
+          title: "Saved Messages",
+          description: "Messages kept from subscriptions",
+          icon: "sap-icon://inbox",
+          additionalInformation: "SAPUI5.Component=aem.suite.messages",
+          applicationType: "URL",
+          url: "./messages/"
+        },
+        "Brokers-manage": {
+          title: "Brokers",
+          description: "Connections and credentials (Admin)",
+          icon: "sap-icon://connected",
+          additionalInformation: "SAPUI5.Component=aem.suite.brokers",
+          applicationType: "URL",
+          url: "./brokers/"
+        },
+        "Variables-manage": {
+          title: "Global Variables",
+          description: "Template variables (Admin)",
+          icon: "sap-icon://key-user-settings",
+          additionalInformation: "SAPUI5.Component=aem.suite.variables",
+          applicationType: "URL",
+          url: "./variables/"
+        }
+      }
+    };
+  </script>
+  <script id="sap-ushell-bootstrap" src="https://ui5.sap.com/1.148.12/test-resources/sap/ushell/bootstrap/sandbox.js"></script>
+  <script id="sap-ui-bootstrap" src="https://ui5.sap.com/1.148.12/resources/sap-ui-core.js"
+    data-sap-ui-libs="sap.m, sap.ushell, sap.fe.templates"
+    data-sap-ui-compat-version="edge"
+    data-sap-ui-theme="sap_horizon"
+    data-sap-ui-frame-options="allow"
+    data-sap-ui-binding-syntax="complex"
+    data-sap-ui-async="true"></script>
+  <script>
+    sap.ui.require(["sap/ui/core/Core"], function (Core) {
+      Core.ready(function () {
+        sap.ushell.Container.createRenderer(true).then(function (renderer) {
+          renderer.placeAt("content");
+        });
+      });
+    });
+  </script>
+</head>
+<body class="sapUiBody" id="content"></body>
+</html>

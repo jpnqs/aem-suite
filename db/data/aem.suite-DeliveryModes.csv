@@ -1,0 +1,3 @@
+code;name;descr
+PERSISTENT;Persistent (Guaranteed);Passed when the broker acknowledges the message
+DIRECT;Direct;Passed when the message was sent without error (no broker acknowledgement)

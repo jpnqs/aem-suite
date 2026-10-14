@@ -1,0 +1,40 @@
+{
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.Admin",
+      "description": "Manage brokers, credentials and global variables"
+    },
+    {
+      "name": "$XSAPPNAME.Tester",
+      "description": "Maintain and run test cases, subscribe to brokers"
+    }
+  ],
+  "attributes": [],
+  "role-templates": [
+    {
+      "name": "Admin",
+      "description": "AEM Test Suite administrator",
+      "scope-references": ["$XSAPPNAME.Admin", "$XSAPPNAME.Tester"],
+      "attribute-references": []
+    },
+    {
+      "name": "Tester",
+      "description": "AEM Test Suite tester",
+      "scope-references": ["$XSAPPNAME.Tester"],
+      "attribute-references": []
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "AEM_Suite_Admin",
+      "description": "AEM Test Suite - administrators (includes tester)",
+      "role-template-references": ["$XSAPPNAME.Admin"]
+    },
+    {
+      "name": "AEM_Suite_Tester",
+      "description": "AEM Test Suite - testers",
+      "role-template-references": ["$XSAPPNAME.Tester"]
+    }
+  ],
+  "authorities-inheritance": false
+}

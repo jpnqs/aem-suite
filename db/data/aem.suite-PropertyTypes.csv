@@ -1,0 +1,4 @@
+code;name;descr
+STRING;String;Text value
+INT;Integer;64 bit integer
+BOOL;Boolean;true or false

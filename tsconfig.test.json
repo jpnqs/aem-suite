@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "node",
+      "jest",
+      "@cap-js/cds-types"
+    ],
+    "noEmit": true
+  },
+  "include": [
+    "srv/**/*.ts",
+    "test/**/*.ts",
+    "@cds-models/**/*.ts"
+  ]
+}

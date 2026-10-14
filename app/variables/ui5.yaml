@@ -1,0 +1,7 @@
+specVersion: "4.0"
+metadata:
+  name: aem.suite.variables
+type: application
+customConfiguration:
+  cds-plugin-ui5:
+    mountPath: /variables

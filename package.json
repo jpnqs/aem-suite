@@ -1,0 +1,85 @@
+{
+  "name": "aem-suite",
+  "version": "1.0.0",
+  "description": "Test suite for SAP Advanced Event Mesh brokers: test cases, multi-broker runs and live subscriptions.",
+  "repository": "<Add your repository here>",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@cap-js-community/websocket": "^1.11.2",
+    "@cap-js/hana": "^3",
+    "@sap-cloud-sdk/connectivity": "^4.9.1",
+    "@sap/cds": "^10",
+    "@sap/xssec": "^4",
+    "express": "^5",
+    "solclientjs": "^10.18.3"
+  },
+  "devDependencies": {
+    "@cap-js/cds-test": "^1",
+    "@cap-js/cds-typer": "^0.41",
+    "@cap-js/cds-types": "^0.20",
+    "@cap-js/sqlite": "^3",
+    "@sap/cds-dk": "^10",
+    "@types/jest": "^30",
+    "@types/node": "^22",
+    "cds-plugin-ui5": "^0.17.4",
+    "jest": "^30",
+    "ts-jest": "^29.4.14",
+    "tsx": "^4",
+    "typescript": "^5",
+    "@ui5/cli": "^4",
+    "@sapui5/types": "1.148.12",
+    "ui5-tooling-transpile": "^3.13.1"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "watch": "cds-tsx w",
+    "before:cds-watch": "cds-typer \"*\"",
+    "typer": "cds-typer \"*\"",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p app/subscriber",
+    "test": "jest",
+    "build:ui": "node scripts/build-ui.js"
+  },
+  "imports": {
+    "#cds-models/*": "./@cds-models/*/index.js"
+  },
+  "cds": {
+    "requires": {
+      "auth": "xsuaa",
+      "[development]": {
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "admin": {
+              "password": "admin",
+              "roles": [
+                "Admin",
+                "Tester"
+              ]
+            },
+            "tester": {
+              "password": "tester",
+              "roles": [
+                "Tester"
+              ]
+            },
+            "*": false
+          }
+        }
+      },
+      "destinations": true
+    },
+    "websocket": {
+      "kind": "ws"
+    },
+    "sql": {
+      "native_hana_associations": false
+    },
+    "fiori": {
+      "draft_messages": false
+    }
+  }
+}

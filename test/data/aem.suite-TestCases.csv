@@ -1,0 +1,19 @@
+ID;name;description;topic;payload;contentType;deliveryMode;timeToLiveMs;dmqEligible;priority;correlationId;ackTimeoutMs
+c1000000-0000-4000-8000-000000000001;Order created;Persistent order event with user properties and a local variable;{{app}}/orders/{{region}}/created/v1/{{uuid}};"{
+  ""orderId"": ""{{uuid}}"",
+  ""createdAt"": ""{{now}}"",
+  ""region"": ""{{region}}"",
+  ""items"": [
+    { ""sku"": ""SKU-100"", ""qty"": {{qty}} }
+  ],
+  ""total"": 49.95
+}";application/json;PERSISTENT;;;;{{uuid}};5000
+c1000000-0000-4000-8000-000000000002;Ping;Direct message - passes when sent;{{app}}/ping/{{broker.name}};"{
+  ""ts"": {{timestamp}},
+  ""broker"": ""{{broker.name}}""
+}";application/json;DIRECT;;;;;5000
+c1000000-0000-4000-8000-000000000003;Inventory updated;Persistent message with random values and TTL;{{app}}/inventory/{{region}}/updated/v1;"{
+  ""sku"": ""SKU-{{randomInt(100,999)}}"",
+  ""stock"": {{randomInt(0,500)}},
+  ""warehouse"": ""WH-{{region}}""
+}";application/json;PERSISTENT;60000;true;;;5000

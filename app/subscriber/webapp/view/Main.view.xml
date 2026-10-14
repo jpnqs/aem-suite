@@ -1,0 +1,199 @@
+<mvc:View
+  controllerName="aem.suite.subscriber.controller.Main"
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:f="sap.f"
+  xmlns:l="sap.ui.layout"
+  xmlns:ce="sap.ui.codeeditor"
+  displayBlock="true"
+  height="100%">
+  <f:DynamicPage id="page" toggleHeaderOnTitleClick="false" fitContent="true">
+    <f:title>
+      <f:DynamicPageTitle>
+        <f:heading>
+          <Title text="Live Subscriber" />
+        </f:heading>
+        <f:snappedContent>
+          <Text text="{state>/sourceLabel}" />
+        </f:snappedContent>
+        <f:content>
+          <ObjectStatus
+            text="{state>/status}"
+            state="{= ${state>/subscriptionId} ? 'Success' : 'None' }"
+            icon="{= ${state>/subscriptionId} ? 'sap-icon://connected' : 'sap-icon://disconnected' }" />
+          <ObjectStatus
+            text="WebSocket offline"
+            state="Warning"
+            icon="sap-icon://alert"
+            visible="{= !${state>/socketConnected} }"
+            class="sapUiSmallMarginBegin" />
+        </f:content>
+        <f:actions>
+          <Button
+            text="Start"
+            type="Emphasized"
+            icon="sap-icon://media-play"
+            enabled="{= !${state>/subscriptionId} &amp;&amp; !${state>/busy} }"
+            press=".onStart" />
+          <Button
+            text="Stop"
+            icon="sap-icon://stop"
+            enabled="{= !!${state>/subscriptionId} &amp;&amp; !${state>/busy} }"
+            press=".onStop" />
+          <Button
+            text="Active Subscriptions"
+            icon="sap-icon://list"
+            press=".onShowActive" />
+        </f:actions>
+      </f:DynamicPageTitle>
+    </f:title>
+    <f:header>
+      <f:DynamicPageHeader pinnable="true">
+        <l:HorizontalLayout allowWrapping="true">
+          <VBox class="sapUiMediumMarginEnd">
+            <Label text="Broker" labelFor="broker" required="true" />
+            <Select
+              id="broker"
+              width="16rem"
+              forceSelection="false"
+              selectedKey="{state>/brokerId}"
+              enabled="{= !${state>/subscriptionId} }"
+              change=".onBrokerChange"
+              items="{path: '/Brokers', sorter: {path: 'name'}}">
+              <core:Item key="{ID}" text="{name}" />
+            </Select>
+          </VBox>
+          <VBox class="sapUiMediumMarginEnd" visible="{state>/needsPassword}">
+            <Label text="Password for {state>/username} (not stored)" required="true" />
+            <Input
+              type="Password"
+              width="14rem"
+              value="{state>/password}"
+              placeholder="Password"
+              enabled="{= !${state>/subscriptionId} }"
+              submit=".onStart" />
+          </VBox>
+          <VBox class="sapUiMediumMarginEnd">
+            <Label text="Source" />
+            <SegmentedButton
+              selectedKey="{state>/sourceType}"
+              enabled="{= !${state>/subscriptionId} }">
+              <items>
+                <SegmentedButtonItem key="TOPIC" text="Topics" icon="sap-icon://feeder-arrow" />
+                <SegmentedButtonItem key="QUEUE_BROWSE" text="Browse Queue" icon="sap-icon://show" />
+                <SegmentedButtonItem key="QUEUE_CONSUME" text="Consume Queue" icon="sap-icon://download" />
+              </items>
+            </SegmentedButton>
+          </VBox>
+          <VBox class="sapUiMediumMarginEnd" visible="{= ${state>/sourceType} === 'TOPIC' }">
+            <Label text="Topic subscriptions (comma separated, wildcards * and &gt;)" required="true" />
+            <Input
+              width="28rem"
+              value="{state>/topicsText}"
+              placeholder="acme/orders/>, acme/*/created/v1/>"
+              enabled="{= !${state>/subscriptionId} }"
+              submit=".onStart" />
+          </VBox>
+          <VBox class="sapUiMediumMarginEnd" visible="{= ${state>/sourceType} !== 'TOPIC' }">
+            <Label text="Queue name" required="true" />
+            <Input
+              width="20rem"
+              value="{state>/queue}"
+              placeholder="q.orders"
+              enabled="{= !${state>/subscriptionId} }"
+              submit=".onStart" />
+          </VBox>
+        </l:HorizontalLayout>
+        <MessageStrip
+          text="Consume removes messages from the queue (client acknowledgement). Browse leaves them on the queue."
+          type="Warning"
+          showIcon="true"
+          visible="{= ${state>/sourceType} === 'QUEUE_CONSUME' }"
+          class="sapUiTinyMarginTop" />
+      </f:DynamicPageHeader>
+    </f:header>
+    <f:content>
+      <l:Splitter height="100%" width="100%">
+        <Table
+          id="messages"
+          items="{path: 'state>/messages', templateShareable: false}"
+          mode="SingleSelectMaster"
+          selectionChange=".onSelect"
+          sticky="ColumnHeaders,HeaderToolbar"
+          growing="true"
+          growingThreshold="100"
+          growingScrollToLoad="true"
+          noDataText="{= ${state>/subscriptionId} ? 'Waiting for messages…' : 'Start a subscription to see messages' }">
+          <layoutData>
+            <l:SplitterLayoutData size="58%" />
+          </layoutData>
+          <headerToolbar>
+            <OverflowToolbar>
+              <Title text="Messages ({state>/received})" />
+              <ToolbarSpacer />
+              <SearchField width="14rem" placeholder="Filter topic / payload" liveChange=".onFilter" />
+              <ToggleButton
+                icon="sap-icon://media-pause"
+                text="{= ${state>/paused} ? 'Paused' : 'Pause' }"
+                pressed="{state>/paused}"
+                tooltip="Pause list updates (messages are still counted)" />
+              <Button icon="sap-icon://clear-all" text="Clear" press=".onClear" />
+            </OverflowToolbar>
+          </headerToolbar>
+          <columns>
+            <Column width="6rem">
+              <Text text="Time" />
+            </Column>
+            <Column>
+              <Text text="Topic" />
+            </Column>
+            <Column width="7rem" minScreenWidth="Desktop" demandPopin="true">
+              <Text text="Delivery" />
+            </Column>
+            <Column width="5rem" hAlign="End" minScreenWidth="Desktop" demandPopin="true">
+              <Text text="Size" />
+            </Column>
+          </columns>
+          <items>
+            <ColumnListItem type="Active">
+              <cells>
+                <Text text="{state>time}" />
+                <Text text="{state>topic}" wrapping="true" />
+                <Text text="{state>deliveryMode}" />
+                <Text text="{state>size}" />
+              </cells>
+            </ColumnListItem>
+          </items>
+        </Table>
+        <ScrollContainer height="100%" vertical="true">
+          <layoutData>
+            <l:SplitterLayoutData size="auto" />
+          </layoutData>
+          <VBox class="sapUiSmallMargin" visible="{= !!${state>/selected} }">
+            <Title text="{state>/selected/topic}" wrapping="true" />
+            <Text
+              text="Received {state>/selected/receivedAt} · {state>/selected/deliveryMode} · {state>/selected/contentType}"
+              class="sapUiTinyMarginBottom" />
+            <Text text="Correlation ID: {state>/selected/correlationId}" visible="{= !!${state>/selected/correlationId} }" />
+            <OverflowToolbar style="Clear" class="sapUiSmallMarginTop">
+              <ToolbarSpacer />
+              <Button text="Copy Payload" icon="sap-icon://copy" press=".onCopy" />
+              <Button text="Save" icon="sap-icon://save" press=".onSave" enabled="{= !${state>/selected/savedId} }" />
+              <Button text="Save as Test Case" icon="sap-icon://add-document" type="Emphasized" press=".onSaveAsTestCase" />
+            </OverflowToolbar>
+            <Title text="Payload" level="H5" />
+            <ce:CodeEditor type="{state>/selected/editorType}" value="{state>/selected/prettyPayload}" editable="false" height="22rem" />
+            <Title text="User Properties" level="H5" class="sapUiSmallMarginTop" />
+            <ce:CodeEditor type="json" value="{state>/selected/prettyProperties}" editable="false" height="8rem" />
+          </VBox>
+          <IllustratedMessage
+            illustrationType="sapIllus-NoEntries"
+            title="No message selected"
+            description="Select a message to see payload and properties"
+            visible="{= !${state>/selected} }" />
+        </ScrollContainer>
+      </l:Splitter>
+    </f:content>
+  </f:DynamicPage>
+</mvc:View>

@@ -1,0 +1,35 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:ce="sap.ui.codeeditor">
+  <VBox
+    core:require="{handler: 'aem/suite/testcases/ext/PayloadSection'}"
+    width="100%">
+    <OverflowToolbar style="Clear">
+      <ObjectStatus
+        text="{path: 'payload', formatter: 'handler.statusText'}"
+        state="{path: 'payload', formatter: 'handler.statusState'}"
+        icon="{path: 'payload', formatter: 'handler.statusIcon'}" />
+      <ToolbarSpacer />
+      <Button
+        icon="sap-icon://sys-help"
+        tooltip="Template variables and built-ins"
+        type="Transparent"
+        press="handler.onHelp" />
+      <Button
+        text="Format"
+        icon="sap-icon://indent"
+        enabled="{ui>/isEditable}"
+        press="handler.onFormat" />
+    </OverflowToolbar>
+    <ce:CodeEditor
+      type="json"
+      value="{payload}"
+      editable="{ui>/isEditable}"
+      height="420px"
+      width="100%"
+      lineNumbers="true"
+      syntaxHints="false"
+      liveChange="handler.onLiveChange" />
+  </VBox>
+</core:FragmentDefinition>
