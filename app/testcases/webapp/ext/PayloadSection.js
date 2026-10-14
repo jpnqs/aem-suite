@@ -11,7 +11,7 @@ sap.ui.define(
   "use strict";
 
   var HELP = [
-    ["{{name}}", "Your variable: test case > broker > global variables"],
+    ["{{name}}", "Your variable: test case > broker > folder > global variables"],
     ["{{uuid}}", "UUID, same value in topic, payload and correlation ID"],
     ["{{newUuid}}", "New UUID for every occurrence"],
     ["{{now}}", "Current time, ISO 8601"],

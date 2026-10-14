@@ -3,6 +3,7 @@ import { currentJwt, loadBroker } from './lib/credentials/resolve'
 import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord } from './lib/test-case-spec'
 import { BrokerCredential, createRun, executeRunInBackground, toPasswords } from './lib/test-runner'
 import { detectContentType, inferPropertyType, STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
+import { compareSiblings, loadTree, TreeNode } from './lib/tree'
 
 const VAR_NAME = /^[A-Za-z_][\w.-]*$/
 
@@ -10,9 +11,10 @@ export default class TestService extends cds.ApplicationService {
   async init() {
     const { TestCases } = this.entities
 
-    // starter template for new test cases (not for copies / test cases created from messages)
+    // starter template for new test cases (not for folders, copies or test cases created from messages)
     this.before('NEW', TestCases.drafts!, (req) => {
       const d = req.data as Partial<TestCaseRecord>
+      if (d.kind === 'FOLDER') return
       d.payload ??= STARTER_PAYLOAD
       d.correlationId ??= STARTER_CORRELATION_ID
     })
@@ -23,13 +25,40 @@ export default class TestService extends cds.ApplicationService {
       if (d.topic === undefined || d.name !== undefined) return
       const draft = (await SELECT.one
         .from(TestCases.drafts!)
-        .columns('name', 'topic')
-        .where({ ID: d.ID ?? keyOf(req).ID })) as { name?: string | null; topic?: string | null } | undefined
+        .columns('name', 'topic', 'kind')
+        .where({ ID: d.ID ?? keyOf(req).ID })) as { name?: string | null; topic?: string | null; kind?: string } | undefined
+      if (draft?.kind === 'FOLDER') return
       if (!draft?.name || draft.name === draft.topic) d.name = (d.topic ?? '').slice(0, 200)
+    })
+
+    // tree: parent must be a folder and must not be the node itself or below it; new nodes go to the end
+    this.before(['CREATE', 'UPDATE'], TestCases, async (req) => {
+      const d = req.data as TestCaseRecord & { sortOrder?: number | null }
+      const id = d.ID ?? keyOf(req).ID
+      if (d.parent_ID !== undefined && d.parent_ID !== null) {
+        const tree = await loadTree()
+        const parent = tree.byId.get(d.parent_ID)
+        if (!parent) return req.error(400, 'Parent folder not found', 'in/parent_ID')
+        if (parent.kind !== 'FOLDER') return req.error(400, 'Test cases can only be placed in folders', 'in/parent_ID')
+        if (id && tree.isWithin(d.parent_ID, id)) return req.error(400, 'A folder cannot be moved into itself', 'in/parent_ID')
+      }
+      if (req.event === 'CREATE' && !d.sortOrder) {
+        const siblings = (await SELECT.from('aem.suite.TestCases')
+          .columns('sortOrder')
+          .where({ parent_ID: d.parent_ID ?? null })) as { sortOrder: number | null }[]
+        d.sortOrder = Math.max(0, ...siblings.map((x) => x.sortOrder ?? 0)) + 10
+      }
     })
 
     this.before(['CREATE', 'UPDATE'], TestCases, (req) => {
       const d = req.data as TestCaseRecord
+      const isFolder = d.kind === 'FOLDER'
+      if (isFolder) {
+        if ((req.event === 'CREATE' || d.name !== undefined) && !d.name?.trim())
+          req.error(400, 'Folder name is required', 'in/name')
+      } else if (d.kind === 'TEST' || req.event === 'CREATE') {
+        if (!d.topic?.trim()) req.error(400, 'Topic is required', 'in/topic')
+      }
       // fill what was left empty
       if (!d.name && d.topic) d.name = d.topic.slice(0, 200)
       if (!d.contentType && d.payload !== undefined) d.contentType = detectContentType(d.payload)
@@ -71,10 +100,46 @@ export default class TestService extends cds.ApplicationService {
       })
     })
 
+    // drag & drop: place the node before NextSibling (null = at the end).
+    // Fiori sends the parent change (PATCH) in the same $batch change set, which may be processed
+    // concurrently - so the target parent is derived from NextSibling, not from the node itself.
+    this.on('moveBefore', TestCases, async (req) => {
+      const { ID } = keyOf(req)
+      const nextId = (req.data as { NextSibling?: { ID?: string } | null }).NextSibling?.ID ?? null
+      type Row = TreeNode & { modifiedAt: string; modifiedBy: string }
+      const cols = ['ID', 'parent_ID', 'kind', 'name', 'sortOrder', 'modifiedAt', 'modifiedBy']
+      const node = (await SELECT.one.from('aem.suite.TestCases').columns(...cols).where({ ID })) as Row | undefined
+      if (!node) return req.error(404, 'Node not found')
+      const keep = (r: Row) => ({ modifiedAt: r.modifiedAt, modifiedBy: r.modifiedBy }) // reordering is no content change
+
+      if (!nextId) {
+        // last position in whatever folder the node ends up in
+        const max = (await SELECT.one.from('aem.suite.TestCases').columns('max(sortOrder) as max')) as { max: number | null }
+        await UPDATE('aem.suite.TestCases', ID).with({ sortOrder: (max?.max ?? 0) + 10, ...keep(node) })
+        return
+      }
+      const next = (await SELECT.one.from('aem.suite.TestCases').columns('ID', 'parent_ID').where({ ID: nextId })) as
+        | { ID: string; parent_ID: string | null }
+        | undefined
+      if (!next) return req.error(404, 'Next sibling not found')
+      const siblings = ((await SELECT.from('aem.suite.TestCases')
+        .columns(...cols)
+        .where({ parent_ID: next.parent_ID ?? null })) as Row[])
+        .filter((x) => x.ID !== ID)
+        .sort(compareSiblings)
+      const order: Row[] = [...siblings]
+      order.splice(Math.max(0, siblings.findIndex((x) => x.ID === nextId)), 0, node)
+      for (const [i, row] of order.entries()) {
+        await UPDATE('aem.suite.TestCases', row.ID).with({ sortOrder: (i + 1) * 10, ...keep(row) })
+      }
+    })
+
     this.on('runTest', TestCases, async (req) => {
       const { brokerIds, credentials } = req.data as { brokerIds: string[]; credentials?: BrokerCredential[] }
       return startRun(req, [keyOf(req).ID], brokerIds, credentials)
     })
+
+    this.on('currentUser', (req) => req.user.id)
 
     this.on('runTests', async (req) => {
       const { testCaseIds, brokerIds, credentials } = req.data as {

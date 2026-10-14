@@ -35,6 +35,11 @@ type RunStatus      : String(10) enum {
   FAILED;
 }
 
+type NodeKind       : String(10) enum {
+  FOLDER;
+  TEST;
+}
+
 type ResultStatus   : String(10) enum {
   PENDING;
   PASSED;
@@ -77,12 +82,22 @@ entity Variables : cuid {
   value  : String(2000);
 }
 
+/**
+ * Test cases and folders in one tree (Fiori tree table).
+ * FOLDER nodes only use name, description, variables and children.
+ */
 entity TestCases : cuid, managed {
-  /** empty = taken from the topic */
+  kind           : NodeKind default 'TEST' @mandatory;
+  parent         : Association to TestCases;
+  children       : Composition of many TestCases
+                     on children.parent = $self;
+  /** order among siblings (drag & drop) */
+  sortOrder      : Integer default 0;
+  /** empty = taken from the topic (test cases) */
   name           : String(200);
   description    : String(1000);
-  /** topic template, e.g. acme/orders/{{region}}/created/v1/{{uuid}} */
-  topic          : String(500) @mandatory;
+  /** topic template, e.g. acme/orders/{{region}}/created/v1/{{uuid}} - required for test cases */
+  topic          : String(500);
   /** JSON payload template */
   payload        : LargeString;
   /** empty = detected from the payload on save (JSON or text) */
@@ -99,6 +114,19 @@ entity TestCases : cuid, managed {
                      on userProperties.testCase = $self;
   variables      : Composition of many TestCaseVariables
                      on variables.testCase = $self;
+  /** outcome of the latest run (kept separately, so runs do not touch modifiedAt) */
+  lastResult     : Association to one TestCaseStats
+                     on lastResult.testCase = $self;
+}
+
+/** Latest run outcome per test case - written by the test runner. */
+entity TestCaseStats {
+  key testCase  : Association to TestCases;
+      status    : ResultStatus; // PASSED if all brokers passed, else FAILED / ERROR
+      runAt     : Timestamp;
+      run       : Association to TestRuns;
+      brokers   : String(500);
+      message   : String(1000);
 }
 
 entity TestCaseProperties : cuid {
@@ -118,6 +146,8 @@ entity TestCaseVariables : cuid {
 }
 
 entity TestRuns : cuid, managed {
+  /** e.g. "Order created, Ping -> local-docker, aem-dev" */
+  summary     : String(500);
   startedAt   : Timestamp;
   finishedAt  : Timestamp;
   status      : RunStatus default 'RUNNING';

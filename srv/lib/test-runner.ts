@@ -3,6 +3,7 @@ import { BrokerRecord, loadBroker, needsPassword, resolveConnection } from './cr
 import type { Publisher } from './solace/session'
 import { connect, Connector, setConnector } from './solace/connector'
 import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord } from './test-case-spec'
+import { loadTree } from './tree'
 import { TemplateError } from './template/resolve'
 
 const LOG = cds.log('aem-runner')
@@ -25,6 +26,14 @@ interface PendingResult {
   ID: string
   testCase_ID: string
   broker_ID: string
+  brokerName: string
+}
+
+/** "A, B +3 more -> broker1, broker2" */
+function runSummary(testCaseNames: string[], brokerNames: string[]): string {
+  const list = (names: string[], max: number) =>
+    names.length > max ? `${names.slice(0, max).join(', ')} +${names.length - max} more` : names.join(', ')
+  return `${list(testCaseNames, 3)} → ${list(brokerNames, 3)}`.slice(0, 500)
 }
 
 /**
@@ -47,20 +56,23 @@ export function toPasswords(credentials?: BrokerCredential[] | null): Passwords 
 }
 
 export async function createRun(testCaseIds: string[], brokerIds: string[], passwords: Passwords = new Map()): Promise<string> {
-  const tcIds = [...new Set(testCaseIds ?? [])]
+  const selected = [...new Set(testCaseIds ?? [])]
   const brIds = [...new Set(brokerIds ?? [])]
-  if (!tcIds.length) throw httpError(400, 'Select at least one test case')
+  if (!selected.length) throw httpError(400, 'Select at least one test case or folder')
   if (!brIds.length) throw httpError(400, 'Select at least one broker')
 
-  const testCases = (await SELECT.from('aem.suite.TestCases').columns('ID', 'name').where({ ID: { in: tcIds } })) as {
-    ID: string
-    name: string
-  }[]
-  if (testCases.length !== tcIds.length) throw httpError(404, 'One or more test cases not found (save drafts first)')
+  // folders run all test cases below them (tree order)
+  const tree = await loadTree()
+  if (selected.some((id) => !tree.byId.has(id))) throw httpError(404, 'One or more test cases not found (save drafts first)')
+  const tcIds = tree.expandToTests(selected)
+  if (!tcIds.length) throw httpError(400, 'The selected folders contain no test cases')
+  const testCases = tcIds.map((id) => ({ ID: id, name: tree.byId.get(id)!.name ?? id }))
   const brokers = (await SELECT.from('aem.suite.Brokers').columns('ID', 'name', 'active', 'credentialMode').where({
     ID: { in: brIds }
   })) as { ID: string; name: string; active: boolean; credentialMode: string }[]
   if (brokers.length !== brIds.length) throw httpError(404, 'One or more brokers not found')
+  // keep the user's selection order (summary, results)
+  brokers.sort((a, b) => brIds.indexOf(a.ID) - brIds.indexOf(b.ID))
   const inactive = brokers.filter((b) => b.active === false).map((b) => b.name)
   if (inactive.length) throw httpError(400, `Broker(s) inactive: ${inactive.join(', ')}`)
   const missing = brokers.filter((b) => needsPassword(b) && !passwords.get(b.ID)).map((b) => b.name)
@@ -81,6 +93,10 @@ export async function createRun(testCaseIds: string[], brokerIds: string[], pass
   )
   await INSERT.into('aem.suite.TestRuns').entries({
     ID: runId,
+    summary: runSummary(
+      tcIds.map((id) => tcById.get(id)!.name),
+      brokers.map((b) => b.name)
+    ),
     startedAt: new Date().toISOString(),
     status: 'RUNNING',
     totalCount: results.length,
@@ -106,7 +122,7 @@ export function executeRunInBackground(runId: string, jwt?: string, passwords: P
 async function executeRun(runId: string, jwt: string | undefined, passwords: Passwords): Promise<void> {
   const live = await cds.connect.to('LiveService').catch(() => undefined)
   const pending = (await cds.db.tx(() =>
-    SELECT.from('aem.suite.RunResults').columns('ID', 'testCase_ID', 'broker_ID').where({ run_ID: runId })
+    SELECT.from('aem.suite.RunResults').columns('ID', 'testCase_ID', 'broker_ID', 'brokerName').where({ run_ID: runId })
   )) as PendingResult[]
 
   const total = pending.length
@@ -127,7 +143,13 @@ async function executeRun(runId: string, jwt: string | undefined, passwords: Pas
   }))
   const tcById = new Map(testCases.map((t) => [t.ID, t]))
 
+  // per test case: outcome over all brokers, for TestCaseStats
+  const perTestCase = new Map<string, { status: string; broker: string; error?: string }[]>()
+
   const finish = async (r: PendingResult, status: 'PASSED' | 'FAILED' | 'ERROR', data: Record<string, unknown>) => {
+    const outcomes = perTestCase.get(r.testCase_ID) ?? []
+    outcomes.push({ status, broker: r.brokerName, error: data.errorMessage as string | undefined })
+    perTestCase.set(r.testCase_ID, outcomes)
     counts.done++
     if (status === 'PASSED') counts.passed++
     else counts.failed++
@@ -195,8 +217,31 @@ async function executeRun(runId: string, jwt: string | undefined, passwords: Pas
       failedCount: counts.failed
     })
   )
+  await updateTestCaseStats(runId, perTestCase)
   await progress(undefined, 'DONE')
   LOG.info(`Run ${runId} finished: ${counts.passed}/${total} passed`)
+}
+
+/** Stores the latest outcome per test case: PASSED only if all brokers passed. */
+async function updateTestCaseStats(runId: string, perTestCase: Map<string, { status: string; broker: string; error?: string }[]>) {
+  const runAt = new Date().toISOString()
+  const rows = [...perTestCase].map(([testCaseId, outcomes]) => {
+    const bad = outcomes.filter((o) => o.status !== 'PASSED')
+    const status = !bad.length ? 'PASSED' : bad.some((o) => o.status === 'FAILED') ? 'FAILED' : 'ERROR'
+    return {
+      testCase_ID: testCaseId,
+      status,
+      runAt,
+      run_ID: runId,
+      brokers: outcomes.map((o) => o.broker).join(', ').slice(0, 500),
+      message: bad.length ? truncate(bad.map((o) => `${o.broker}: ${o.error ?? o.status}`).join('; '), 1000) : null
+    }
+  })
+  try {
+    await cds.db.tx(() => UPSERT.into('aem.suite.TestCaseStats').entries(rows))
+  } catch (e) {
+    LOG.warn('Cannot update test case stats', e)
+  }
 }
 
 function errMsg(e: unknown): string {

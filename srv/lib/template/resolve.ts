@@ -4,7 +4,8 @@ import { randomInt, randomUUID } from 'node:crypto'
  * Template syntax: {{name}} or {{fn(arg1, arg2)}}
  *
  * Lookup order for plain names (first match wins):
- *   1. test case variables   2. broker variables   3. global variables   4. built-ins
+ *   1. test case variables   2. broker variables   3. folder variables (inner before outer)
+ *   4. global variables      5. built-ins
  *
  * Built-ins are stable within one resolver instance (= one message), so {{uuid}} in
  * topic, payload and correlation id resolves to the same value. Use {{newUuid}} for a
@@ -15,6 +16,8 @@ import { randomInt, randomUUID } from 'node:crypto'
  */
 export interface TemplateScope {
   testCase?: Record<string, string>
+  /** variables of the enclosing folders, outermost first */
+  folders?: Record<string, string>[]
   broker?: Record<string, string>
   global?: Record<string, string>
   brokerInfo?: { id?: string; name?: string; msgVpn?: string }
@@ -37,7 +40,8 @@ export class TemplateResolver {
   private readonly vars: Record<string, string>
 
   constructor(scope: TemplateScope = {}, now = new Date()) {
-    this.vars = { ...scope.global, ...scope.broker, ...scope.testCase }
+    // precedence: global < folders (outer -> inner) < broker < test case
+    this.vars = Object.assign({}, scope.global, ...(scope.folders ?? []), scope.broker, scope.testCase)
     this.fixed = {
       uuid: randomUUID(),
       now: now.toISOString(),

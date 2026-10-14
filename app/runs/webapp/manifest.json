@@ -158,6 +158,15 @@
           }
         }
       }
+    },
+    "extends": {
+      "extensions": {
+        "sap.ui.controllerExtensions": {
+          "sap.fe.templates.ListReport.ListReportController#aem.suite.runs::TestRunsList": {
+            "controllerName": "aem.suite.runs.ext.MyEntriesFilter"
+          }
+        }
+      }
     }
   },
   "sap.fiori": {

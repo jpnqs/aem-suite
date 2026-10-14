@@ -2,9 +2,12 @@ import type { BrokerRecord } from './credentials/resolve'
 import type { PublishSpec, DeliveryMode } from './solace/session'
 import { TemplateResolver, TemplateScope, jsonError, TemplateError } from './template/resolve'
 import { detectContentType, inferPropertyType } from './defaults'
+import { loadTree, Tree } from './tree'
 
 export interface TestCaseRecord {
   ID: string
+  kind?: string
+  parent_ID?: string | null
   name: string
   topic: string
   payload?: string | null
@@ -38,11 +41,16 @@ export async function loadTestCases(ids: string[]): Promise<TestCaseRecord[]> {
   return ids.map((id) => byId.get(id)).filter((r): r is TestCaseRecord => !!r)
 }
 
-/** Global variables and per-broker variables for the given brokers. */
-export async function loadVariableScopes(brokerIds: string[]): Promise<{
+export interface VariableScopes {
   global: Record<string, string>
   byBroker: Map<string, Record<string, string>>
-}> {
+  /** folder ID -> its variables */
+  byFolder: Map<string, Record<string, string>>
+  tree: Tree
+}
+
+/** Global, per-broker and per-folder variables. */
+export async function loadVariableScopes(brokerIds: string[]): Promise<VariableScopes> {
   // variables are few - filter in memory
   const wanted = new Set(brokerIds)
   const rows = ((await SELECT.from('aem.suite.Variables').columns('name', 'value', 'broker_ID')) as VariableRow[]).filter(
@@ -58,16 +66,34 @@ export async function loadVariableScopes(brokerIds: string[]): Promise<{
       byBroker.set(r.broker_ID, m)
     }
   }
-  return { global, byBroker }
+
+  const tree = await loadTree()
+  const folderIds = [...tree.byId.values()].filter((n) => n.kind === 'FOLDER').map((n) => n.ID)
+  const byFolder = new Map<string, Record<string, string>>()
+  if (folderIds.length) {
+    const folderVars = (await SELECT.from('aem.suite.TestCaseVariables')
+      .columns('testCase_ID', 'name', 'value')
+      .where({ testCase_ID: { in: folderIds } })) as { testCase_ID: string; name: string; value?: string | null }[]
+    for (const v of folderVars) {
+      const m = byFolder.get(v.testCase_ID) ?? {}
+      m[v.name] = v.value ?? ''
+      byFolder.set(v.testCase_ID, m)
+    }
+  }
+  return { global, byBroker, byFolder, tree }
 }
 
 export function scopeFor(
   tc: TestCaseRecord,
   broker: Pick<BrokerRecord, 'ID' | 'name' | 'msgVpn'> | undefined,
-  vars: { global: Record<string, string>; byBroker: Map<string, Record<string, string>> }
+  vars: VariableScopes
 ): TemplateScope {
+  // folder chain: from the test case's parent (also for unsaved drafts) up to the root
+  const parentId = tc.parent_ID ?? undefined
+  const chain = parentId ? [...vars.tree.ancestors(parentId), vars.tree.byId.get(parentId)].filter(Boolean) : []
   return {
     global: vars.global,
+    folders: chain.map((f) => vars.byFolder.get(f!.ID) ?? {}),
     broker: broker ? vars.byBroker.get(broker.ID) : undefined,
     testCase: Object.fromEntries((tc.variables ?? []).map((v) => [v.name, v.value ?? ''])),
     brokerInfo: broker ? { id: broker.ID, name: broker.name, msgVpn: broker.msgVpn ?? '' } : undefined

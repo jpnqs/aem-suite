@@ -8,18 +8,61 @@ annotate service.TestCases with @(
     Description   : {Value: topic}
   },
   UI.SelectionFields   : [
+    createdBy,
     name,
     topic,
     deliveryMode
   ],
+  // folders first, then manual (drag & drop) order
+  UI.PresentationVariant: {
+    SortOrder     : [
+      {Property: kind},
+      {Property: sortOrder},
+      {Property: name}
+    ],
+    Visualizations: ['@UI.LineItem']
+  },
   UI.LineItem          : [
     {Value: name},
+    {Value: kind},
     {Value: topic},
+    {
+      Value      : lastResult.status,
+      Criticality: lastResult.criticality,
+      Label      : 'Last Result'
+    },
+    {
+      Value: lastResult.runAt,
+      Label: 'Last Run'
+    },
     {Value: deliveryMode},
-    {Value: description},
-    {Value: modifiedAt},
-    {Value: modifiedBy}
+    {Value: modifiedAt}
   ],
+  UI.HeaderFacets      : [{
+    $Type        : 'UI.ReferenceFacet',
+    Target       : '@UI.FieldGroup#LastResult',
+    Label        : 'Last Result',
+    ![@UI.Hidden]: (kind = 'FOLDER')
+  }],
+  UI.FieldGroup #LastResult: {Data: [
+    {
+      Value      : lastResult.status,
+      Criticality: lastResult.criticality,
+      Label      : 'Status'
+    },
+    {
+      Value: lastResult.runAt,
+      Label: 'Run At'
+    },
+    {
+      Value: lastResult.brokers,
+      Label: 'Brokers'
+    },
+    {
+      Value: lastResult.message,
+      Label: 'Problems'
+    }
+  ]},
   UI.FieldGroup #Advanced: {Data: [
     {Value: description},
     {Value: deliveryMode},
@@ -33,9 +76,10 @@ annotate service.TestCases with @(
   UI.Facets            : [
     // topic + name: custom section "message" (full width, see manifest)
     {
-      $Type : 'UI.CollectionFacet',
-      ID    : 'AdvancedSection',
-      Label : 'Advanced',
+      $Type        : 'UI.CollectionFacet',
+      ID           : 'AdvancedSection',
+      Label        : 'Advanced',
+      ![@UI.Hidden]: (kind = 'FOLDER'),
       Facets: [{
         $Type              : 'UI.ReferenceFacet',
         ID                 : 'Advanced',
@@ -45,20 +89,29 @@ annotate service.TestCases with @(
       }]
     },
     {
-      $Type : 'UI.ReferenceFacet',
-      ID    : 'UserProperties',
-      Target: 'userProperties/@UI.LineItem',
-      Label : 'User Properties'
+      $Type        : 'UI.ReferenceFacet',
+      ID           : 'UserProperties',
+      Target       : 'userProperties/@UI.LineItem',
+      Label        : 'User Properties',
+      ![@UI.Hidden]: (kind = 'FOLDER')
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Variables',
       Target: 'variables/@UI.LineItem',
-      Label : 'Local Variables'
+      Label : 'Variables'
     }
   ]
 ) {
-  name          @title: 'Name'  @Common.QuickInfo: 'Empty = topic';
+  name          @title: 'Name'  @Common.QuickInfo: 'Test cases: empty = topic';
+  kind          @title: 'Type'  @Core.Immutable
+                @Common.Text: {
+                  $value                : kindText,
+                  ![@UI.TextArrangement]: #TextOnly
+                };
+  kindText      @UI.Hidden;
+  sortOrder     @UI.Hidden;
+  parent        @UI.Hidden;
   description   @title: 'Description'  @UI.MultiLineText;
   topic         @title: 'Topic'  @UI.MultiLineText
                 @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. variable region or built-in uuid';
@@ -86,6 +139,7 @@ annotate service.TestCases with @(
   correlationId @title: 'Correlation ID'  @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. built-in uuid';
   ackTimeoutMs  @title: 'ACK Timeout (ms)';
   modifiedAt    @title: 'Changed At';
+  createdBy     @title: 'Created By'  @UI.HiddenFilter: false;
   modifiedBy    @title: 'Changed By';
 };
 

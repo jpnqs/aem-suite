@@ -3,10 +3,11 @@ sap.ui.define(
     "sap/m/MessageBox",
     "sap/m/MessageToast",
     "sap/ui/model/json/JSONModel",
+    "sap/ui/model/Filter",
     "aem/suite/testcases/ext/LiveSocket",
     "aem/suite/testcases/ext/Prefs"
   ],
-  function (MessageBox, MessageToast, JSONModel, LiveSocket, Prefs) {
+  function (MessageBox, MessageToast, JSONModel, Filter, LiveSocket, Prefs) {
     "use strict";
 
     /** Navigates to the run in the runs app (FLP intent or standalone app). */
@@ -17,6 +18,12 @@ sap.ui.define(
       } else {
         window.open("/runs/index.html#/TestRuns(" + runId + ")", "_blank");
       }
+    }
+
+    function showError(e) {
+      // eslint-disable-next-line no-console
+      console.error("[aem-suite] action failed", e);
+      MessageBox.error(errorText(e));
     }
 
     function errorText(e) {
@@ -32,6 +39,7 @@ sap.ui.define(
       var state = new JSONModel({
         label: label,
         credentials: [],
+        problems: [],
         runId: null,
         starting: false,
         total: 0,
@@ -49,7 +57,33 @@ sap.ui.define(
         state.setProperty("/passed", data.passed);
         state.setProperty("/failed", data.failed);
         state.setProperty("/finished", data.status === "DONE");
+        if (data.status === "DONE") {
+          loadProblems(data.runId);
+        }
       });
+
+      /** Failed / errored results of the run, shown directly in the dialog. */
+      function loadProblems(runId) {
+        if (!state.getProperty("/failed")) {
+          return;
+        }
+        model
+          .bindList("/RunResults", null, [], [new Filter("run_ID", "EQ", runId), new Filter("status", "NE", "PASSED")], {
+            $select: "testCaseName,brokerName,status,errorMessage"
+          })
+          .requestContexts(0, 50)
+          .then(function (contexts) {
+            state.setProperty(
+              "/problems",
+              contexts.map(function (c) {
+                return c.getObject();
+              })
+            );
+          })
+          .catch(function () {
+            /* details remain available in the results */
+          });
+      }
       var dialog;
       var preselected = false;
 
@@ -158,6 +192,7 @@ sap.ui.define(
                     state.setProperty("/passed", r.passedCount);
                     state.setProperty("/failed", r.failedCount);
                     state.setProperty("/finished", true);
+                    loadProblems(id);
                   }
                 });
               }, function () {
@@ -211,12 +246,12 @@ sap.ui.define(
           return;
         }
         var label = ids.length === 1 ? contexts[0].getProperty("name") : ids.length + " test cases";
-        return openRunDialog(this, ids, label);
+        return openRunDialog(this, ids, label).catch(showError);
       },
 
       /** Object page header action. */
       runFromObjectPage: function (context) {
-        return openRunDialog(this, [context.getProperty("ID")], context.getProperty("name"));
+        return openRunDialog(this, [context.getProperty("ID")], context.getProperty("name")).catch(showError);
       },
 
       /** Object page header action: resolves templates without sending. */

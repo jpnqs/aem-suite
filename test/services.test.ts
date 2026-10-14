@@ -47,6 +47,11 @@ describe('AEM test suite services', () => {
 
   afterAll(() => setPublisherFactory())
 
+  it('returns the logged-in user for the "my entries" filter', async () => {
+    const { data } = await GET('/odata/v4/test/currentUser()', tester)
+    expect(data.value).toBe('tester')
+  })
+
   it('denies admin service to testers', async () => {
     const res = await GET('/odata/v4/admin/Brokers', tester)
     expect(res.status).toBe(403)
@@ -225,6 +230,14 @@ describe('AEM test suite services', () => {
     const sent = published.find((p) => p.broker === 'dev')!.spec
     expect(sent.userProperties).toEqual([{ name: 'qty', type: 'INT', value: '5' }])
     expect(connectedWith.dev).toBe('pw-dev')
+    expect(run.summary).toBe('Order created → dev, unreachable')
+    // last result per test case: failed on one broker -> ERROR overall, with the reason
+    const { data: tc } = await GET(
+      `/odata/v4/test/TestCases(ID=${testCase.ID},IsActiveEntity=true)?$expand=lastResult`,
+      tester
+    )
+    expect(tc.lastResult).toMatchObject({ status: 'ERROR', criticality: 1, brokers: 'dev, unreachable' })
+    expect(tc.lastResult.message).toBe('unreachable: Connect failed: Unauthorized')
     // the password is not part of anything persisted for the run
     const rows = await SELECT.from('aem.suite.RunResults').where({ run_ID: runId })
     expect(JSON.stringify(rows)).not.toContain('pw-dev')
@@ -261,6 +274,10 @@ describe('AEM test suite services', () => {
     const { data } = await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${res.data.runId}`, tester)
     const statuses = data.value.map((r: { testCaseName: string; status: string }) => `${r.testCaseName}:${r.status}`).sort()
     expect(statuses).toEqual(['Order created:PASSED', 'rejected:FAILED'])
+    const { data: stats } = await GET('/odata/v4/test/TestCaseStats', tester)
+    const byCase = Object.fromEntries(stats.value.map((x: { testCase_ID: string; status: string }) => [x.testCase_ID, x.status]))
+    expect(byCase[testCase.ID]).toBe('PASSED')
+    expect(byCase[rejecting.ID]).toBe('FAILED')
   })
 
   it('validates run input', async () => {

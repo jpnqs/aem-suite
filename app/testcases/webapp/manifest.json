@@ -116,8 +116,21 @@
               "controlConfiguration": {
                 "@com.sap.vocabularies.UI.v1.LineItem": {
                   "tableSettings": {
-                    "type": "ResponsiveTable",
-                    "selectionMode": "Multi"
+                    "type": "TreeTable",
+                    "hierarchyQualifier": "TestTree",
+                    "selectionMode": "Multi",
+                    "isMoveToPositionAllowed": "aem.suite.testcases.ext.TreeRules.isMoveToPositionAllowed",
+                    "creationMode": {
+                      "name": "NewPage",
+                      "isCreateEnabled": "aem.suite.testcases.ext.TreeRules.isCreateEnabled",
+                      "nodeType": {
+                        "propertyName": "kind",
+                        "values": {
+                          "FOLDER": "Folder",
+                          "TEST": "Test Case"
+                        }
+                      }
+                    }
                   },
                   "actions": {
                     "runSelected": {
@@ -175,6 +188,18 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "extends": {
+      "extensions": {
+        "sap.ui.controllerExtensions": {
+          "sap.fe.templates.ObjectPage.ObjectPageController#aem.suite.testcases::TestCasesObjectPage": {
+            "controllerName": "aem.suite.testcases.ext.ObjectPageExt"
+          },
+          "sap.fe.templates.ListReport.ListReportController#aem.suite.testcases::TestCasesList": {
+            "controllerName": "aem.suite.testcases.ext.MyEntriesFilter"
           }
         }
       }

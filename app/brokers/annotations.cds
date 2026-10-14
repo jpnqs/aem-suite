@@ -13,16 +13,20 @@ annotate service.Brokers with @(
     lastConnectionStatus
   ],
   UI.LineItem                  : [
-    {Value: name},
-    {Value: credentialMode},
-    {Value: msgVpn},
+    {
+      Value                : name,
+      ![@UI.Importance]    : #High
+    },
+    {
+      Value                : lastConnectionStatus,
+      Criticality          : connectionCriticality,
+      ![@UI.Importance]    : #High
+    },
     {Value: url},
+    {Value: msgVpn},
+    {Value: credentialMode},
     {Value: destinationName},
     {Value: active},
-    {
-      Value      : lastConnectionStatus,
-      Criticality: connectionCriticality
-    },
     {Value: lastConnectionAt},
     {
       $Type : 'UI.DataFieldForAction',

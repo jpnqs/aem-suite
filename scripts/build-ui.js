@@ -38,4 +38,5 @@ for (const app of apps) {
   fs.cpSync(dist, path.join(target, app), { recursive: true })
 }
 fs.copyFileSync(path.join(appDir, 'launchpad.html'), path.join(target, 'launchpad.html'))
+fs.cpSync(path.join(appDir, 'appconfig'), path.join(target, 'appconfig'), { recursive: true })
 console.log(`\nAssembled ${apps.length} apps into ${path.relative(root, target)}: ${apps.join(', ')}`)

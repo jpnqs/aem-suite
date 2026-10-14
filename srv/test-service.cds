@@ -6,7 +6,16 @@ using {aem.suite as db} from '../db/schema';
 service TestService {
 
   @odata.draft.enabled
-  entity TestCases as projection on db.TestCases
+  entity TestCases as
+    projection on db.TestCases {
+      *,
+      case kind when 'FOLDER' then 'Folder' else 'Test Case' end as kindText : String(20),
+      // computed by CAP for hierarchy requests of the tree table
+      null as LimitedDescendantCount : Int16,
+      null as DistanceFromRoot       : Int16,
+      null as DrillState             : String,
+      null as LimitedRank            : Int16
+    }
     actions {
       /** Runs this test case against the given brokers. Returns the started run (executes asynchronously). */
       @Core.OperationAvailable: in.IsActiveEntity
@@ -17,7 +26,47 @@ service TestService {
 
       @Core.OperationAvailable: in.IsActiveEntity
       action duplicate() returns TestCases;
+
+      /** Drag & drop ordering (Hierarchy ChangeNextSiblingAction): place this node before NextSibling (null = last). */
+      action moveBefore(NextSibling : SiblingKey);
     };
+
+  type SiblingKey {
+    ID             : UUID;
+    IsActiveEntity : Boolean;
+  }
+
+  // ---- tree table (CAP hierarchy support) ----
+  annotate TestCases with @(
+    Aggregation.RecursiveHierarchy #TestTree    : {
+      $Type                   : 'Aggregation.RecursiveHierarchyType',
+      NodeProperty            : ID,
+      ParentNavigationProperty: parent
+    },
+    Hierarchy.RecursiveHierarchy #TestTree      : {
+      $Type                 : 'Hierarchy.RecursiveHierarchyType',
+      LimitedDescendantCount: LimitedDescendantCount,
+      DistanceFromRoot      : DistanceFromRoot,
+      DrillState            : DrillState,
+      LimitedRank           : LimitedRank
+    },
+    Hierarchy.RecursiveHierarchyActions #TestTree: {
+      $Type                  : 'Hierarchy.RecursiveHierarchyActionsType',
+      ChangeNextSiblingAction: 'TestService.moveBefore'
+    },
+    Capabilities.FilterRestrictions.NonFilterableProperties: [
+      'LimitedDescendantCount',
+      'DistanceFromRoot',
+      'DrillState',
+      'LimitedRank'
+    ],
+    Capabilities.SortRestrictions.NonSortableProperties    : [
+      'LimitedDescendantCount',
+      'DistanceFromRoot',
+      'DrillState',
+      'LimitedRank'
+    ]
+  );
 
   @readonly
   entity Brokers as
@@ -38,6 +87,11 @@ service TestService {
   entity TestRuns as
     projection on db.TestRuns {
       *,
+      case
+        when status = 'RUNNING' then 'RUNNING'
+        when failedCount > 0    then 'FAILED'
+        else 'PASSED'
+      end as outcome : String(10),
       case status
         when 'DONE'   then (case when failedCount > 0 then 1 else 3 end)
         when 'FAILED' then 1
@@ -58,10 +112,25 @@ service TestService {
     };
 
   @readonly
+  entity TestCaseStats as
+    projection on db.TestCaseStats {
+      *,
+      case status
+        when 'PASSED' then 3
+        when 'FAILED' then 1
+        when 'ERROR'  then 1
+        else 0
+      end as criticality : Integer
+    };
+
+  @readonly
   entity DeliveryModes as projection on db.DeliveryModes;
 
   @readonly
   entity PropertyTypes as projection on db.PropertyTypes;
+
+  /** ID of the logged-in user - used to prefill "Created by" / "Started by" filters. */
+  function currentUser() returns String;
 
   /** Runs several test cases against several brokers in one run. */
   action runTests(testCaseIds : many UUID not null, brokerIds : many UUID not null, credentials : many BrokerCredential) returns RunRef;

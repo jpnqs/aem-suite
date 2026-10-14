@@ -42,9 +42,19 @@ HANA Cloud · Destination service · XSUAA
 - **Content type / property type**: left empty, they're detected on save (`{`/`[` gives JSON, otherwise text; `42` gives INT, `true` gives BOOL, otherwise STRING).
 - **Remembered per browser**: the Run dialog preselects the last brokers (or the only one), Preview preselects a broker, and the subscriber restores broker, mode, topics and queue.
 
+## Folders
+
+The test case list is a tree table with nested **folders**:
+
+- **Create**: "Create" offers *Folder* or *Test Case*. A new node is created below the selected folder.
+- **Arrange**: drag & drop (or Cut/Paste, Move Up/Down) moves nodes into folders and orders siblings. Folders are always listed before test cases. Nodes can only be placed in folders, and a folder cannot be moved into itself.
+- **Folder variables** apply to all test cases inside the folder and its subfolders.
+- **Run a folder**: "Run…" on a folder (list or object page) runs every test case below it, in tree order.
+- **Delete** a folder to delete its whole content.
+
 ## Templates
 
-`{{name}}` is looked up in this order: **test case variables, then broker variables, then global variables, then built-ins**. Variables can reference other variables.
+`{{name}}` is looked up in this order: **test case variables, then broker variables, then folder variables (inner folder first), then global variables, then built-ins**. Variables can reference other variables.
 
 | Built-in | Value |
 |---|---|

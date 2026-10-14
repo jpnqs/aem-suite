@@ -4,8 +4,8 @@ annotate service.TestRuns with @(
   UI.HeaderInfo        : {
     TypeName      : 'Test Run',
     TypeNamePlural: 'Test Runs',
-    Title         : {Value: createdAt},
-    Description   : {Value: createdBy}
+    Title         : {Value: summary},
+    Description   : {Value: createdAt}
   },
   UI.PresentationVariant: {
     SortOrder     : [{
@@ -15,17 +15,18 @@ annotate service.TestRuns with @(
     Visualizations: ['@UI.LineItem']
   },
   UI.SelectionFields   : [
-    status,
     createdBy,
+    status,
     createdAt
   ],
   UI.LineItem          : [
     {Value: createdAt},
-    {Value: createdBy},
+    {Value: summary},
     {
-      Value      : status,
+      Value      : outcome,
       Criticality: statusCriticality
     },
+    {Value: createdBy},
     {Value: totalCount},
     {Value: passedCount},
     {Value: failedCount},
@@ -38,7 +39,7 @@ annotate service.TestRuns with @(
   }],
   UI.FieldGroup #Summary: {Data: [
     {
-      Value      : status,
+      Value      : outcome,
       Criticality: statusCriticality
     },
     {Value: totalCount},
@@ -55,10 +56,13 @@ annotate service.TestRuns with @(
   }]
 ) {
   createdAt         @title: 'Started';
-  createdBy         @title: 'Started By';
+  summary           @title: 'Test Cases → Brokers';
+  createdBy         @title: 'Started By'  @UI.HiddenFilter: false;
+  createdAt         @UI.HiddenFilter: false;
   startedAt         @title: 'Started At';
   finishedAt        @title: 'Finished At';
-  status            @title: 'Status';
+  status            @title: 'Run Status';
+  outcome           @title: 'Result';
   totalCount        @title: 'Total';
   passedCount       @title: 'Passed';
   failedCount       @title: 'Failed / Error';
