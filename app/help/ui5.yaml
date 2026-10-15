@@ -1,0 +1,7 @@
+specVersion: "4.0"
+metadata:
+  name: com.aem.suite.help
+type: application
+customConfiguration:
+  cds-plugin-ui5:
+    mountPath: /help

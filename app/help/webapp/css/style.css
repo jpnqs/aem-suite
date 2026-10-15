@@ -1,0 +1,177 @@
+/* Help app - theme aware (SAP theming parameters only) */
+
+.aemHelpPage {
+  background: var(--sapBackgroundColor);
+}
+
+/* navigation */
+.aemHelpNav {
+  background: var(--sapList_Background);
+  border-right: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.aemHelpSearch {
+  padding: 1rem 1rem 0.5rem;
+}
+
+.aemHelpHint {
+  color: var(--sapContent_LabelColor);
+  font-size: var(--sapFontSmallSize);
+}
+
+.aemHelpSideNav {
+  width: 100%;
+}
+
+/* article */
+.aemHelpContent {
+  background: var(--sapBackgroundColor);
+}
+
+.aemHelpArticle {
+  max-width: 56rem;
+  padding: 1.5rem 2.5rem 3rem;
+  margin: 0 auto;
+}
+
+.aemHelpArticle h1,
+.aemHelpArticle h2,
+.aemHelpArticle h3,
+.aemHelpArticle h4 {
+  color: var(--sapHeaderColor, var(--sapTextColor));
+  font-family: var(--sapFontHeaderFamily);
+  scroll-margin-top: 1rem;
+}
+
+.aemHelpArticle h1 {
+  font-size: 2rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.aemHelpArticle h2 {
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.aemHelpArticle h3 {
+  font-size: 1.15rem;
+  margin: 2rem 0 0.75rem;
+}
+
+.aemHelpArticle h4 {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.aemHelpArticle p,
+.aemHelpArticle li {
+  line-height: 1.6;
+  color: var(--sapTextColor);
+}
+
+.aemHelpArticle ul,
+.aemHelpArticle ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.aemHelpArticle li {
+  margin: 0.25rem 0;
+}
+
+.aemHelpArticle a {
+  color: var(--sapLinkColor);
+}
+
+.aemHelpArticle a:hover {
+  color: var(--sapLink_Hover_Color);
+}
+
+.aemHelpArticle blockquote {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 0.25rem solid var(--sapInformationBorderColor);
+  background: var(--sapInformationBackground);
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.aemHelpArticle blockquote p {
+  margin: 0.25rem 0;
+}
+
+.aemHelpArticle code {
+  font-family: var(--sapFontMonospaceFamily, ui-monospace, Consolas, monospace);
+  font-size: 0.875em;
+  padding: 0.1rem 0.35rem;
+  background: var(--sapShell_Background, var(--sapBackgroundColor));
+  border: 1px solid var(--sapGroup_ContentBorderColor);
+  border-radius: 0.25rem;
+}
+
+.aemHelpArticle pre {
+  margin: 1rem 0;
+  padding: 1rem;
+  overflow-x: auto;
+  background: var(--sapList_Background);
+  border: 1px solid var(--sapGroup_ContentBorderColor);
+  border-radius: 0.5rem;
+}
+
+.aemHelpArticle pre code {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.aemHelpArticle .aemDocTable {
+  margin: 1rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--sapGroup_ContentBorderColor);
+  border-radius: 0.5rem;
+  background: var(--sapList_Background);
+}
+
+.aemHelpArticle table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.aemHelpArticle th,
+.aemHelpArticle td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--sapList_BorderColor, var(--sapGroup_ContentBorderColor));
+}
+
+.aemHelpArticle th {
+  background: var(--sapList_HeaderBackground);
+  color: var(--sapList_HeaderTextColor);
+  font-weight: 600;
+}
+
+.aemHelpArticle tr:last-child td {
+  border-bottom: 0;
+}
+
+.aemHelpArticle mark.aemHit {
+  background: var(--sapHighlightColor, #ffe08a);
+  color: var(--sapHighlightTextColor, inherit);
+  border-radius: 0.15rem;
+  padding: 0 0.1rem;
+}
+
+/* "next" stays on the right, also without a "previous" button */
+.aemHelpNext {
+  margin-left: auto;
+}
+
+.aemHelpPager {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sapGroup_ContentBorderColor);
+}

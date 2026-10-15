@@ -1,0 +1,74 @@
+<mvc:View
+  controllerName="com.aem.suite.help.controller.Main"
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  displayBlock="true"
+  height="100%">
+  <Page showHeader="false" enableScrolling="false" class="aemHelpPage">
+    <FlexBox height="100%" width="100%" fitContainer="true" alignItems="Stretch">
+      <!-- table of contents + search -->
+      <VBox width="20rem" height="100%" class="aemHelpNav">
+        <VBox class="aemHelpSearch">
+          <SearchField
+            placeholder="Search the help"
+            value="{doc>/query}"
+            liveChange=".onSearch"
+            search=".onSearch"
+            width="100%" />
+          <Text text="{doc>/matches}" visible="{= !!${doc>/matches} }" class="aemHelpHint sapUiTinyMarginTop" />
+        </VBox>
+        <ScrollContainer vertical="true" height="100%">
+          <layoutData>
+            <FlexItemData growFactor="1" />
+          </layoutData>
+          <tnt:SideNavigation expanded="true" selectedKey="{doc>/selectedKey}" class="aemHelpSideNav">
+            <tnt:NavigationList items="{path: 'doc>/nav', templateShareable: false}" itemSelect=".onNavSelect">
+              <tnt:NavigationListItem
+                text="{doc>title}"
+                key="{doc>key}"
+                expanded="{doc>expanded}"
+                items="{path: 'doc>items', templateShareable: false}">
+                <tnt:NavigationListItem text="{doc>title}" key="{doc>key}" />
+              </tnt:NavigationListItem>
+            </tnt:NavigationList>
+          </tnt:SideNavigation>
+        </ScrollContainer>
+      </VBox>
+
+      <!-- the section -->
+      <ScrollContainer id="scroll" vertical="true" height="100%" width="100%" class="aemHelpContent">
+        <layoutData>
+          <FlexItemData growFactor="1" />
+        </layoutData>
+        <VBox class="aemHelpArticle">
+          <MessageStrip
+            text="{doc>/error}"
+            type="Error"
+            showIcon="true"
+            visible="{= !!${doc>/error} }"
+            class="sapUiSmallMarginBottom" />
+          <BusyIndicator visible="{= !${doc>/ready} &amp;&amp; !${doc>/error} }" size="2rem" class="sapUiMediumMargin" />
+          <core:HTML id="article" content="{doc>/current/html}" afterRendering=".onArticleRendered" />
+          <HBox justifyContent="SpaceBetween" class="aemHelpPager" visible="{= !!${doc>/current} }">
+            <Button
+              text="{doc>/prev/title}"
+              icon="sap-icon://navigation-left-arrow"
+              type="Transparent"
+              visible="{= !!${doc>/prev} }"
+              press=".onPrev" />
+            <Button
+              text="{doc>/next/title}"
+              icon="sap-icon://navigation-right-arrow"
+              iconFirst="false"
+              type="Transparent"
+              visible="{= !!${doc>/next} }"
+              press=".onNext"
+              class="aemHelpNext" />
+          </HBox>
+        </VBox>
+      </ScrollContainer>
+    </FlexBox>
+  </Page>
+</mvc:View>
