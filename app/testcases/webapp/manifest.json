@@ -157,6 +157,16 @@
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.copySelected",
                       "text": "Copy",
                       "requiresSelection": true
+                    },
+                    "exportSelected": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.exportSelected",
+                      "text": "Export",
+                      "requiresSelection": false
+                    },
+                    "importFile": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.importFile",
+                      "text": "Import",
+                      "requiresSelection": false
                     }
                   }
                 }
@@ -183,6 +193,11 @@
                     "copy": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.copyFromObjectPage",
                       "text": "Copy",
+                      "visible": "{= ${IsActiveEntity} === true }"
+                    },
+                    "export": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.exportFromObjectPage",
+                      "text": "Export",
                       "visible": "{= ${IsActiveEntity} === true }"
                     },
                     "preview": {

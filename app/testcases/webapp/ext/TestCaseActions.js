@@ -269,7 +269,141 @@ sap.ui.define(
       return copies.length === 1 ? 'Copied as "' + copies[0].name + '"' : copies.length + " copies created";
     }
 
+    /** Calls an unbound action of the service and resolves with its result. */
+    function callAction(api, path, params) {
+      var op = api.getModel().bindContext(path);
+      Object.keys(params).forEach(function (key) {
+        op.setParameter(key, params[key]);
+      });
+      return op.invoke().then(function () {
+        var result = op.getBoundContext().getObject();
+        op.destroy();
+        return result;
+      });
+    }
+
+    /** "2 folders and 5 test cases" */
+    function describeCounts(r) {
+      var parts = [];
+      if (r.folders) {
+        parts.push(r.folders + (r.folders === 1 ? " folder" : " folders"));
+      }
+      if (r.testCases) {
+        parts.push(r.testCases + (r.testCases === 1 ? " test case" : " test cases"));
+      }
+      return parts.join(" and ") || "nothing";
+    }
+
+    /** Lets the browser save text as a file. */
+    function download(filename, text) {
+      var url = URL.createObjectURL(new window.Blob([text], { type: "application/json" }));
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(function () {
+        URL.revokeObjectURL(url);
+      }, 1000);
+    }
+
+    /** Opens the file chooser; resolves with { name, text } or null if nothing was chosen. */
+    function pickJsonFile() {
+      return new Promise(function (resolve) {
+        var input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.addEventListener("change", function () {
+          var file = input.files && input.files[0];
+          if (!file) {
+            resolve(null);
+            return;
+          }
+          file.text().then(function (text) {
+            resolve({ name: file.name, text: text });
+          });
+        });
+        input.addEventListener("cancel", function () {
+          resolve(null);
+        });
+        input.click();
+      });
+    }
+
+    function exportNodes(api, ids) {
+      return callAction(api, "/exportNodes(...)", { ids: ids }).then(function (result) {
+        download(result.filename, result.content);
+        MessageToast.show("Exported " + describeCounts(result) + " to " + result.filename);
+      });
+    }
+
+    function activeIds(contexts) {
+      return (contexts || [])
+        .filter(function (c) {
+          return c.getProperty("IsActiveEntity") !== false;
+        })
+        .map(function (c) {
+          return c.getProperty("ID");
+        });
+    }
+
     return {
+      /** List report toolbar action: saves the selected test cases / folders (everything if nothing is selected) as a JSON file. */
+      exportSelected: function (context, selectedContexts) {
+        return exportNodes(this, activeIds(selectedContexts)).catch(showError);
+      },
+
+      /** Object page header action: saves this test case or folder (with everything below) as a JSON file. */
+      exportFromObjectPage: function (context) {
+        return exportNodes(this, [context.getProperty("ID")]).catch(showError);
+      },
+
+      /**
+       * List report toolbar action: imports a JSON file as new test cases and folders. They go into the selected
+       * folder (if exactly one folder is selected), otherwise to the top level. The file is checked first, then
+       * the user confirms.
+       */
+      importFile: function (context, selectedContexts) {
+        var api = this;
+        var selected = selectedContexts || [];
+        var target = selected.length === 1 && selected[0].getProperty("kind") === "FOLDER" ? selected[0].getProperty("ID") : null;
+        return pickJsonFile()
+          .then(function (file) {
+            if (!file) {
+              return undefined;
+            }
+            return callAction(api, "/importNodes(...)", { content: file.text, parentId: target, dryRun: true })
+              .then(function (check) {
+                return new Promise(function (resolve) {
+                  MessageBox.confirm(
+                    "Import " + describeCounts(check) + ' from "' + file.name + '" into ' +
+                      (check.target ? 'the folder "' + check.target + '"' : "the top level") + "?\n\n" +
+                      "They are added as new items. Existing test cases and folders are not changed.",
+                    {
+                      title: "Import",
+                      actions: ["Import", MessageBox.Action.CANCEL],
+                      emphasizedAction: "Import",
+                      onClose: function (action) {
+                        resolve(action === "Import");
+                      }
+                    }
+                  );
+                });
+              })
+              .then(function (confirmed) {
+                if (!confirmed) {
+                  return undefined;
+                }
+                return callAction(api, "/importNodes(...)", { content: file.text, parentId: target, dryRun: false }).then(function (result) {
+                  MessageToast.show("Imported " + describeCounts(result));
+                  return api.refresh();
+                });
+              });
+          })
+          .catch(showError);
+      },
+
       /** List report toolbar action (multi selection): copies the selected test cases and folders. */
       copySelected: function (context, selectedContexts) {
         var api = this;
