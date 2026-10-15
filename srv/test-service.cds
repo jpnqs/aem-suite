@@ -103,6 +103,13 @@ service TestService {
   entity RunResults as
     projection on db.RunResults {
       *,
+      // run data, so the result list can be filtered and sorted by it
+      run.createdAt as runStartedAt,
+      run.createdBy as runStartedBy,
+      // navigation targets (launchpad intents) for the link columns
+      '#AEMSuiteTestCases-manage&/TestCases(ID=' || testCase.ID || ',IsActiveEntity=true)' as testCaseLink : String,
+      '#AEMSuiteBrokers-manage&/Brokers(ID=' || broker.ID || ',IsActiveEntity=true)'       as brokerLink   : String,
+      '#AEMSuiteTestRuns-display&/TestRuns(' || run.ID || ')'                              as runLink      : String,
       case status
         when 'PASSED' then 3
         when 'FAILED' then 1

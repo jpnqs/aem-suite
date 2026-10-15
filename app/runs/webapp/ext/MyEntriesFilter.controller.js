@@ -34,11 +34,11 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension"], function (ControllerExten
           Promise.all([userPromise, filterBar.initialized()])
             .then(function (results) {
               var user = results[0] && results[0].value;
-              var existing = filterBar.getFilterConditions().createdBy;
+              var existing = filterBar.getFilterConditions().runStartedBy;
               if (!user || (existing && existing.length)) {
                 return undefined;
               }
-              return api.setFilterValues("createdBy", "EQ", user).then(function () {
+              return api.setFilterValues("runStartedBy", "EQ", user).then(function () {
                 return filterBar.triggerSearch();
               });
             })

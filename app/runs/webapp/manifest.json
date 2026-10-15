@@ -86,8 +86,13 @@
       "routes": [
         {
           "pattern": ":?query:",
-          "name": "TestRunsList",
-          "target": "TestRunsList"
+          "name": "RunResultsList",
+          "target": "RunResultsList"
+        },
+        {
+          "pattern": "RunResults({key}):?query:",
+          "name": "RunResultsRootPage",
+          "target": "RunResultsRootPage"
         },
         {
           "pattern": "TestRuns({key}):?query:",
@@ -101,19 +106,19 @@
         }
       ],
       "targets": {
-        "TestRunsList": {
+        "RunResultsList": {
           "type": "Component",
-          "id": "TestRunsList",
+          "id": "RunResultsList",
           "name": "sap.fe.templates.ListReport",
           "options": {
             "settings": {
-              "contextPath": "/TestRuns",
+              "contextPath": "/RunResults",
               "variantManagement": "Page",
               "initialLoad": "Enabled",
               "navigation": {
-                "TestRuns": {
+                "RunResults": {
                   "detail": {
-                    "route": "TestRunsObjectPage"
+                    "route": "RunResultsRootPage"
                   }
                 }
               },
@@ -125,6 +130,17 @@
                   }
                 }
               }
+            }
+          }
+        },
+        "RunResultsRootPage": {
+          "type": "Component",
+          "id": "RunResultsRootPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "editableHeaderContent": false,
+              "contextPath": "/RunResults"
             }
           }
         },
@@ -162,8 +178,8 @@
     "extends": {
       "extensions": {
         "sap.ui.controllerExtensions": {
-          "sap.fe.templates.ListReport.ListReportController#aem.suite.runs::TestRunsList": {
-            "controllerName": "aem.suite.runs.ext.MyEntriesFilter"
+          "sap.fe.templates.ListReport.ListReportController#com.aem.suite.runs::RunResultsList": {
+            "controllerName": "com.aem.suite.runs.ext.MyEntriesFilter"
           }
         }
       }

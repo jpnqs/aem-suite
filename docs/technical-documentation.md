@@ -252,7 +252,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | App (`app/…`) | Type | Highlights |
 |---|---|---|
 | `testcases` | Fiori elements LR/OP | **Tree table** (`hierarchyQualifier: TestTree`, create menu Folder/Test Case, drag & drop, Cut/Paste, Move Up/Down); custom sections `MessageSection` (full-width topic + name) and `PayloadSection` (`sap.ui.codeeditor` JSON editor, validation, format, template help); custom actions *Run…* and *Preview*. |
-| `runs` | Fiori elements LR/OP | Runs with summary/outcome, results sub object page. |
+| `runs` | Fiori elements LR/OP | List on `RunResults` (one row per test case × broker, filters for test case, broker, status, started by/at); link columns to the test case, broker and run (`testCaseLink`, `brokerLink`, `runLink` in `TestService.RunResults` are launchpad intents). Run page (`TestRuns`) with totals and its results. |
 | `subscriber` | Freestyle UI5, **TypeScript** | Live subscriptions over WebSocket, message list (batched, max. 500), detail panel, save / save as test case. |
 | `messages` | Fiori elements | Saved messages, *Create Test Case*. |
 | `brokers`, `variables` | Fiori elements | Admin apps. |

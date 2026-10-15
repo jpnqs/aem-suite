@@ -51,7 +51,7 @@ annotate service.TestRuns with @(
   UI.Facets            : [{
     $Type : 'UI.ReferenceFacet',
     ID    : 'Results',
-    Target: 'results/@UI.LineItem',
+    Target: 'results/@UI.LineItem#Run',
     Label : 'Results'
   }]
 ) {
@@ -76,16 +76,70 @@ annotate service.RunResults with @(
     Title         : {Value: testCaseName},
     Description   : {Value: brokerName}
   },
+  // main list of the app: one row per test case x broker
   UI.PresentationVariant: {
     SortOrder     : [
+      {
+        Property  : runStartedAt,
+        Descending: true
+      },
       {Property: brokerName},
       {Property: testCaseName}
     ],
     Visualizations: ['@UI.LineItem']
   },
+  UI.SelectionFields   : [
+    testCaseName,
+    brokerName,
+    status,
+    runStartedBy,
+    runStartedAt
+  ],
   UI.LineItem          : [
-    {Value: brokerName},
-    {Value: testCaseName},
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: runStartedAt,
+      Url  : runLink
+    },
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: testCaseName,
+      Url  : testCaseLink
+    },
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: brokerName,
+      Url  : brokerLink
+    },
+    {
+      Value      : status,
+      Criticality: statusCriticality
+    },
+    {Value: ackLatencyMs},
+    {Value: deliveryMode},
+    {Value: resolvedTopic},
+    {Value: errorMessage},
+    {Value: runStartedBy}
+  ],
+  // results table on the run page (run columns would be redundant there)
+  UI.PresentationVariant #Run: {
+    SortOrder     : [
+      {Property: brokerName},
+      {Property: testCaseName}
+    ],
+    Visualizations: ['@UI.LineItem#Run']
+  },
+  UI.LineItem #Run     : [
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: testCaseName,
+      Url  : testCaseLink
+    },
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: brokerName,
+      Url  : brokerLink
+    },
     {
       Value      : status,
       Criticality: statusCriticality
@@ -109,8 +163,22 @@ annotate service.RunResults with @(
     {Value: executedAt}
   ]},
   UI.FieldGroup #Message: {Data: [
-    {Value: brokerName},
-    {Value: testCaseName},
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: testCaseName,
+      Url  : testCaseLink
+    },
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: brokerName,
+      Url  : brokerLink
+    },
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: runStartedAt,
+      Url  : runLink
+    },
+    {Value: runStartedBy},
     {Value: deliveryMode},
     {Value: resolvedTopic},
     {Value: correlationId},
@@ -142,7 +210,12 @@ annotate service.RunResults with @(
   correlationId     @title: 'Correlation ID';
   errorMessage      @title: 'Error';
   executedAt        @title: 'Executed At';
+  runStartedAt      @title: 'Run Started'  @UI.HiddenFilter: false;
+  runStartedBy      @title: 'Started By'  @UI.HiddenFilter: false;
   statusCriticality @UI.Hidden;
+  testCaseLink      @UI.Hidden  @UI.HiddenFilter;
+  brokerLink        @UI.Hidden  @UI.HiddenFilter;
+  runLink           @UI.Hidden  @UI.HiddenFilter;
   run               @UI.Hidden;
   testCase          @UI.Hidden;
   broker            @UI.Hidden;

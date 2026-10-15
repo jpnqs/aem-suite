@@ -181,15 +181,15 @@ PASSED means the broker accepted the message. It does not check whether a consum
 
 ## 7. Check results
 
-**Test Runs** lists all runs, newest first:
+**Test Runs** lists one row per test case × broker, newest run first:
 
-- **Test Cases → Brokers**: what was run where (e.g. `Order created, Ping → dev, qa-eu`)
-- **Result**: PASSED / FAILED / RUNNING
-- Started By, totals, Finished At
+- **Test Case** and **Broker** are separate columns and separate filters. Click a name to open that test case or broker configuration (the *Brokers* app needs the Admin role).
+- **Status**: PASSED / FAILED / ERROR, with **ACK latency**, delivery mode, the resolved topic and the error message
+- **Run Started** (click to open the whole run with its totals) and **Started By**
 
 The list opens with **your** runs ("Started By" filter); remove the filter to see all runs.
 
-Open a run to see one row per test case × broker with status, **ACK latency**, delivery mode, the resolved topic and the error message. Open a row to see the **resolved payload** that was actually sent.
+Open a row to see the **resolved payload** that was actually sent. Open the run (click *Run Started*) to see all results of that run together with its totals.
 
 The **Last Result** of each test case is also shown in the test case list and in the header of the test case page.
 
