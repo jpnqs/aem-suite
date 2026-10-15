@@ -63,7 +63,7 @@ describe('AEM test suite services', () => {
   it('creates direct brokers without storing any password', async () => {
     const { data: draft } = await POST(
       '/odata/v4/admin/Brokers',
-      { name: 'dev', credentialMode: 'DIRECT', url: 'dev.example', msgVpn: 'dev-vpn' },
+      { name: 'dev', credentialMode: 'DIRECT', url: 'dev.example', msgVpn: 'dev-vpn', username: 'solace-cloud-client' },
       admin
     )
     expect(draft.username).toBe('solace-cloud-client')
@@ -257,14 +257,14 @@ describe('AEM test suite services', () => {
   })
 
   it('asks for a username only for direct brokers without a maintained one', async () => {
-    // the username is optional on the broker
+    // the username is optional on the broker and has no default value
     const noUser = await createActive('admin', 'Brokers', {
       name: 'no-user',
       credentialMode: 'DIRECT',
       url: 'nouser.example',
-      msgVpn: 'v',
-      username: null
+      msgVpn: 'v'
     })
+    expect(noUser.username ?? null).toBeNull()
     // the test case needs {{region}}
     await INSERT.into('aem.suite.Variables').entries({ broker_ID: noUser.ID, name: 'region', value: 'eu' })
     try {

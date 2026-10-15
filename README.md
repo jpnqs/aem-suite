@@ -40,7 +40,7 @@ HANA Cloud · Destination service · XSUAA
 ## Defaults and automatic settings
 
 - **Broker URL**: the host is enough. `mr-xyz.messaging.solace.cloud` becomes `wss://…:443`. With port `55443` you get `tcps://`, with `55555` `tcp://`, and with `8008` `ws://`. `https://` is mapped to `wss://`.
-- **Username** defaults to `solace-cloud-client` (the AEM standard). It is optional: clear it and the username is asked for together with the password.
+- **Username** is optional and empty by default (the AEM standard is `solace-cloud-client`). If a direct broker has no username, it is asked for together with the password.
 - **Password (direct brokers)**: not part of the broker configuration. The Run dialog shows one password field per selected direct broker (plus a username field if the broker has no username); Test Connection and the subscriber ask for them too. It's sent with that request only, held in server memory while the run or subscription lasts, and never written to the database, logs or browser storage.
 - **Connection test on save** (destination brokers only, since direct brokers have no stored password): every save of an active destination broker tests the connection (max. 5 s) and shows the result. Turn it off with `cds.aemSuite.autoTestConnection: false`.
 - **Destination**: in destination mode, a dropdown lists the BTP destinations (or env `destinations` locally) with URL and message VPN.

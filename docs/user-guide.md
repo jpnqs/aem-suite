@@ -56,7 +56,7 @@ Open **Brokers** → **Create**.
 | **Credentials** | **Direct Input**: URL, message VPN and username are entered here; the password is asked for whenever a connection is opened. **BTP Destination**: everything comes from a BTP destination maintained by your BTP admin. |
 | **URL** (direct) | The host is enough, e.g. `mr-xyz.messaging.solace.cloud`. It is completed automatically: no port → `wss://…:443`, port `55443` → `tcps://`, port `55555` → `tcp://`. |
 | **Message VPN** (direct) | e.g. `dev-vpn` |
-| **Username** (direct) | optional, default `solace-cloud-client`. If you clear it, the username is asked for together with the password whenever you run tests, test the connection or subscribe. |
+| **Username** (direct) | optional (the AEM standard is `solace-cloud-client`). If it is empty, the username is asked for together with the password whenever you run tests, test the connection or subscribe. |
 | **Destination** (destination mode) | choose from the list (shows URL and VPN) |
 | **Active** | inactive brokers are hidden in run and subscribe dialogs |
 | Advanced | client name prefix, connect timeout |
