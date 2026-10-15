@@ -104,7 +104,19 @@ describe('AI agent service (MCP)', () => {
       )
       // no global / broker variables, no saved messages, no delete
       expect(Object.keys(actions).sort()).toEqual(
-        ['copyNodes', 'createFolder', 'createTestCase', 'getRunSummary', 'moveNode', 'previewTestCase', 'runTests', 'updateFolder', 'updateTestCase'].sort()
+        [
+          'copyNodes',
+          'createFolder',
+          'createTestCase',
+          'exportNodes',
+          'getRunSummary',
+          'importNodes',
+          'moveNode',
+          'previewTestCase',
+          'runTests',
+          'updateFolder',
+          'updateTestCase'
+        ].sort()
       )
       // only the MCP protocol is served for this service
       expect((await GET('/odata/v4/agent/', tester)).status).toBe(404)
@@ -220,6 +232,58 @@ describe('AI agent service (MCP)', () => {
       expect(copies).toMatchObject({ ok: true, result: [{ name: 'Orders v2 (Copy)', kind: 'FOLDER' }] })
       const below = await query(`SELECT name from TestNodes where parent_ID = '${copies.result[0].ID}'`)
       expect(below.map((r) => r.name).sort()).toEqual(['Order created', 'ping/a'])
+    })
+  })
+
+  describe('export and import', () => {
+    it('exports a folder as the file the UI would download', async () => {
+      const e = await call('exportNodes', { ids: [folder.ID] })
+      expect(e).toMatchObject({ ok: true, result: { folders: 1, testCases: 2, filename: 'orders-v2.json' } })
+      const file = JSON.parse(e.result.content)
+      expect(file).toMatchObject({ format: 'aem-suite.test-cases', version: 1 })
+      expect(file.nodes[0]).toMatchObject({ kind: 'FOLDER', name: 'Orders v2', variables: [{ name: 'domain', value: 'orders2' }] })
+    })
+
+    it('imports a whole generated suite in one call - checked first with a dry run', async () => {
+      const content = JSON.stringify({
+        format: 'aem-suite.test-cases',
+        version: 1,
+        nodes: [
+          {
+            kind: 'FOLDER',
+            name: 'Generated',
+            variables: [{ name: 'domain', value: 'gen' }],
+            children: [
+              { kind: 'TEST', name: 'One', topic: '{{domain}}/one', payload: '{"n":1}' },
+              { kind: 'TEST', name: 'Two', topic: '{{domain}}/two', payload: '{"n":2}', userProperties: [{ name: 'qty', value: '2' }] }
+            ]
+          }
+        ]
+      })
+      const before = (await query('SELECT ID from TestNodes')).length
+      const dry = await call('importNodes', { content, dryRun: true })
+      expect(dry).toMatchObject({ ok: true, result: { dryRun: true, folders: 1, testCases: 2 } })
+      expect((await query('SELECT ID from TestNodes')).length).toBe(before)
+
+      const done = await call('importNodes', { content })
+      expect(done).toMatchObject({ ok: true, result: { dryRun: false, folders: 1, testCases: 2, roots: [{ name: 'Generated', kind: 'FOLDER' }] } })
+      expect((await query('SELECT ID from TestNodes')).length).toBe(before + 3)
+      const p = await call('previewTestCase', { testCaseId: (await query("SELECT ID from TestNodes where name = 'Two'"))[0].ID })
+      expect(p.result.topic).toBe('gen/two')
+    })
+
+    it('rejects an invalid file as a whole and says where the problems are', async () => {
+      const bad = await call('importNodes', {
+        content: JSON.stringify({
+          format: 'aem-suite.test-cases',
+          version: 1,
+          nodes: [{ kind: 'FOLDER', name: 'Broken', children: [{ kind: 'TEST', name: 'Bad', topic: 't', payload: '{oops' }] }]
+        })
+      })
+      expect(bad.ok).toBe(false)
+      expect(bad.error).toMatch(/Nothing was imported: Broken \/ Bad: payload: Payload is not valid JSON/)
+      expect(await query("SELECT ID from TestNodes where name = 'Broken'")).toHaveLength(0)
+      expect((await call('importNodes', { content: 'nope' })).error).toMatch(/not valid JSON/)
     })
   })
 

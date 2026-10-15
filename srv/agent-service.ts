@@ -1,7 +1,8 @@
 import cds from '@sap/cds'
 import { copyNodes } from './lib/copy-nodes'
+import { exportNodes, importNodes } from './lib/export-import'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
-import { nextSortOrder, NodeData, validateNode, validateParent } from './lib/node-validation'
+import { nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './lib/node-validation'
 import { buildPreview } from './lib/preview'
 import { currentJwt } from './lib/credentials/resolve'
 import { TestCaseRecord } from './lib/test-case-spec'
@@ -10,8 +11,6 @@ import { loadTree } from './lib/tree'
 
 const LOG = cds.log('agent')
 const TABLE = 'aem.suite.TestCases'
-const DELIVERY_MODES = ['PERSISTENT', 'DIRECT']
-const PROPERTY_TYPES = ['STRING', 'INT', 'BOOL']
 const MAX_WAIT_SECONDS = 30
 const MAX_FAILURES = 25
 
@@ -55,7 +54,7 @@ const TEST_FIELDS = [
 export default class TestAgentService extends cds.ApplicationService {
   async init() {
     // ---------------------------------------------------------------- audit: who asked for what (no payloads, no secrets)
-    this.before(['createFolder', 'createTestCase', 'updateTestCase', 'updateFolder', 'moveNode', 'copyNodes', 'runTests'], (req) => {
+    this.before(['createFolder', 'createTestCase', 'updateTestCase', 'updateFolder', 'moveNode', 'copyNodes', 'importNodes', 'runTests'], (req) => {
       LOG.info('audit', { user: req.user.id, action: req.event, ...auditData(req.data as Record<string, unknown>) })
     })
 
@@ -109,7 +108,7 @@ export default class TestAgentService extends cds.ApplicationService {
       // check the result as a whole, with the same rules as for new test cases
       const merged = { ...current, ...changes, userProperties: userProperties ?? current.userProperties, variables: variables ?? current.variables }
       problemsOf(req, (reject) => {
-        checkEnums(merged as unknown as NodeData, reject)
+        validateEnums(merged as unknown as NodeData, reject)
         validateNode(merged as unknown as NodeData, 'UPDATE', reject)
       })
       return saveChanges(input.id, changes, userProperties, variables)
@@ -137,6 +136,13 @@ export default class TestAgentService extends cds.ApplicationService {
       await problemsOfAsync(req, (reject) => validateParent({ parent_ID: parentId ?? null } as NodeData, id, reject))
       await UPDATE(TABLE, id).with({ parent_ID: parentId ?? null, sortOrder: await nextSortOrder(parentId) })
       return { ID: id, name: current.name, kind: current.kind }
+    })
+
+    this.on('exportNodes', async (req) => exportNodes((req.data as { ids?: string[] }).ids))
+
+    this.on('importNodes', async (req) => {
+      const { content, parentId, dryRun } = req.data as { content: string; parentId?: string; dryRun?: boolean }
+      return importNodes(content, { parentId, dryRun: !!dryRun })
     })
 
     this.on('copyNodes', async (req) => {
@@ -250,17 +256,9 @@ async function problemsOfAsync(req: cds.Request, check: (reject: Rejector) => Pr
   if (problems.length) req.reject(400, problems.join('; '))
 }
 
-/** Enum values that the UI offers as dropdowns - the database does not check them. */
-function checkEnums(d: NodeData, reject: Rejector): void {
-  if (d.deliveryMode && !DELIVERY_MODES.includes(d.deliveryMode)) reject(400, `deliveryMode must be ${DELIVERY_MODES.join(' or ')}`, 'in/deliveryMode')
-  d.userProperties?.forEach((p, i) => {
-    if (p.type && !PROPERTY_TYPES.includes(p.type)) reject(400, `type must be ${PROPERTY_TYPES.join(', ')}`, `in/userProperties(${i})/type`)
-  })
-}
-
 async function createNode(req: cds.Request, d: NodeData): Promise<{ ID: string; name: string; kind: string }> {
   await problemsOfAsync(req, async (reject) => {
-    checkEnums(d, reject)
+    validateEnums(d, reject)
     validateNode(d, 'CREATE', reject)
     await validateParent(d, undefined, reject)
   })
@@ -304,6 +302,6 @@ const toVariables = (list?: VariableInput[] | null): VariableInput[] => (list ??
 
 /** What is worth logging about a request: names and IDs, never payloads or credentials. */
 function auditData(data: Record<string, unknown>): Record<string, unknown> {
-  const keep = ['id', 'ids', 'name', 'topic', 'parentId', 'testCaseId', 'testCaseIds', 'brokerIds']
+  const keep = ['id', 'ids', 'name', 'topic', 'parentId', 'testCaseId', 'testCaseIds', 'brokerIds', 'dryRun']
   return Object.fromEntries(Object.entries(data ?? {}).filter(([k]) => keep.includes(k)))
 }
