@@ -7,6 +7,12 @@ CAP (Node.js, TypeScript) app on SAP BTP for testing **SAP Integration Suite, Ad
 - **Runs**: run one or many test cases against several brokers in parallel. A result **passes when the broker acknowledges** the message (PERSISTENT), or when the send succeeds (DIRECT). The run history is kept per broker.
 - **Live subscriber**: subscribe to topics (wildcards allowed), browse or consume queues, watch messages live over a WebSocket, and save them or turn them into a test case.
 
+## Documentation
+
+- [User guide](docs/user-guide.md): how to use the apps (brokers, folders and test cases, runs, live subscriber, variables).
+- [Technical documentation](docs/technical-documentation.md): architecture, data model, APIs, runtime behaviour, security, configuration, deployment, extension points.
+- [Local broker](local/README.md): Solace PubSub+ in Docker for local testing.
+
 ## Architecture
 
 ```
