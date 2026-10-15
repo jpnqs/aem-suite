@@ -90,6 +90,7 @@ Open http://localhost:4004/launchpad.html and log in as `admin`/`admin` (Admin +
   docker run -d --name solace-broker --shm-size=1g -p 8080:8080 -p 55555:55555 -p 8008:8008 \
     -e username_admin_globalaccesslevel=admin -e username_admin_password=admin solace/solace-pubsub-standard
   ```
+- Broker `local-docker (ask for user)`: the same Docker broker without a username, to try the username prompt (enter user `default`).
 - Broker `aem-dev (destination)`: an inactive example for DESTINATION mode.
 - Global variables `app`, `region` and `source`, plus a broker override `region=local`.
 - Test cases "Order created" (persistent, user properties, local variable), "Ping" (direct) and "Inventory updated" (persistent, TTL, random values).
