@@ -1,23 +1,13 @@
 import cds from '@sap/cds'
-import path from 'node:path'
-import { setPublisherFactory, waitForRun } from '../srv/lib/test-runner'
+import { waitForRun } from '../srv/lib/test-runner'
 import { Tree } from '../srv/lib/tree'
+import { createActive, fakeBroker, resetDatabase, startServer, users } from './helpers'
 
-const { GET, POST, PATCH, axios } = cds.test(path.join(__dirname, '..'))
-const tester = { auth: { username: 'tester', password: 'tester' } }
-const admin = { auth: { username: 'admin', password: 'admin' } }
+const { GET, POST, PATCH, axios } = startServer()
+const { tester } = users
 const TREE = "com.sap.vocabularies.Hierarchy.v1.TopLevels(HierarchyNodes=$root/TestCases,HierarchyQualifier='TestTree',NodeProperty='ID',Levels=9)"
 
-async function create(data: object) {
-  const { data: draft } = await POST('/odata/v4/test/TestCases', data, tester)
-  const res = await POST(
-    `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)/TestService.draftActivate`,
-    {},
-    tester
-  )
-  if (res.status >= 300) throw new Error(JSON.stringify(res.data))
-  return res.data as { ID: string; sortOrder: number }
-}
+const create = async (data: object) => (await createActive(POST, 'test', 'TestCases', data)) as { ID: string; sortOrder: number }
 
 async function treeRows(): Promise<{ ID: string; name: string; DistanceFromRoot: number; DrillState: string }[]> {
   const res = await GET(
@@ -33,28 +23,26 @@ const outline = (rows: { name: string; DistanceFromRoot: number }[]) => rows.map
 describe('test case tree (folders)', () => {
   type Node = { ID: string; sortOrder: number }
   let orders: Node, eu: Node, created: Node, cancelled: Node, ping: Node
-  const published: string[] = []
+  const broker = { ID: cds.utils.uuid() }
+  const fake = fakeBroker()
 
   beforeAll(async () => {
-    for (const e of ['TestCaseProperties', 'TestCaseVariables', 'TestCases', 'Variables', 'Brokers'])
-      await DELETE.from(`aem.suite.${e}`)
-    axios.defaults.validateStatus = () => true
-    setPublisherFactory(async () => ({
-      publish: async (spec) => {
-        published.push(spec.topic)
-        return { latencyMs: 1 }
-      },
-      close: async () => undefined
-    }))
+    await resetDatabase()
+    await INSERT.into('aem.suite.Brokers').entries({ ID: broker.ID, name: 'b', credentialMode: 'DIRECT', url: 'wss://b:443', msgVpn: 'v', username: 'u', active: true })
   })
-  afterAll(() => setPublisherFactory())
 
-  it('builds folders with test cases and returns them as a tree', async () => {
+  // every test starts from the same tree: Orders / EU / (created, cancelled), and ping at top level
+  beforeEach(async () => {
+    for (const e of ['RunResults', 'TestRuns', 'TestCaseStats', 'TestCaseProperties', 'TestCaseVariables', 'TestCases']) await DELETE.from(`aem.suite.${e}`)
+    fake.published.length = 0
     orders = await create({ kind: 'FOLDER', name: 'Orders', variables: [{ name: 'domain', value: 'orders' }] })
     eu = await create({ kind: 'FOLDER', name: 'EU', parent_ID: orders.ID, variables: [{ name: 'region', value: 'eu' }] })
     created = await create({ topic: '{{domain}}/{{region}}/created', parent_ID: eu.ID })
     cancelled = await create({ topic: '{{domain}}/{{region}}/cancelled', parent_ID: eu.ID })
     ping = await create({ topic: 'ping' })
+  })
+
+  it('builds folders with test cases and returns them as a tree', async () => {
     expect(cancelled.sortOrder).toBeGreaterThan(created.sortOrder)
 
     expect(outline(await treeRows())).toEqual([
@@ -110,7 +98,7 @@ describe('test case tree (folders)', () => {
       '  EU',
       '    {{domain}}/{{region}}/cancelled',
       '    {{domain}}/{{region}}/created',
-      '  ping'
+      'ping'
     ])
     // move to the end
     await POST(`/odata/v4/test/TestCases(ID=${cancelled.ID},IsActiveEntity=true)/TestService.moveBefore`, { NextSibling: null }, tester)
@@ -119,7 +107,7 @@ describe('test case tree (folders)', () => {
   })
 
   it('handles parent change and ordering sent together (as on drop)', async () => {
-    // ping currently lives in Orders; move it into EU before "created" - action read before the PATCH lands
+    // move ping from the top level into EU before "created" - the action is read before the PATCH lands
     await POST(
       `/odata/v4/test/TestCases(ID=${ping.ID},IsActiveEntity=true)/TestService.moveBefore`,
       { NextSibling: { ID: created.ID, IsActiveEntity: true } },
@@ -148,16 +136,7 @@ describe('test case tree (folders)', () => {
   })
 
   it('runs a whole folder with folder variables', async () => {
-    const broker = { ID: cds.utils.uuid() }
-    await INSERT.into('aem.suite.Brokers').entries({
-      ID: broker.ID,
-      name: 'b',
-      credentialMode: 'DIRECT',
-      url: 'wss://b:443',
-      msgVpn: 'v',
-      username: 'u',
-      active: true
-    })
+    await UPDATE('aem.suite.TestCases', ping.ID).with({ parent_ID: orders.ID })
     const res = await POST(
       '/odata/v4/test/runTests',
       { testCaseIds: [orders.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'p' }] },
@@ -166,14 +145,13 @@ describe('test case tree (folders)', () => {
     expect(res.status).toBe(200)
     await waitForRun(res.data.runId)
     // tree order: EU folder first (created, cancelled), then ping
-    expect(published).toEqual(['orders/eu/created', 'orders/eu/cancelled', 'ping'])
+    expect(fake.published.map((p) => p.spec.topic)).toEqual(['orders/eu/created', 'orders/eu/cancelled', 'ping'])
     const { data: run } = await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)
     expect(run).toMatchObject({ totalCount: 3, passedCount: 3 })
   })
 
   it('refuses to run an empty folder', async () => {
     const empty = await create({ kind: 'FOLDER', name: 'Empty' })
-    const broker = await SELECT.one.from('aem.suite.Brokers')
     const res = await POST(
       '/odata/v4/test/runTests',
       { testCaseIds: [empty.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'p' }] },
@@ -191,7 +169,6 @@ describe('test case tree (folders)', () => {
       tester
     )
     expect(data).toMatchObject({ valid: true, topic: 'orders/eu/x' })
-    void admin
   })
 
   it('copies a folder with everything below it, right after the original', async () => {
@@ -217,7 +194,7 @@ describe('test case tree (folders)', () => {
     const copyEu = below(copy.ID).find((n) => n.name === 'EU')!
     expect(copyEu.ID).not.toBe(eu.ID)
     expect(below(copyEu.ID).map((n) => n.name).sort()).toEqual(['{{domain}}/{{region}}/cancelled', '{{domain}}/{{region}}/created'])
-    expect(below(copy.ID).some((n) => n.name === 'ping')).toBe(true)
+    expect(below(copy.ID).map((n) => n.name)).toEqual(['EU'])
 
     // folder variables are copied, the original is untouched
     const vars = (id: string) => SELECT.from('aem.suite.TestCaseVariables').where({ testCase_ID: id })
@@ -253,7 +230,8 @@ describe('test case tree (folders)', () => {
   it('deletes a folder including its content', async () => {
     const res = await axios.delete(`/odata/v4/test/TestCases(ID=${orders.ID},IsActiveEntity=true)`, tester)
     expect(res.status).toBe(204)
-    expect(await SELECT.from('aem.suite.TestCases').where({ ID: { in: [eu.ID, created.ID, ping.ID] } })).toHaveLength(0)
+    expect(await SELECT.from('aem.suite.TestCases').where({ ID: { in: [eu.ID, created.ID, cancelled.ID] } })).toHaveLength(0)
+    expect(await SELECT.one.from('aem.suite.TestCases', ping.ID)).toBeTruthy() // not inside the folder
   })
 })
 
@@ -281,7 +259,6 @@ describe('Tree helper', () => {
 
 describe('folder variables on the object page', () => {
   it('can be maintained on a folder that has no delivery mode (draft edit + save)', async () => {
-    axios.defaults.validateStatus = () => true
     const folder = await create({ kind: 'FOLDER', name: 'VarFolder' })
     // folders created before the field was optional have no delivery mode
     await UPDATE('aem.suite.TestCases').set({ deliveryMode: null }).where({ ID: folder.ID })

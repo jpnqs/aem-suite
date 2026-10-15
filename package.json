@@ -2,7 +2,6 @@
   "name": "aem-suite",
   "version": "1.0.0",
   "description": "Test suite for SAP Advanced Event Mesh brokers: test cases, multi-broker runs and live subscriptions.",
-  "repository": "<Add your repository here>",
   "license": "UNLICENSED",
   "private": true,
   "engines": {
@@ -24,6 +23,7 @@
     "@cap-js/cds-typer": "^0.41",
     "@cap-js/cds-types": "^0.20",
     "@cap-js/sqlite": "^3",
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "1.63.0",
     "@sap/cds-dk": "^10",
     "@sapui5/types": "1.148.12",
@@ -32,12 +32,16 @@
     "@types/node": "^22",
     "@ui5/cli": "^4",
     "cds-plugin-ui5": "^0.17.4",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
     "jest": "^30",
     "ts-jest": "^29.4.14",
     "tsx": "^4",
     "typescript": "^5",
+    "typescript-eslint": "^8.71.2",
     "ui5-task-zipper": "^3.7.0",
-    "ui5-tooling-transpile": "^3.13.1"
+    "ui5-tooling-transpile": "^3.13.1",
+    "yaml": "^2.9.1"
   },
   "scripts": {
     "start": "cds-serve",
@@ -45,12 +49,15 @@
     "before:cds-watch": "cds-typer \"*\"",
     "typer": "cds-typer \"*\"",
     "typecheck": "tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p app/subscriber && tsc --noEmit -p e2e",
+    "lint": "eslint .",
     "test": "jest",
+    "verify": "npm run typecheck && npm run lint && npm test",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
     "e2e:trace": "playwright show-trace",
-    "build:ui": "node scripts/build-ui.js",
+    "sync:ui": "node scripts/sync-shared-ui.js",
+    "build:ui": "node scripts/sync-shared-ui.js && node scripts/build-ui.js",
     "build:docs": "node scripts/build-docs.js"
   },
   "imports": {
@@ -77,6 +84,16 @@
               ]
             },
             "*": false
+          }
+        }
+      },
+      "[test]": {
+        "auth": {
+          "users": {
+            "norole": {
+              "password": "norole",
+              "roles": []
+            }
           }
         }
       },

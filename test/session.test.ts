@@ -1,45 +1,6 @@
-import { EventEmitter } from 'node:events'
 import type solaceTypes from 'solclientjs'
 import { buildMessage, readMessage, SolaceSession, sol } from '../srv/lib/solace/session'
-
-type Behaviour = 'ack' | 'reject' | 'silent'
-
-/** Fake solclientjs session: reacts to connect()/send() with configurable events. */
-class FakeSession extends EventEmitter {
-  sent: solaceTypes.Message[] = []
-  /** solclientjs uses numeric event codes */
-  fire(code: number, data: unknown) {
-    return this.emit(code as unknown as string, data)
-  }
-  constructor(
-    private connectOk = true,
-    public behaviour: Behaviour = 'ack'
-  ) {
-    super()
-  }
-  connect() {
-    const s = sol()
-    setImmediate(() =>
-      this.connectOk
-        ? this.fire(s.SessionEventCode.UP_NOTICE, {})
-        : this.fire(s.SessionEventCode.CONNECT_FAILED_ERROR, { infoStr: 'Unauthorized' })
-    )
-  }
-  send(m: solaceTypes.Message) {
-    const s = sol()
-    this.sent.push(m)
-    const key = (m as unknown as { getCorrelationKey(): unknown }).getCorrelationKey()
-    if (this.behaviour === 'ack') setImmediate(() => this.fire(s.SessionEventCode.ACKNOWLEDGED_MESSAGE, { correlationKey: key }))
-    if (this.behaviour === 'reject')
-      setImmediate(() =>
-        this.fire(s.SessionEventCode.REJECTED_MESSAGE_ERROR, { correlationKey: key, infoStr: 'Queue full' })
-      )
-  }
-  disconnect() {
-    setImmediate(() => this.fire(sol().SessionEventCode.DISCONNECTED, {}))
-  }
-  dispose() {}
-}
+import { FakeSolclientSession as FakeSession } from './fakes/solace'
 
 const cfg = { url: 'wss://fake', vpnName: 'v', userName: 'u', password: 'p', connectTimeoutMs: 1000 }
 const spec = { topic: 'a/b', payload: '{"x":1}', deliveryMode: 'PERSISTENT' as const, ackTimeoutMs: 200 }

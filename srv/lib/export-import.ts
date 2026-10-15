@@ -1,5 +1,8 @@
 import cds from '@sap/cds'
-import { nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './node-validation'
+import { SORT_STEP } from './defaults'
+import { httpError } from './errors'
+import { collectProblems, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './node-validation'
+import { selectNodesDeep, TABLE } from './nodes'
 import { Tree, TreeNode } from './tree'
 
 /**
@@ -16,7 +19,6 @@ export const VERSION = 1
 const MAX_NODES = 5000
 const MAX_DEPTH = 20
 const MAX_PROBLEMS_SHOWN = 20
-const TABLE = 'aem.suite.TestCases'
 
 export interface PropertyDoc {
   name: string
@@ -92,11 +94,7 @@ type Row = TreeNode & {
  * node are part of that node only). Without IDs the whole tree is exported.
  */
 export async function exportNodes(ids?: string[] | null): Promise<ExportResult> {
-  const rows = (await SELECT.from(TABLE, (t: any) => {
-    t`.*`
-    t.userProperties((p: any) => p`.*`)
-    t.variables((v: any) => v`.*`)
-  })) as Row[]
+  const rows = (await selectNodesDeep()) as Row[]
   const tree = new Tree(rows)
   const byId = new Map(rows.map((r) => [r.ID, r]))
 
@@ -153,7 +151,7 @@ export async function exportNodes(ids?: string[] | null): Promise<ExportResult> 
   const document: ExportDocument = { format: FORMAT, version: VERSION, exportedAt: new Date().toISOString(), nodes: roots.map(toDoc) }
   const only = roots.length === 1 ? byId.get(roots[0])!.name : null
   return {
-    filename: `${only ? slug(only) : 'aem-suite-test-cases'}${only ? '' : `-${document.exportedAt.slice(0, 10)}`}.json`,
+    filename: `${only ? fileNameOf(only) : 'aem-suite-test-cases'}${only ? '' : `-${document.exportedAt.slice(0, 10)}`}.json`,
     content: JSON.stringify(document, null, 2),
     folders,
     testCases
@@ -174,13 +172,33 @@ interface Flat {
 
 /** Checks a file and, unless dryRun, creates its nodes below parentId (empty = top level). All or nothing. */
 export async function importNodes(content: string, opts: { parentId?: string | null; dryRun?: boolean } = {}): Promise<ImportResult> {
-  const problems: string[] = []
-  const fail = () => {
+  const file = parseDocument(content)
+  const { flat, problems } = flatten(file.nodes)
+  const parentId = opts.parentId ?? null
+  problems.push(...(await validate(flat, parentId)))
+  if (problems.length) {
     const shown = problems.slice(0, MAX_PROBLEMS_SHOWN).join('; ')
     const more = problems.length > MAX_PROBLEMS_SHOWN ? ` (and ${problems.length - MAX_PROBLEMS_SHOWN} more)` : ''
     throw httpError(400, `Nothing was imported: ${shown}${more}`)
   }
 
+  const target = parentId ? (((await SELECT.one.from(TABLE).columns('name').where({ ID: parentId })) as { name: string } | undefined)?.name ?? null) : null
+  const count = (kind: string) => flat.filter((n) => n.d.kind === kind).length
+  const result: ImportResult = {
+    dryRun: !!opts.dryRun,
+    folders: count('FOLDER'),
+    testCases: count('TEST'),
+    userProperties: flat.reduce((s, n) => s + (n.d.userProperties?.length ?? 0), 0),
+    variables: flat.reduce((s, n) => s + (n.d.variables?.length ?? 0), 0),
+    roots: flat.filter((n) => n.parent === null).map((n) => ({ ID: opts.dryRun ? undefined : n.d.ID, name: n.d.name ?? n.d.topic ?? '', kind: n.d.kind as string })),
+    target
+  }
+  if (!opts.dryRun) await write(flat, parentId)
+  return result
+}
+
+/** The file's top level: JSON, format and version. */
+function parseDocument(content: string): ExportDocument {
   let doc: unknown
   try {
     doc = JSON.parse(content)
@@ -193,11 +211,15 @@ export async function importNodes(content: string, opts: { parentId?: string | n
   if (typeof file.version !== 'number' || file.version > VERSION)
     throw httpError(400, `Nothing was imported: the file has format version ${file.version}, this system understands up to ${VERSION} - update the application first`)
   if (!Array.isArray(file.nodes) || !file.nodes.length) throw httpError(400, 'Nothing was imported: the file contains no test cases or folders')
+  return file as ExportDocument
+}
 
-  // ---- flatten + type checks
+/** The nested nodes as a list (parents before children), with the problems of their structure and field types. */
+function flatten(nodes: unknown[]): { flat: Flat[]; problems: string[] } {
   const flat: Flat[] = []
-  const collect = (nodes: unknown[], parent: number | null, depth: number, prefix: string) => {
-    nodes.forEach((raw, i) => {
+  const problems: string[] = []
+  const collect = (list: unknown[], parent: number | null, depth: number, prefix: string) => {
+    list.forEach((raw, i) => {
       if (flat.length >= MAX_NODES) return
       const where = `${prefix}${prefix ? ' / ' : ''}${nameOf(raw) ?? `#${i + 1}`}`
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return void problems.push(`${where}: not an object`)
@@ -205,92 +227,91 @@ export async function importNodes(content: string, opts: { parentId?: string | n
       const kind = n.kind ?? (Array.isArray(n.children) ? 'FOLDER' : 'TEST')
       if (kind !== 'FOLDER' && kind !== 'TEST') return void problems.push(`${where}: kind must be FOLDER or TEST`)
       if (depth > MAX_DEPTH) return void problems.push(`${where}: folders are nested deeper than ${MAX_DEPTH} levels`)
-      const problemsBefore = problems.length
-      if (kind === 'TEST' && n.children !== undefined) problems.push(`${where}: a test case cannot have children`)
+      const own: string[] = []
+      if (kind === 'TEST' && n.children !== undefined) own.push(`${where}: a test case cannot have children`)
+      const d = nodeData(n, kind, where, own)
+      problems.push(...own)
 
-      const d: Record<string, unknown> = { ID: cds.utils.uuid(), kind }
-      const text = (k: string) => {
-        if (n[k] === undefined || n[k] === null) return
-        if (typeof n[k] === 'string') d[k] = n[k]
-        else if (k === 'payload' && typeof n[k] === 'object') d[k] = JSON.stringify(n[k], null, 2)
-        else problems.push(`${where}: ${k} must be text`)
-      }
-      const whole = (k: string) => {
-        if (n[k] === undefined || n[k] === null) return
-        if (typeof n[k] === 'number' && Number.isInteger(n[k])) d[k] = n[k]
-        else problems.push(`${where}: ${k} must be a whole number`)
-      }
-      text('name')
-      text('description')
-      if (kind === 'TEST') {
-        for (const k of ['topic', 'payload', 'contentType', 'deliveryMode', 'correlationId']) text(k)
-        for (const k of ['timeToLiveMs', 'priority', 'ackTimeoutMs']) whole(k)
-        if (n.dmqEligible !== undefined && n.dmqEligible !== null) {
-          if (typeof n.dmqEligible === 'boolean') d.dmqEligible = n.dmqEligible
-          else problems.push(`${where}: dmqEligible must be true or false`)
-        }
-        d.userProperties = listOf(n.userProperties, 'userProperties', where, problems, ['name', 'type', 'value'])
-      }
-      d.variables = listOf(n.variables, 'variables', where, problems, ['name', 'value'])
-
-      const index = flat.push({ path: where, depth, parent, d: d as unknown as Flat['d'], broken: problems.length > problemsBefore }) - 1
+      const index = flat.push({ path: where, depth, parent, d, broken: own.length > 0 }) - 1
       if (kind === 'FOLDER' && n.children !== undefined) {
         if (Array.isArray(n.children)) collect(n.children, index, depth + 1, where)
         else problems.push(`${where}: children must be a list`)
       }
     })
   }
-  collect(file.nodes, null, 0, '')
+  collect(nodes, null, 0, '')
   if (flat.length >= MAX_NODES) problems.push(`the file has more than ${MAX_NODES} test cases and folders - split it`)
+  return { flat, problems }
+}
 
-  // ---- same rules as in the UI (all problems of the file in one go)
+/** The fields of one node of the file, as the node will be stored (with a new ID). */
+function nodeData(n: Record<string, unknown>, kind: 'FOLDER' | 'TEST', where: string, problems: string[]): Flat['d'] {
+  const d: Record<string, unknown> = { ID: cds.utils.uuid(), kind }
+  const text = (k: string) => {
+    if (n[k] === undefined || n[k] === null) return
+    if (typeof n[k] === 'string') d[k] = n[k]
+    else if (k === 'payload' && typeof n[k] === 'object') d[k] = JSON.stringify(n[k], null, 2)
+    else problems.push(`${where}: ${k} must be text`)
+  }
+  const whole = (k: string) => {
+    if (n[k] === undefined || n[k] === null) return
+    if (typeof n[k] === 'number' && Number.isInteger(n[k])) d[k] = n[k]
+    else problems.push(`${where}: ${k} must be a whole number`)
+  }
+  text('name')
+  text('description')
+  if (kind === 'TEST') {
+    for (const k of ['topic', 'payload', 'contentType', 'deliveryMode', 'correlationId']) text(k)
+    for (const k of ['timeToLiveMs', 'priority', 'ackTimeoutMs']) whole(k)
+    if (n.dmqEligible !== undefined && n.dmqEligible !== null) {
+      if (typeof n.dmqEligible === 'boolean') d.dmqEligible = n.dmqEligible
+      else problems.push(`${where}: dmqEligible must be true or false`)
+    }
+    d.userProperties = listOf(n.userProperties, 'userProperties', where, problems, ['name', 'type', 'value'])
+  }
+  d.variables = listOf(n.variables, 'variables', where, problems, ['name', 'value'])
+  return d as unknown as Flat['d']
+}
+
+/** Same rules as in the UI, all problems of the file in one go. */
+async function validate(flat: Flat[], parentId: string | null): Promise<string[]> {
+  const problems: string[] = []
   for (const n of flat) {
     if (n.broken) continue
-    const reject = (_status: number, message: string, target?: string) =>
-      problems.push(`${n.path}: ${target ? `${target.replace(/^in\//, '')}: ` : ''}${message}`)
-    validateEnums(n.d, reject)
-    validateNode(n.d, 'CREATE', reject)
+    problems.push(
+      ...(await collectProblems((reject) => {
+        validateEnums(n.d, reject)
+        validateNode(n.d, 'CREATE', reject)
+      }, n.path))
+    )
   }
-  const parentId = opts.parentId ?? null
-  let target: string | null = null
-  if (parentId) {
-    await validateParent({ parent_ID: parentId } as NodeData, undefined, (_s, message) => problems.push(`target folder: ${message}`))
-    target = ((await SELECT.one.from(TABLE).columns('name').where({ ID: parentId })) as { name: string } | undefined)?.name ?? null
-  }
-  if (problems.length) fail()
+  if (parentId)
+    problems.push(...(await collectProblems((reject) => validateParent({ parent_ID: parentId }, undefined, (s, message) => reject(s, message)), 'target folder')))
+  return problems
+}
 
-  const count = (kind: string) => flat.filter((n) => n.d.kind === kind).length
-  const result: ImportResult = {
-    dryRun: !!opts.dryRun,
-    folders: count('FOLDER'),
-    testCases: count('TEST'),
-    userProperties: flat.reduce((s, n) => s + (n.d.userProperties?.length ?? 0), 0),
-    variables: flat.reduce((s, n) => s + (n.d.variables?.length ?? 0), 0),
-    roots: flat.filter((n) => n.parent === null).map((n) => ({ ID: opts.dryRun ? undefined : n.d.ID, name: n.d.name ?? n.d.topic ?? '', kind: n.d.kind as string })),
-    target
-  }
-  if (opts.dryRun) return result
-
-  // ---- write: parents before children, new nodes behind the existing ones of their folder
+/** Parents before children (one INSERT per depth); the new nodes go behind the existing ones of their folder. */
+async function write(flat: Flat[], parentId: string | null): Promise<void> {
   const firstOrder = await nextSortOrder(parentId)
   const position = new Map<number | null, number>()
-  const rowFor = (n: Flat, index: number) => {
+  const rowFor = (n: Flat) => {
     const slot = position.get(n.parent) ?? 0
     position.set(n.parent, slot + 1)
-    const { ID, ...rest } = n.d
     return {
-      ...rest,
-      ID,
+      ...n.d,
       parent_ID: n.parent === null ? parentId : flat[n.parent].d.ID,
-      sortOrder: n.parent === null ? firstOrder + slot * 10 : (slot + 1) * 10,
+      sortOrder: n.parent === null ? firstOrder + slot * SORT_STEP : (slot + 1) * SORT_STEP,
       userProperties: n.d.userProperties?.map((p) => ({ ...p })) ?? [],
       variables: n.d.variables?.map((v) => ({ ...v })) ?? []
     }
   }
   const rowsByDepth = new Map<number, ReturnType<typeof rowFor>[]>()
-  flat.forEach((n, i) => rowsByDepth.set(n.depth, [...(rowsByDepth.get(n.depth) ?? []), rowFor(n, i)]))
+  for (const n of flat) {
+    const rows = rowsByDepth.get(n.depth) ?? []
+    rows.push(rowFor(n))
+    rowsByDepth.set(n.depth, rows)
+  }
   for (const depth of [...rowsByDepth.keys()].sort((a, b) => a - b)) await INSERT.into(TABLE).entries(rowsByDepth.get(depth)!)
-  return result
 }
 
 // ------------------------------------------------------------------------------------------------ helpers
@@ -327,14 +348,11 @@ function compact<T extends Record<string, unknown>>(o: T): Partial<T> {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined)) as Partial<T>
 }
 
-const slug = (s: string) =>
+/** File name part from a node name: ASCII letters and digits, hyphen separated. */
+const fileNameOf = (s: string) =>
   s
     .toLowerCase()
     .replace(/\{\{[^}]*\}\}/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60) || 'aem-suite-test-cases'
-
-function httpError(status: number, message: string): Error {
-  return Object.assign(new Error(message), { status, code: status })
-}

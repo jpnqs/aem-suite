@@ -1,8 +1,16 @@
 import cds from '@sap/cds'
 import { registerMcpOAuth } from './lib/mcp-oauth'
+import { stopAll } from './lib/solace/subscription-hub'
+import { failRuns } from './lib/test-runner'
 
 // AI clients log in against XSUAA themselves (OAuth discovery for /mcp/agent).
 cds.on('bootstrap', (app) => registerMcpOAuth(app))
+
+// Runs execute in memory of this (single, see mta.yaml) instance: whatever was RUNNING when it stopped never finishes.
+cds.on('served', () => failRuns({}, 'The server restarted while the run was in progress'))
+
+// live subscriptions hold broker sessions
+cds.on('shutdown', () => stopAll())
 
 if (process.env.NODE_ENV !== 'production') {
   // The UI apps call odata/ and ws/ relative to their own path (in BTP each app's xs-app.json routes them

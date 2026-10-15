@@ -16,6 +16,11 @@ const apps = fs
   .filter((d) => fs.existsSync(path.join(appDir, d, 'ui5.yaml')))
   .sort()
 
+function fail(message) {
+  console.error(`\nbuild-ui: ${message}`)
+  process.exit(1)
+}
+
 for (const app of apps) {
   console.log(`\n> ui5 build ${app}`)
   const r = spawnSync('npx', ['ui5', 'build', '--clean-dest', '--dest', 'dist'], {
@@ -23,8 +28,9 @@ for (const app of apps) {
     stdio: 'inherit',
     shell: process.platform === 'win32'
   })
-  if (r.status !== 0) process.exit(r.status ?? 1)
+  if (r.error) fail(`${app}: ui5 could not be started (${r.error.message})`)
+  if (r.status !== 0) fail(`${app}: ui5 build failed (exit code ${r.status ?? r.signal})`)
   const zips = fs.readdirSync(path.join(appDir, app, 'dist')).filter((f) => f.endsWith('.zip'))
-  if (!zips.length) throw new Error(`${app}: no zip in dist - is ui5-task-zipper configured in ui5.yaml?`)
+  if (!zips.length) fail(`${app}: no zip in dist - is ui5-task-zipper configured in ui5.yaml?`)
   console.log(`  -> app/${app}/dist/${zips.join(', ')}`)
 }

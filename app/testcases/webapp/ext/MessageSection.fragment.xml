@@ -13,7 +13,6 @@
       growing="true"
       growingMaxLines="8"
       placeholder="e.g. acme/orders/\{\{region\}\}/created/v1/\{\{uuid\}\}"
-      liveChange="handler.onTopicLiveChange"
       change="handler.onTopicChange" />
     <Text text="{topic}" visible="{= !${ui>/isEditable} &amp;&amp; !${aem>/isFolder} }" wrapping="true" renderWhitespace="true" />
 

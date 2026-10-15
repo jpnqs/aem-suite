@@ -14,15 +14,20 @@ import Table from "sap/m/Table";
 import ColumnListItem from "sap/m/ColumnListItem";
 import { SearchField$LiveChangeEvent } from "sap/m/SearchField";
 import { ListBase$DeleteEvent, ListBase$SelectionChangeEvent } from "sap/m/ListBase";
-import LiveSocket from "../util/LiveSocket";
+import Actions from "../shared/Actions";
+import Help from "../shared/Help";
+import LiveSocket from "../shared/LiveSocket";
+import Navigation from "../shared/Navigation";
 
 const MAX_MESSAGES = 500;
 const FLUSH_MS = 250;
 const HEARTBEAT_MS = 60 * 1000;
 const PREFS_KEY = "aem-suite.subscriber";
 const MAX_TOPIC_HISTORY = 30;
-// section of the user guide (docs/user-guide.md) that explains this app - a test checks that it exists
-const HELP_SECTION = "8-watch-messages-live-live-subscriber";
+const MAX_BROKERS = 200;
+/** the server allows a few per user (cds.aemSuite.subscriptions.maxPerUser) */
+const MAX_SUBSCRIPTIONS = 50;
+const { errorText, invokeAction } = Actions;
 
 interface SubscriberPrefs {
   brokerId?: string;
@@ -34,7 +39,43 @@ interface SubscriberPrefs {
   queue?: string;
 }
 
+/** The model "state" of the page. */
+interface SubscriberState {
+  brokerId: string | null;
+  sourceType: SourceType;
+  topics: { text: string }[];
+  topicHistory: { text: string }[];
+  queue: string;
+  password: string;
+  needsPassword: boolean;
+  username: string;
+  needsUsername: boolean;
+  enteredUsername: string;
+  subscriptionId: string | null;
+  /** what the running subscription listens to - every message keeps a copy */
+  subscription: Origin | null;
+  brokerName: string;
+  sourceLabel: string;
+  status: string;
+  busy: boolean;
+  paused: boolean;
+  socketConnected: boolean;
+  received: number;
+  messages: LiveMessage[];
+  selected: SelectedMessage | null;
+}
+
+type SourceType = "TOPIC" | "QUEUE_BROWSE" | "QUEUE_CONSUME";
+
+/** The subscription a message was received on. */
+interface Origin {
+  brokerId: string;
+  sourceType: SourceType;
+  sourceLabel: string;
+}
+
 interface LiveMessage {
+  origin: Origin;
   seq: number;
   time: string;
   receivedAt: string;
@@ -68,9 +109,9 @@ export default class Main extends Controller {
 
   public onInit(): void {
     const prefs = loadPrefs();
-    this.state = new JSONModel({
+    const initial: SubscriberState = {
       brokerId: prefs.brokerId ?? null,
-      sourceType: prefs.sourceType ?? "TOPIC",
+      sourceType: (prefs.sourceType as SourceType) ?? "TOPIC",
       // topic subscriptions: a list of { text }; the input above the list adds to it
       topics: splitTopics(prefs.topicsText ?? "").map((text) => ({ text })),
       topicHistory: (prefs.topicHistory ?? []).map((text) => ({ text })),
@@ -83,6 +124,7 @@ export default class Main extends Controller {
       needsUsername: false,
       enteredUsername: "",
       subscriptionId: null,
+      subscription: null,
       brokerName: "",
       sourceLabel: "",
       status: "Not subscribed",
@@ -92,7 +134,8 @@ export default class Main extends Controller {
       received: 0,
       messages: [],
       selected: null
-    });
+    };
+    this.state = new JSONModel(initial);
     this.state.setSizeLimit(MAX_MESSAGES);
     this.getView()!.setModel(this.state, "state");
 
@@ -100,9 +143,16 @@ export default class Main extends Controller {
       (event, data) => this.onLiveEvent(event, data),
       (connected) => this.state.setProperty("/socketConnected", connected)
     );
+    // the page shows the connection state from the start
+    void this.socket.connect();
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
     window.addEventListener("beforeunload", this.onUnload);
     void this.preselectBroker();
+  }
+
+  /** The page state (a copy - change it with this.state.setProperty). */
+  private data(): SubscriberState {
+    return this.state.getData() as SubscriberState;
   }
 
   // ---------------------------------------------------------------- topics (list)
@@ -177,7 +227,7 @@ export default class Main extends Controller {
     try {
       const contexts = await this.odata()
         .bindList("/Brokers", undefined, [], [], { $select: "ID,credentialMode,username", $orderby: "name" })
-        .requestContexts(0, 200);
+        .requestContexts(0, MAX_BROKERS);
       this.brokers = Object.fromEntries(
         contexts.map((c) => [c.getProperty("ID") as string, c.getObject() as { credentialMode: string; username: string }])
       );
@@ -221,29 +271,27 @@ export default class Main extends Controller {
   // ---------------------------------------------------------------- subscription
 
   public async onStart(): Promise<void> {
-    const s = this.state.getData() as Record<string, string>;
-    if (this.state.getProperty("/subscriptionId")) return;
-    if (!s.brokerId) return void MessageToast.show("Select a broker");
+    const s = this.data();
+    if (s.subscriptionId) return;
+    const brokerId = s.brokerId;
+    if (!brokerId) return void MessageToast.show("Select a broker");
     const topics = this.collectTopics();
     if (s.sourceType === "TOPIC" && !topics.length) return void MessageToast.show("Enter at least one topic");
     if (s.sourceType !== "TOPIC" && !s.queue?.trim()) return void MessageToast.show("Enter a queue name");
-    const needsPassword = this.state.getProperty("/needsPassword") as boolean;
-    const needsUsername = this.state.getProperty("/needsUsername") as boolean;
-    if (needsUsername && !s.enteredUsername?.trim()) return void MessageToast.show("Enter the broker username");
-    if (needsPassword && !s.password) return void MessageToast.show("Enter the broker password");
+    if (s.needsUsername && !s.enteredUsername?.trim()) return void MessageToast.show("Enter the broker username");
+    if (s.needsPassword && !s.password) return void MessageToast.show("Enter the broker password");
 
     this.state.setProperty("/busy", true);
     try {
-      const op = this.odata().bindContext("/start(...)");
-      op.setParameter("brokerId", s.brokerId);
-      op.setParameter("sourceType", s.sourceType);
-      op.setParameter("topics", s.sourceType === "TOPIC" ? topics : []);
-      op.setParameter("queue", s.sourceType === "TOPIC" ? null : s.queue.trim());
-      op.setParameter("password", needsPassword ? s.password : null);
-      op.setParameter("username", needsUsername ? s.enteredUsername.trim() : null);
-      await op.invoke();
-      const id = (op.getBoundContext() as Context).getProperty("subscriptionId") as string;
-      op.destroy(); // drop the request incl. password from the model
+      // the binding (with the password) is dropped from the model afterwards, also if starting fails
+      const { subscriptionId: id } = await invokeAction<{ subscriptionId: string }>(this.odata(), "/start(...)", {
+        brokerId,
+        sourceType: s.sourceType,
+        topics: s.sourceType === "TOPIC" ? topics : [],
+        queue: s.sourceType === "TOPIC" ? null : s.queue.trim(),
+        password: s.needsPassword ? s.password : null,
+        username: s.needsUsername ? s.enteredUsername.trim() : null
+      });
       this.state.setProperty("/password", "");
       await this.socket.enter(id);
       // the text that was still being typed is now a topic, too
@@ -251,7 +299,7 @@ export default class Main extends Controller {
       this.addTopics(topics);
       const history = s.sourceType === "TOPIC" ? this.rememberTopics(topics) : ((this.state.getProperty("/topicHistory") as { text: string }[]) ?? []).map((h) => h.text);
       savePrefs({
-        brokerId: s.brokerId,
+        brokerId,
         sourceType: s.sourceType,
         topicsText: topics.join(", "),
         topicHistory: history,
@@ -260,6 +308,8 @@ export default class Main extends Controller {
 
       const label = s.sourceType === "TOPIC" ? topics.join(", ") : `${s.sourceType === "QUEUE_BROWSE" ? "Browsing" : "Consuming"} ${s.queue.trim()}`;
       this.state.setProperty("/subscriptionId", id);
+      const origin: Origin = { brokerId, sourceType: s.sourceType, sourceLabel: label };
+      this.state.setProperty("/subscription", origin);
       this.state.setProperty("/brokerName", (this.byId("broker") as Select).getSelectedItem()?.getText() ?? "");
       this.state.setProperty("/sourceLabel", label);
       this.state.setProperty("/status", "Subscribed");
@@ -288,9 +338,7 @@ export default class Main extends Controller {
     this.markStopped("Not subscribed");
     this.socket.exit(id);
     try {
-      const op = this.odata().bindContext("/stop(...)");
-      op.setParameter("subscriptionId", id);
-      await op.invoke();
+      await invokeAction(this.odata(), "/stop(...)", { subscriptionId: id });
     } catch (e) {
       MessageToast.show(errorText(e));
     }
@@ -300,6 +348,7 @@ export default class Main extends Controller {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = undefined;
     this.state.setProperty("/subscriptionId", null);
+    this.state.setProperty("/subscription", null);
     this.state.setProperty("/status", status);
     this.setHeaderExpanded(true);
   }
@@ -321,17 +370,13 @@ export default class Main extends Controller {
 
   private async fetchActive(): Promise<Record<string, string>[]> {
     const binding = this.odata().bindList("/activeSubscriptions()");
-    const contexts = await binding.requestContexts(0, 50);
+    const contexts = await binding.requestContexts(0, MAX_SUBSCRIPTIONS);
     return contexts.map((c) => c.getObject() as Record<string, string>);
   }
 
   /** Opens the matching section of the user guide in a new tab, so the running subscription is not interrupted. */
   public onHelp(): void {
-    const ushell = (window as unknown as { sap?: { ushell?: { Container?: unknown } } }).sap?.ushell;
-    const url = ushell?.Container
-      ? `${window.location.pathname}#AEMSuiteHelp-display&/${HELP_SECTION}`
-      : `${window.location.origin}/help/index.html#/${HELP_SECTION}`;
-    window.open(url, "_blank", "noopener");
+    Help.open();
   }
 
   public async onShowActive(): Promise<void> {
@@ -348,11 +393,7 @@ export default class Main extends Controller {
         actions: others.length ? ["Stop others", MessageBox.Action.CLOSE] : [MessageBox.Action.CLOSE],
         onClose: async (action: string | null) => {
           if (action !== "Stop others") return;
-          for (const s of others) {
-            const op = this.odata().bindContext("/stop(...)");
-            op.setParameter("subscriptionId", s.subscriptionId);
-            await op.invoke().catch(() => undefined);
-          }
+          for (const s of others) await invokeAction(this.odata(), "/stop(...)", { subscriptionId: s.subscriptionId }).catch(() => undefined);
           MessageToast.show(`${others.length} subscription(s) stopped`);
         }
       });
@@ -364,13 +405,14 @@ export default class Main extends Controller {
   // ---------------------------------------------------------------- live events
 
   private onLiveEvent(event: string, data: Record<string, unknown>): void {
-    const current = this.state.getProperty("/subscriptionId") as string | null;
-    if (data.subscriptionId !== current) return;
+    const { subscriptionId: current, subscription } = this.data();
+    if (data.subscriptionId !== current || !subscription) return;
 
     if (event === "message") {
       const received = new Date(String(data.receivedAt));
       const payload = String(data.payload ?? "");
       this.buffer.push({
+        origin: subscription,
         seq: Number(data.seq),
         time: received.toLocaleTimeString(),
         receivedAt: received.toISOString(),
@@ -382,6 +424,8 @@ export default class Main extends Controller {
         deliveryMode: String(data.deliveryMode ?? ""),
         size: formatSize(new Blob([payload]).size)
       });
+      // while paused nothing is shown - keep only what the table could show afterwards
+      if (this.buffer.length > MAX_MESSAGES) this.buffer.splice(0, this.buffer.length - MAX_MESSAGES);
       this.state.setProperty("/received", (this.state.getProperty("/received") as number) + 1);
     } else if (event === "subscriptionStatus") {
       const status = String(data.status);
@@ -455,14 +499,14 @@ export default class Main extends Controller {
   private async save(): Promise<Context | undefined> {
     const sel = this.state.getProperty("/selected") as SelectedMessage | null;
     if (!sel) return undefined;
-    const s = this.state.getData() as Record<string, string>;
     if (sel.savedId) return this.odata().bindContext(`/ReceivedMessages(${sel.savedId})`).getBoundContext() as Context;
 
+    // the subscription the message came from - the form may show another one by now
     const list = this.odata().bindList("/ReceivedMessages");
     const ctx = list.create({
-      broker_ID: s.brokerId,
-      source: s.sourceLabel,
-      sourceType: s.sourceType === "TOPIC" ? "TOPIC" : "QUEUE",
+      broker_ID: sel.origin.brokerId,
+      source: sel.origin.sourceLabel,
+      sourceType: sel.origin.sourceType,
       topic: sel.topic,
       payload: sel.payload,
       contentType: sel.contentType,
@@ -493,9 +537,7 @@ export default class Main extends Controller {
     try {
       const ctx = await this.save();
       if (!ctx) return;
-      const op = this.odata().bindContext("SubscribeService.createTestCase(...)", ctx);
-      await op.invoke();
-      const testCaseId = (op.getBoundContext() as Context).getProperty("ID") as string;
+      const { ID: testCaseId } = await invokeAction<{ ID: string }>(this.odata(), "SubscribeService.createTestCase(...)", {}, ctx);
       MessageBox.success("Test case created.", {
         actions: ["Open Test Case", MessageBox.Action.CLOSE],
         emphasizedAction: "Open Test Case",
@@ -533,10 +575,7 @@ function savePrefs(prefs: SubscriberPrefs): void {
 }
 
 function openTestCase(id: string): void {
-  const path = `TestCases(ID=${id},IsActiveEntity=true)`;
-  const ushell = (window as unknown as { sap?: { ushell?: { Container?: unknown } } }).sap?.ushell;
-  if (ushell?.Container) window.location.hash = `#AEMSuiteTestCases-manage&/${path}`;
-  else window.open(`/testcases/index.html#/${path}`, "_blank");
+  Navigation.toApp({ app: "testcases", intent: "AEMSuiteTestCases-manage", path: `TestCases(ID=${id},IsActiveEntity=true)` });
 }
 
 function tryJson(text: string): unknown {
@@ -549,8 +588,4 @@ function tryJson(text: string): unknown {
 
 function formatSize(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
-}
-
-function errorText(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
 }

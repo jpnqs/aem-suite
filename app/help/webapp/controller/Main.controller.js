@@ -3,6 +3,11 @@ sap.ui.define(
   function (Controller, JSONModel, Sorter) {
     "use strict";
 
+    /** Retries scrolling to a heading while the page settles after rendering. */
+    var SCROLL_RETRY_MS = 250;
+    var SCROLL_RETRIES = 8;
+    var MAX_SECTIONS = 200;
+
     /** Plain text for case-insensitive searching. */
     function lower(text) {
       return String(text || "").toLowerCase();
@@ -44,7 +49,7 @@ sap.ui.define(
         var model = this.getOwnerComponent().getModel();
         model
           .bindList("/Sections", undefined, [new Sorter("number")])
-          .requestContexts(0, 200)
+          .requestContexts(0, MAX_SECTIONS)
           .then(
             function (contexts) {
               var sections = contexts.map(function (c) {
@@ -154,16 +159,21 @@ sap.ui.define(
         this._doc.setProperty("/current", section);
         this._doc.setProperty("/selectedKey", anchor || section.id);
         this._buildNav();
-
-        var visible = this._visibleSections();
-        var index = visible.findIndex(function (s) {
-          return s.id === section.id;
-        });
-        this._doc.setProperty("/prev", index > 0 ? visible[index - 1] : null);
-        this._doc.setProperty("/next", index >= 0 && index < visible.length - 1 ? visible[index + 1] : null);
+        this._updatePrevNext();
         // The HTML control swaps its content in place (no "after rendering" event), so finish explicitly once the
         // new text is in the page: links, search marks, scrolling.
         setTimeout(this._afterShow.bind(this), 0);
+      },
+
+      /** Previous / next among the sections that match the search. */
+      _updatePrevNext: function () {
+        var currentId = this._doc.getProperty("/current/id");
+        var visible = this._visibleSections();
+        var index = visible.findIndex(function (s) {
+          return s.id === currentId;
+        });
+        this._doc.setProperty("/prev", index > 0 ? visible[index - 1] : null);
+        this._doc.setProperty("/next", index >= 0 && index < visible.length - 1 ? visible[index + 1] : null);
       },
 
       _go: function (id) {
@@ -181,9 +191,17 @@ sap.ui.define(
         if (text !== undefined) {
           this._doc.setProperty("/query", text);
         }
+        // the current section and the reading position stay; navigation, previous / next and the marks follow the search
         this._buildNav();
-        // the current section stays; previous / next follow the matches
-        this._show(this._doc.getProperty("/current/id"));
+        this._updatePrevNext();
+        var dom = this.byId("article").getDomRef();
+        if (dom) {
+          this._highlight(dom, (this._doc.getProperty("/query") || "").trim());
+        }
+      },
+
+      onExit: function () {
+        this._stopScrolling();
       },
 
       onPrev: function () {
@@ -222,33 +240,39 @@ sap.ui.define(
         }
         this._highlight(dom, (this._doc.getProperty("/query") || "").trim());
         this._scroll();
-        clearInterval(this._scrollTimer);
-        if (!this._anchor) {
+        this._stopScrolling();
+        var scroller = this.byId("scroll").getDomRef();
+        if (!this._anchor || !scroller) {
           return;
         }
         // The page is still settling right after rendering (the layout and the navigation change, which can move the
         // scroll position back to the top): for a heading, scroll again for a moment - until the person scrolls.
         var tries = 0;
+        var events = ["wheel", "touchmove", "keydown"];
         var stop = function () {
-          clearInterval(this._scrollTimer);
-          scroller.removeEventListener("wheel", stop);
-          scroller.removeEventListener("touchmove", stop);
-          scroller.removeEventListener("keydown", stop);
+          clearInterval(timer);
+          events.forEach(function (name) {
+            scroller.removeEventListener(name, stop);
+          });
+          this._stopScrolling = function () {};
         }.bind(this);
-        var scroller = this.byId("scroll").getDomRef();
-        ["wheel", "touchmove", "keydown"].forEach(function (name) {
+        events.forEach(function (name) {
           scroller.addEventListener(name, stop, { passive: true });
         });
-        this._scrollTimer = setInterval(
+        var timer = setInterval(
           function () {
             this._scroll();
-            if (++tries >= 8) {
+            if (++tries >= SCROLL_RETRIES) {
               stop();
             }
           }.bind(this),
-          250
+          SCROLL_RETRY_MS
         );
+        this._stopScrolling = stop;
       },
+
+      /** Ends the scroll retries of the previous section (timer and listeners). */
+      _stopScrolling: function () {},
 
       /** To the heading that was asked for, or to the top of the section. */
       _scroll: function () {

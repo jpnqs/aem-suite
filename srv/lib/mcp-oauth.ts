@@ -1,5 +1,6 @@
 import cds from '@sap/cds'
 import type { Application, Request, Response, NextFunction } from 'express'
+import { config } from './config'
 
 /**
  * OAuth discovery for the MCP endpoint (MCP authorization spec, RFC 9728 / RFC 8414), so AI clients
@@ -17,17 +18,15 @@ import type { Application, Request, Response, NextFunction } from 'express'
 const PROTECTED_RESOURCE = '/.well-known/oauth-protected-resource'
 const AUTHORIZATION_SERVER = '/.well-known/oauth-authorization-server'
 
-type MCPConfig = { publicUrl?: string; authorizationServer?: string }
-
 function authServerUrl(): string | undefined {
-  const own = (cds.env as { aemSuite?: { mcp?: MCPConfig } }).aemSuite?.mcp?.authorizationServer
+  const own = config().mcp.authorizationServer
   const auth = cds.env.requires?.auth as { credentials?: { url?: string } } | undefined
   return (own ?? auth?.credentials?.url)?.replace(/\/+$/, '')
 }
 
 /** The URL the client used: configured, or derived from the approuter's forwarded headers. */
 function publicBase(req: Request): string {
-  const configured = (cds.env as { aemSuite?: { mcp?: MCPConfig } }).aemSuite?.mcp?.publicUrl
+  const configured = config().mcp.publicUrl
   if (configured) return configured.replace(/\/+$/, '')
   const first = (h: string | string[] | undefined) => String(Array.isArray(h) ? h[0] : (h ?? '')).split(',')[0].trim()
   const proto = first(req.headers['x-forwarded-proto']) || req.protocol

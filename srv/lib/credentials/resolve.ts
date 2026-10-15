@@ -1,11 +1,16 @@
 import cds from '@sap/cds'
 import { getDestination } from '@sap-cloud-sdk/connectivity'
 import type { ConnectionConfig } from '../solace/session'
+import { readBrokerProps, toSmfUrl } from '../broker-url'
+import { HttpError } from '../errors'
+import { DEFAULT_CLIENT_NAME_PREFIX, DEFAULT_CONNECT_TIMEOUT_MS } from '../defaults'
+
+export type CredentialMode = 'DESTINATION' | 'DIRECT'
 
 export interface BrokerRecord {
   ID: string
   name: string
-  credentialMode: 'DESTINATION' | 'DIRECT' | string
+  credentialMode: CredentialMode
   destinationName?: string | null
   url?: string | null
   msgVpn?: string | null
@@ -47,18 +52,16 @@ export async function resolveConnection(
   const base = {
     brokerId: broker.ID,
     brokerName: broker.name,
-    clientName: broker.clientNamePrefix || 'aem-suite',
-    connectTimeoutMs: broker.connectTimeoutMs || 10000
+    clientName: broker.clientNamePrefix || DEFAULT_CLIENT_NAME_PREFIX,
+    connectTimeoutMs: broker.connectTimeoutMs || DEFAULT_CONNECT_TIMEOUT_MS
   }
 
   if (broker.credentialMode === 'DESTINATION') {
     if (!broker.destinationName) throw new Error(`Broker "${broker.name}": no destination name maintained`)
     const dest = await getDestination({ destinationName: broker.destinationName, jwt, useCache: true })
     if (!dest) throw new Error(`Destination "${broker.destinationName}" not found`)
-    const props = (dest.originalProperties ?? {}) as Record<string, string>
-    const vpn = props.msgVpn || props['aem.msgVpn']
+    const { url, msgVpn: vpn } = readBrokerProps((dest.originalProperties ?? {}) as Record<string, string>, dest.url)
     if (!vpn) throw new Error(`Destination "${broker.destinationName}": additional property "msgVpn" missing`)
-    const url = props.smfUrl || props['aem.smfUrl'] || dest.url
     if (!url) throw new Error(`Destination "${broker.destinationName}": URL missing`)
     return {
       ...base,
@@ -84,17 +87,15 @@ export async function resolveConnection(
   }
 }
 
-export class MissingPasswordError extends Error {
-  readonly status = 400
+export class MissingPasswordError extends HttpError {
   constructor(brokerName: string) {
-    super(`Password required for broker "${brokerName}"`)
+    super(400, `Password required for broker "${brokerName}"`)
   }
 }
 
-export class MissingUsernameError extends Error {
-  readonly status = 400
+export class MissingUsernameError extends HttpError {
   constructor(brokerName: string) {
-    super(`Username required for broker "${brokerName}"`)
+    super(400, `Username required for broker "${brokerName}"`)
   }
 }
 
@@ -106,15 +107,6 @@ export function needsPassword(broker: { credentialMode?: string | null }): boole
 /** True if the user has to enter a username too: DIRECT broker without a maintained username. */
 export function needsUsername(broker: { credentialMode?: string | null; username?: string | null }): boolean {
   return broker.credentialMode !== 'DESTINATION' && !broker.username
-}
-
-/** Maps http(s) URLs to ws(s), keeps ws/wss/tcp/tcps. */
-export function toSmfUrl(url: string): string {
-  const trimmed = url.trim()
-  if (/^https:\/\//i.test(trimmed)) return trimmed.replace(/^https:/i, 'wss:')
-  if (/^http:\/\//i.test(trimmed)) return trimmed.replace(/^http:/i, 'ws:')
-  if (/^(wss?|tcps?):\/\//i.test(trimmed)) return trimmed
-  throw new Error(`Unsupported broker URL "${url}" (expected wss://, ws://, tcps:// or tcp://)`)
 }
 
 /** Current user's JWT (if any) - used for destination lookup with user propagation. */

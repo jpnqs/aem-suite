@@ -52,6 +52,9 @@
   },
   "sap.ui5": {
     "flexEnabled": false,
+    "config": {
+      "myEntriesFilter": "createdBy"
+    },
     "dependencies": {
       "minUI5Version": "1.148.0",
       "libs": {
@@ -114,7 +117,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.testcases.ext.Help.openForList",
+                      "press": "com.aem.suite.testcases.shared.Help.openForList",
                       "text": "Help"
                     }
                   }
@@ -215,7 +218,7 @@
                       "visible": "{= ${IsActiveEntity} === true }"
                     },
                     "help": {
-                      "press": "com.aem.suite.testcases.ext.Help.openForObjectPage",
+                      "press": "com.aem.suite.testcases.shared.Help.openForObjectPage",
                       "text": "Help"
                     },
                     "preview": {
@@ -257,7 +260,7 @@
             "controllerName": "com.aem.suite.testcases.ext.ObjectPageExt"
           },
           "sap.fe.templates.ListReport.ListReportController#com.aem.suite.testcases::TestCasesList": {
-            "controllerName": "com.aem.suite.testcases.ext.MyEntriesFilter"
+            "controllerName": "com.aem.suite.testcases.shared.MyEntriesFilter"
           }
         }
       }

@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import { getAllDestinationsFromDestinationService, getServiceBinding } from '@sap-cloud-sdk/connectivity'
-import { toSmfUrl } from './resolve'
+import { isBrokerUrl, readBrokerProps } from '../broker-url'
 
 const LOG = cds.log('aem-destinations')
 
@@ -26,12 +26,10 @@ export async function listDestinations(jwt?: string): Promise<DestinationInfo[]>
     try {
       const all = await getAllDestinationsFromDestinationService({ jwt, useCache: true })
       for (const d of all) {
-        const props = (d.originalProperties ?? {}) as Record<string, string>
         if (!d.name) continue
         result.set(d.name, {
           name: d.name,
-          url: props.smfUrl || d.url || null,
-          msgVpn: props.msgVpn || props['aem.msgVpn'] || null,
+          ...readBrokerProps((d.originalProperties ?? {}) as Record<string, string>, d.url),
           authentication: d.authentication ?? null,
           source: 'BTP'
         })
@@ -53,23 +51,12 @@ function fromEnv(): DestinationInfo[] {
       .filter((d) => d.name)
       .map((d) => ({
         name: d.name,
-        url: d.smfUrl || d.url || null,
-        msgVpn: d.msgVpn || null,
+        ...readBrokerProps(d, d.url),
         authentication: d.authentication || (d.username ? 'BasicAuthentication' : 'NoAuthentication'),
         source: 'ENV' as const
       }))
   } catch {
     LOG.warn('env variable "destinations" is not valid JSON')
     return []
-  }
-}
-
-function isBrokerUrl(url: string | null): boolean {
-  if (!url) return false
-  try {
-    toSmfUrl(url)
-    return true
-  } catch {
-    return false
   }
 }

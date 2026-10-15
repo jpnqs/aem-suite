@@ -53,7 +53,7 @@ the Docker host's open-file limit is too low. This is fixed via the `ulimits.nof
 | SMF (native Solace messaging)       | `tcp://localhost:55555` | Used by `solclientjs` based services   |
 | MQTT                                | `localhost:1883`        |                                        |
 | AMQP                                | `localhost:5672`        |                                        |
-| WebSocket (SMF over WS)             | `ws://localhost:9000`   |                                        |
+| WebSocket (SMF over WS)             | `ws://localhost:8008`   |                                        |
 
 **Admin credentials** (from `environment` in [docker-compose.yml](docker-compose.yml)):
 
@@ -80,7 +80,7 @@ Edit users, queues and topic subscriptions in [terragrunt/local/terragrunt.hcl](
 
 > Local test credentials only – never reuse them on a shared or cloud broker.
 
-All users live in Message VPN `aem-local` and connect via `tcp://localhost:55555` (SMF) or `ws://localhost:9000` (WebSocket). Topic access is deny-by-default; only the topics listed are allowed.
+All users live in Message VPN `aem-local` and connect via `tcp://localhost:55555` (SMF) or `ws://localhost:8008` (WebSocket). Topic access is deny-by-default; only the topics listed are allowed.
 
 | Username         | Password     | ACL profile  | May publish | May subscribe | Demo broker in the app      |
 | ---------------- | ------------ | ------------ | ----------- | ------------- | --------------------------- |

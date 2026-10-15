@@ -52,6 +52,9 @@
   },
   "sap.ui5": {
     "flexEnabled": false,
+    "config": {
+      "myEntriesFilter": "runStartedBy"
+    },
     "dependencies": {
       "minUI5Version": "1.148.0",
       "libs": {
@@ -123,7 +126,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -158,7 +161,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -179,7 +182,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -207,7 +210,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -223,7 +226,7 @@
       "extensions": {
         "sap.ui.controllerExtensions": {
           "sap.fe.templates.ListReport.ListReportController#com.aem.suite.runs::RunResultsList": {
-            "controllerName": "com.aem.suite.runs.ext.MyEntriesFilter"
+            "controllerName": "com.aem.suite.runs.shared.MyEntriesFilter"
           }
         }
       }

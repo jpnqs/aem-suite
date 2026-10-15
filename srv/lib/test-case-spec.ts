@@ -1,7 +1,9 @@
 import type { BrokerRecord } from './credentials/resolve'
 import type { PublishSpec, DeliveryMode } from './solace/session'
 import { TemplateResolver, TemplateScope, jsonError, TemplateError } from './template/resolve'
-import { detectContentType, inferPropertyType } from './defaults'
+import { DEFAULT_ACK_TIMEOUT_MS, detectContentType } from './defaults'
+import { NodeRow, selectNodesDeep } from './nodes'
+import { inferPropertyType, PropertyType } from './property-types'
 import { loadTree, Tree } from './tree'
 
 export interface TestCaseRecord {
@@ -12,13 +14,13 @@ export interface TestCaseRecord {
   topic: string
   payload?: string | null
   contentType?: string | null
-  deliveryMode: DeliveryMode | string
+  deliveryMode?: DeliveryMode | null
   timeToLiveMs?: number | null
   dmqEligible?: boolean | null
   priority?: number | null
   correlationId?: string | null
   ackTimeoutMs?: number | null
-  userProperties?: { name: string; type?: string | null; value?: string | null }[]
+  userProperties?: { name: string; type?: PropertyType | null; value?: string | null }[]
   variables?: { name: string; value?: string | null }[]
 }
 
@@ -31,14 +33,10 @@ interface VariableRow {
 /** Loads active test cases including properties and variables. */
 export async function loadTestCases(ids: string[]): Promise<TestCaseRecord[]> {
   if (!ids.length) return []
-  const rows = (await SELECT.from('aem.suite.TestCases', (tc: any) => {
-    tc`.*`
-    tc.userProperties((p: any) => p`.*`)
-    tc.variables((v: any) => v`.*`)
-  }).where({ ID: { in: ids } })) as TestCaseRecord[]
+  const rows = await selectNodesDeep({ ID: { in: ids } })
   // keep requested order
   const byId = new Map(rows.map((r) => [r.ID, r]))
-  return ids.map((id) => byId.get(id)).filter((r): r is TestCaseRecord => !!r)
+  return ids.map((id) => byId.get(id)).filter((r): r is NodeRow => !!r)
 }
 
 export interface VariableScopes {
@@ -123,7 +121,7 @@ export function buildSpec(tc: TestCaseRecord, scope: TemplateScope): PublishSpec
     dmqEligible: tc.dmqEligible ?? undefined,
     priority: tc.priority ?? undefined,
     correlationId: tc.correlationId ? r.resolve(tc.correlationId) : undefined,
-    ackTimeoutMs: tc.ackTimeoutMs ?? 5000,
+    ackTimeoutMs: tc.ackTimeoutMs ?? DEFAULT_ACK_TIMEOUT_MS,
     userProperties: (tc.userProperties ?? []).map((p) => ({
       name: p.name,
       type: p.type || inferPropertyType(p.value),

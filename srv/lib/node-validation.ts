@@ -1,21 +1,45 @@
-import { detectContentType, inferPropertyType } from './defaults'
+import cds from '@sap/cds'
+import { detectContentType, SORT_STEP } from './defaults'
+import { httpError } from './errors'
+import { inferPropertyType, propertyValueProblem } from './property-types'
 import type { TestCaseRecord } from './test-case-spec'
 import { loadTree } from './tree'
 
 /**
- * Rules for creating / changing test cases and folders - shared by the UI service (TestService)
- * and the AI agent service (TestAgentService), so both ways in apply exactly the same checks.
+ * Rules for creating / changing test cases and folders - shared by the UI service (TestService),
+ * the AI agent service (TestAgentService), the import and "create test case from message",
+ * so all ways in apply exactly the same checks.
  */
 
 /** Reports a validation problem (req.error of the calling service). */
 export type Reject = (status: number, message: string, target?: string) => void
 
-export type NodeData = TestCaseRecord & { sortOrder?: number | null }
+export type NodeData = TestCaseRecord & { description?: string | null; sortOrder?: number | null }
 
-const VAR_NAME = /^[A-Za-z_][\w.-]*$/
+export const VAR_NAME = /^[A-Za-z_][\w.-]*$/
+export const VAR_NAME_RULE = 'Variable names must start with a letter or _ and contain only letters, digits, _ . -'
+
+/**
+ * Runs the checks and returns all findings as readable texts ("userProperties(0)/name: ..."),
+ * each prefixed with `where` if given (e.g. the position in an import file).
+ */
+export async function collectProblems(check: (reject: Reject) => unknown, where?: string): Promise<string[]> {
+  const problems: string[] = []
+  await check((_status, message, target) => {
+    const text = target ? `${target.replace(/^in\//, '')}: ${message}` : message
+    problems.push(where ? `${where}: ${text}` : text)
+  })
+  return problems
+}
+
+/** Like collectProblems, but throws a 400 with all findings in one message. */
+export async function assertValid(check: (reject: Reject) => unknown): Promise<void> {
+  const problems = await collectProblems(check)
+  if (problems.length) throw httpError(400, problems.join('; '))
+}
 
 /** The parent must be an existing folder and must not be the node itself or lie below it. Returns false if rejected. */
-export async function validateParent(d: NodeData, id: string | undefined, reject: Reject): Promise<boolean> {
+export async function validateParent(d: Pick<NodeData, 'parent_ID'>, id: string | undefined, reject: Reject): Promise<boolean> {
   if (d.parent_ID === undefined || d.parent_ID === null) return true
   const tree = await loadTree()
   const parent = tree.byId.get(d.parent_ID)
@@ -30,38 +54,46 @@ export async function nextSortOrder(parentId: string | null | undefined): Promis
   const siblings = (await SELECT.from('aem.suite.TestCases')
     .columns('sortOrder')
     .where({ parent_ID: parentId ?? null })) as { sortOrder: number | null }[]
-  return Math.max(0, ...siblings.map((x) => x.sortOrder ?? 0)) + 10
+  return Math.max(0, ...siblings.map((x) => x.sortOrder ?? 0)) + SORT_STEP
 }
 
-const DELIVERY_MODES = ['PERSISTENT', 'DIRECT']
-const PROPERTY_TYPES = ['STRING', 'INT', 'BOOL']
+// ------------------------------------------------------------------ enums and lengths from db/schema.cds
+
+type Element = { length?: number; enum?: Record<string, unknown> }
+
+function elementOf(entity: string, element: string): Element | undefined {
+  const def = cds.model?.definitions[`aem.suite.${entity}`] as { elements?: Record<string, Element> } | undefined
+  return def?.elements?.[element]
+}
+
+const enumValues = (entity: string, element: string): string[] => Object.keys(elementOf(entity, element)?.enum ?? {})
 
 /** Enum values the UI offers as dropdowns - the database does not check them. */
 export function validateEnums(d: NodeData, reject: Reject): void {
-  if (d.deliveryMode && !DELIVERY_MODES.includes(d.deliveryMode))
-    reject(400, `deliveryMode must be ${DELIVERY_MODES.join(' or ')}`, 'in/deliveryMode')
+  const deliveryModes = enumValues('TestCases', 'deliveryMode')
+  if (d.deliveryMode && !deliveryModes.includes(d.deliveryMode))
+    reject(400, `deliveryMode must be ${deliveryModes.join(' or ')}`, 'in/deliveryMode')
+  const propertyTypes = enumValues('TestCaseProperties', 'type')
   d.userProperties?.forEach((p, i) => {
-    if (p.type && !PROPERTY_TYPES.includes(p.type)) reject(400, `type must be ${PROPERTY_TYPES.join(', ')}`, `in/userProperties(${i})/type`)
+    if (p.type && !propertyTypes.includes(p.type)) reject(400, `type must be ${propertyTypes.join(', ')}`, `in/userProperties(${i})/type`)
   })
 }
 
-/** Column sizes of db/schema.cds: OData requests are checked by CAP, direct database writes (copy, import, agent) are not. */
+/** Column sizes of db/schema.cds: OData requests are checked by CAP, direct database writes (copy, import, agent, from message) are not. */
 function validateLengths(d: NodeData, reject: Reject): void {
-  const max = (value: string | null | undefined, limit: number, field: string, target: string) => {
-    if (typeof value === 'string' && value.length > limit) reject(400, `${field} is too long (${value.length} characters, maximum ${limit})`, target)
+  const max = (entity: string, element: string, value: string | null | undefined, field: string, target: string) => {
+    const limit = elementOf(entity, element)?.length
+    if (limit && typeof value === 'string' && value.length > limit)
+      reject(400, `${field} is too long (${value.length} characters, maximum ${limit})`, target)
   }
-  max(d.name, 200, 'name', 'in/name')
-  max((d as { description?: string | null }).description, 1000, 'description', 'in/description')
-  max(d.topic, 500, 'topic', 'in/topic')
-  max(d.contentType, 100, 'contentType', 'in/contentType')
-  max(d.correlationId, 200, 'correlationId', 'in/correlationId')
+  for (const f of ['name', 'description', 'topic', 'contentType', 'correlationId'] as const) max('TestCases', f, d[f], f, `in/${f}`)
   d.userProperties?.forEach((p, i) => {
-    max(p.name, 100, 'user property name', `in/userProperties(${i})/name`)
-    max(p.value, 1000, `user property "${p.name}" value`, `in/userProperties(${i})/value`)
+    max('TestCaseProperties', 'name', p.name, 'user property name', `in/userProperties(${i})/name`)
+    max('TestCaseProperties', 'value', p.value, `user property "${p.name}" value`, `in/userProperties(${i})/value`)
   })
   d.variables?.forEach((v, i) => {
-    max(v.name, 100, 'variable name', `in/variables(${i})/name`)
-    max(v.value, 2000, `variable "${v.name}" value`, `in/variables(${i})/value`)
+    max('TestCaseVariables', 'name', v.name, 'variable name', `in/variables(${i})/name`)
+    max('TestCaseVariables', 'value', v.value, `variable "${v.name}" value`, `in/variables(${i})/value`)
   })
 }
 
@@ -75,10 +107,11 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
     if (!d.topic?.trim()) reject(400, 'Topic is required', 'in/topic')
   }
   // fill what was left empty
-  if (!d.name && d.topic) d.name = d.topic.slice(0, 200)
+  const nameLength = elementOf('TestCases', 'name')?.length
+  if (!d.name && d.topic) d.name = d.topic.slice(0, nameLength)
   if (!d.contentType && d.payload !== undefined) d.contentType = detectContentType(d.payload)
   d.userProperties?.forEach((p) => {
-    if (!p.type) p.type = inferPropertyType(p.value) as string
+    if (!p.type) p.type = inferPropertyType(p.value)
   })
   if (d.payload) {
     // placeholders are replaced by 0 so templated numbers ({{count}}) stay valid JSON
@@ -100,11 +133,9 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
   d.userProperties?.forEach((p, i) => {
     if (seen.has(p.name)) reject(400, `Duplicate user property "${p.name}"`, `in/userProperties(${i})/name`)
     seen.add(p.name)
-    const templated = /\{\{/.test(p.value ?? '')
-    if (p.type === 'INT' && !templated && !/^-?\d+$/.test(p.value ?? ''))
-      reject(400, `User property "${p.name}" must be an integer`, `in/userProperties(${i})/value`)
-    if (p.type === 'BOOL' && !templated && !/^(true|false|1|0|yes|no)$/i.test(p.value ?? ''))
-      reject(400, `User property "${p.name}" must be true or false`, `in/userProperties(${i})/value`)
+    if (/\{\{/.test(p.value ?? '')) return // checked after the templates are resolved
+    const problem = propertyValueProblem(p.type, p.value)
+    if (problem) reject(400, `User property "${p.name}" ${problem}`, `in/userProperties(${i})/value`)
   })
   const seenVars = new Set<string>()
   d.variables?.forEach((v, i) => {

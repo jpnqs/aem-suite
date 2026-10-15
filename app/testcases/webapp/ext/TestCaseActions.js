@@ -4,31 +4,29 @@ sap.ui.define(
     "sap/m/MessageToast",
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
-    "com/aem/suite/testcases/ext/LiveSocket",
     "com/aem/suite/testcases/ext/Prefs",
-    "com/aem/suite/testcases/ext/Help"
+    "com/aem/suite/testcases/shared/Actions",
+    "com/aem/suite/testcases/shared/Help",
+    "com/aem/suite/testcases/shared/LiveSocket",
+    "com/aem/suite/testcases/shared/Navigation"
   ],
-  function (MessageBox, MessageToast, JSONModel, Filter, LiveSocket, Prefs, Help) {
+  function (MessageBox, MessageToast, JSONModel, Filter, Prefs, Actions, Help, LiveSocket, Navigation) {
     "use strict";
 
-    /** Navigates to the run in the runs app (FLP intent or standalone app). */
+    var showError = Actions.showError;
+    var errorText = Actions.errorText;
+
+    /** How often the run dialog reads the run while it waits (in case live progress is lost or the run aborts). */
+    var POLL_MS = 5000;
+    /** Problems shown in the run dialog - the rest are in the results app. */
+    var MAX_PROBLEMS = 50;
+    /** Brokers offered in the preview (the run dialog lists all of them). */
+    var MAX_BROKERS = 200;
+    var REVOKE_URL_MS = 1000;
+
+    /** Navigates to the run in the runs app. */
     function openRun(runId) {
-      var hash = "AEMSuiteTestRuns-display&/TestRuns(" + runId + ")";
-      if (window.sap && sap.ushell && sap.ushell.Container) {
-        window.location.hash = "#" + hash;
-      } else {
-        window.open("/runs/index.html#/TestRuns(" + runId + ")", "_blank");
-      }
-    }
-
-    function showError(e) {
-      // eslint-disable-next-line no-console
-      console.error("[aem-suite] action failed", e);
-      MessageBox.error(errorText(e));
-    }
-
-    function errorText(e) {
-      return (e && (e.message || (e.error && e.error.message))) || String(e);
+      Navigation.toApp({ app: "runs", intent: "AEMSuiteTestRuns-display", path: "TestRuns(" + runId + ")" });
     }
 
     /**
@@ -47,21 +45,62 @@ sap.ui.define(
         done: 0,
         passed: 0,
         failed: 0,
-        finished: false
+        finished: false,
+        aborted: false,
+        connectionLost: false
       });
-      var socket = new LiveSocket(function (event, data) {
-        if (event !== "runProgress" || data.runId !== state.getProperty("/runId")) {
+      var socket = new LiveSocket(
+        function (event, data) {
+          if (event !== "runProgress" || data.runId !== state.getProperty("/runId")) {
+            return;
+          }
+          state.setProperty("/total", data.total);
+          state.setProperty("/done", data.done);
+          state.setProperty("/passed", data.passed);
+          state.setProperty("/failed", data.failed);
+          if (data.status !== "RUNNING") {
+            finish(data.runId);
+          }
+        },
+        function (connected) {
+          state.setProperty("/connectionLost", !connected);
+        }
+      );
+      var pollTimer;
+
+      function finish(runId) {
+        if (state.getProperty("/finished")) {
           return;
         }
-        state.setProperty("/total", data.total);
-        state.setProperty("/done", data.done);
-        state.setProperty("/passed", data.passed);
-        state.setProperty("/failed", data.failed);
-        state.setProperty("/finished", data.status === "DONE");
-        if (data.status === "DONE") {
-          loadProblems(data.runId);
-        }
-      });
+        state.setProperty("/finished", true);
+        clearInterval(pollTimer);
+        loadProblems(runId);
+      }
+
+      /**
+       * Reads the run itself: catches up if it finished before the live context was entered, and ends the wait
+       * when no progress arrives (connection lost, or the run was aborted on the server).
+       */
+      function poll(runId) {
+        var binding = model.bindContext("/TestRuns(" + runId + ")");
+        return binding
+          .requestObject()
+          .then(function (r) {
+            if (r && r.status !== "RUNNING") {
+              state.setProperty("/done", r.totalCount);
+              state.setProperty("/passed", r.passedCount);
+              state.setProperty("/failed", r.failedCount);
+              state.setProperty("/aborted", r.status === "FAILED");
+              finish(runId);
+            }
+          })
+          .catch(function () {
+            /* try again on the next tick */
+          })
+          .finally(function () {
+            binding.destroy();
+          });
+      }
 
       /** Failed / errored results of the run, shown directly in the dialog. */
       function loadProblems(runId) {
@@ -72,7 +111,7 @@ sap.ui.define(
           .bindList("/RunResults", null, [], [new Filter("run_ID", "EQ", runId), new Filter("status", "NE", "PASSED")], {
             $select: "testCaseName,brokerName,status,errorMessage"
           })
-          .requestContexts(0, 50)
+          .requestContexts(0, MAX_PROBLEMS)
           .then(function (contexts) {
             state.setProperty(
               "/problems",
@@ -89,13 +128,11 @@ sap.ui.define(
       var preselected = false;
 
       // found by what it is, not by its position: the dialog layout may change (a help link once shifted it)
+      /** the broker list (id brokerList in RunDialog.fragment.xml; the id gets the fragment's prefix) */
       function brokerList() {
-        return dialog
-          .getContent()[0]
-          .getItems()
-          .filter(function (item) {
-            return item.isA("sap.m.List") && item.getMode() === "MultiSelect";
-          })[0];
+        return dialog.findAggregatedObjects(true, function (c) {
+          return /--brokerList$/.test(c.getId());
+        })[0];
       }
 
       /**
@@ -195,41 +232,28 @@ sap.ui.define(
           }
           Prefs.set("lastBrokers", brokerIds);
           state.setProperty("/starting", true);
-          var op = model.bindContext("/runTests(...)");
-          op.setParameter("testCaseIds", testCaseIds);
-          op.setParameter("brokerIds", brokerIds);
-          op.setParameter(
-            "credentials",
-            credentials.map(function (c) {
+          Actions.invokeAction(model, "/runTests(...)", {
+            testCaseIds: testCaseIds,
+            brokerIds: brokerIds,
+            credentials: credentials.map(function (c) {
               return {
                 brokerId: c.brokerId,
                 username: c.needsUsername ? c.enteredUsername.trim() : null,
                 password: c.password
               };
             })
-          );
-          op.invoke()
-            .then(function () {
+          })
+            .then(function (result) {
               // passwords are not kept in the UI after the run was started
               state.setProperty("/credentials", []);
-              var id = op.getBoundContext().getProperty("runId");
-              op.destroy(); // drop the request incl. passwords from the model
+              var id = result.runId;
               state.setProperty("/total", testCaseIds.length * brokerIds.length);
               state.setProperty("/runId", id);
+              pollTimer = setInterval(function () {
+                poll(id);
+              }, POLL_MS);
               return socket.enter(id).then(function () {
-                // catch up in case the run finished before the context was entered
-                var run = model.bindContext("/TestRuns(" + id + ")");
-                return run.requestObject().then(function (r) {
-                  if (r && r.status === "DONE") {
-                    state.setProperty("/done", r.totalCount);
-                    state.setProperty("/passed", r.passedCount);
-                    state.setProperty("/failed", r.failedCount);
-                    state.setProperty("/finished", true);
-                    loadProblems(id);
-                  }
-                });
-              }, function () {
-                MessageToast.show("Live progress unavailable - open the results to see the outcome");
+                return poll(id);
               });
             })
             .catch(function (e) {
@@ -254,6 +278,7 @@ sap.ui.define(
           dialog = d;
           dialog.setModel(state, "run");
           dialog.attachAfterClose(function () {
+            clearInterval(pollTimer);
             socket.close();
             dialog.destroy();
           });
@@ -266,12 +291,8 @@ sap.ui.define(
      * Resolves with the copies; the copy is placed right after its original.
      */
     function copyNodes(api, ids) {
-      var op = api.getModel().bindContext("/copyNodes(...)");
-      op.setParameter("ids", ids);
-      return op.invoke().then(function () {
-        var copies = op.getBoundContext().getObject().value || [];
-        op.destroy();
-        return copies;
+      return Actions.invokeAction(api.getModel(), "/copyNodes(...)", { ids: ids }).then(function (result) {
+        return result.value || [];
       });
     }
 
@@ -281,15 +302,7 @@ sap.ui.define(
 
     /** Calls an unbound action of the service and resolves with its result. */
     function callAction(api, path, params) {
-      var op = api.getModel().bindContext(path);
-      Object.keys(params).forEach(function (key) {
-        op.setParameter(key, params[key]);
-      });
-      return op.invoke().then(function () {
-        var result = op.getBoundContext().getObject();
-        op.destroy();
-        return result;
-      });
+      return Actions.invokeAction(api.getModel(), path, params);
     }
 
     /** "2 folders and 5 test cases" */
@@ -313,9 +326,10 @@ sap.ui.define(
       document.body.appendChild(link);
       link.click();
       link.remove();
+      // the download has started by then; the object URL only keeps the text in memory
       setTimeout(function () {
         URL.revokeObjectURL(url);
-      }, 1000);
+      }, REVOKE_URL_MS);
     }
 
     /** Opens the file chooser; resolves with { name, text } or null if nothing was chosen. */
@@ -348,20 +362,24 @@ sap.ui.define(
       });
     }
 
-    function activeIds(contexts) {
-      return (contexts || [])
-        .filter(function (c) {
-          return c.getProperty("IsActiveEntity") !== false;
-        })
-        .map(function (c) {
-          return c.getProperty("ID");
-        });
+    /** IDs of the selected nodes that are saved; tells the user if unsaved drafts were left out. */
+    function selectActiveIds(contexts) {
+      var all = contexts || [];
+      var active = all.filter(function (c) {
+        return c.getProperty("IsActiveEntity") !== false;
+      });
+      if (active.length !== all.length) {
+        MessageToast.show("Unsaved drafts are skipped");
+      }
+      return active.map(function (c) {
+        return c.getProperty("ID");
+      });
     }
 
     return {
       /** List report toolbar action: saves the selected test cases / folders (everything if nothing is selected) as a JSON file. */
       exportSelected: function (context, selectedContexts) {
-        return exportNodes(this, activeIds(selectedContexts)).catch(showError);
+        return exportNodes(this, selectActiveIds(selectedContexts)).catch(showError);
       },
 
       /** Object page header action: saves this test case or folder (with everything below) as a JSON file. */
@@ -417,17 +435,7 @@ sap.ui.define(
       /** List report toolbar action (multi selection): copies the selected test cases and folders. */
       copySelected: function (context, selectedContexts) {
         var api = this;
-        var contexts = selectedContexts || [];
-        var ids = contexts
-          .filter(function (c) {
-            return c.getProperty("IsActiveEntity") !== false;
-          })
-          .map(function (c) {
-            return c.getProperty("ID");
-          });
-        if (ids.length !== contexts.length) {
-          MessageToast.show("Unsaved drafts are skipped");
-        }
+        var ids = selectActiveIds(selectedContexts);
         if (!ids.length) {
           return;
         }
@@ -450,21 +458,11 @@ sap.ui.define(
 
       /** List report toolbar action (multi selection). */
       runSelected: function (context, selectedContexts) {
-        var contexts = selectedContexts || [];
-        var ids = contexts
-          .filter(function (c) {
-            return c.getProperty("IsActiveEntity") !== false;
-          })
-          .map(function (c) {
-            return c.getProperty("ID");
-          });
-        if (ids.length !== contexts.length) {
-          MessageToast.show("Unsaved drafts are skipped");
-        }
+        var ids = selectActiveIds(selectedContexts);
         if (!ids.length) {
           return;
         }
-        var label = ids.length === 1 ? contexts[0].getProperty("name") : ids.length + " test cases";
+        var label = ids.length === 1 ? (selectedContexts || [])[0].getProperty("name") : ids.length + " test cases";
         return openRunDialog(this, ids, label).catch(showError);
       },
 
@@ -486,11 +484,9 @@ sap.ui.define(
             if (brokerId) {
               Prefs.set("lastPreviewBroker", brokerId);
             }
-            var op = model.bindContext("TestService.preview(...)", context);
-            op.setParameter("brokerId", brokerId);
-            op.invoke()
-              .then(function () {
-                state.setData(Object.assign({ brokerId: state.getProperty("/brokerId") }, op.getBoundContext().getObject()));
+            Actions.invokeAction(model, "TestService.preview(...)", { brokerId: brokerId }, context)
+              .then(function (result) {
+                state.setData(Object.assign({ brokerId: state.getProperty("/brokerId") }, result));
               })
               .catch(function (e) {
                 state.setProperty("/valid", false);
@@ -505,7 +501,7 @@ sap.ui.define(
         // preselect: last previewed broker, else broker of the last run, else the first broker
         var brokersLoaded = model
           .bindList("/Brokers", null, [], [], { $select: "ID", $orderby: "name" })
-          .requestContexts(0, 200)
+          .requestContexts(0, MAX_BROKERS)
           .then(function (contexts) {
             var ids = contexts.map(function (c) {
               return c.getProperty("ID");

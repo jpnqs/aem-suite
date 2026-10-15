@@ -52,13 +52,7 @@ describe('TemplateResolver', () => {
 
   it('reports all unknown variables', () => {
     const r = new TemplateResolver({ global: { known: '1' } })
-    try {
-      r.resolve('{{known}} {{foo}} {{bar}} {{foo}}')
-      throw new Error('should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(TemplateError)
-      expect((e as TemplateError).missing).toEqual(['foo', 'bar'])
-    }
+    expect(() => r.resolve('{{known}} {{foo}} {{bar}} {{foo}}')).toThrow(expect.objectContaining({ constructor: TemplateError, missing: ['foo', 'bar'] }))
   })
 
   it('lists referenced non-built-in names', () => {

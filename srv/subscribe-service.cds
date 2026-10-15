@@ -23,11 +23,7 @@ service SubscribeService {
       action createTestCase() returns TestCaseRef;
     };
 
-  type SourceType : String enum {
-    TOPIC;
-    QUEUE_BROWSE;
-    QUEUE_CONSUME;
-  }
+  type SourceType : db.SourceType;
 
   /**
    * Starts a live subscription. Received messages are pushed via websocket

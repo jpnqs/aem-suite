@@ -1,14 +1,9 @@
-import cds from '@sap/cds'
-import path from 'node:path'
+import { startServer, users } from './helpers'
 
-const { GET, axios } = cds.test(path.join(__dirname, '..'))
-const admin = { auth: { username: 'admin', password: 'admin' } }
+const { GET } = startServer()
+const { admin } = users
 
 describe('dev server (UI apps mounted at their HTML5 app names)', () => {
-  beforeAll(() => {
-    axios.defaults.validateStatus = () => true
-  })
-
   it('serves odata/ relative to an app like the app\'s xs-app.json does in BTP', async () => {
     const res = await GET('/comaemsuitebrokers/odata/v4/admin/$metadata', admin)
     expect(res.status).toBe(200)

@@ -113,7 +113,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.messages.ext.Help.open",
+                      "press": "com.aem.suite.messages.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -148,7 +148,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.messages.ext.Help.open",
+                      "press": "com.aem.suite.messages.shared.Help.open",
                       "text": "Help"
                     }
                   }

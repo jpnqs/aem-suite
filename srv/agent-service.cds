@@ -293,7 +293,7 @@ service TestAgentService {
 
   type RunSummary {
     runId     : UUID;
-    /** RUNNING or DONE */
+    /** RUNNING, DONE or FAILED (aborted: crashed or the server restarted) */
     status    : String;
     /** RUNNING, PASSED or FAILED */
     outcome   : String;

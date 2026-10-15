@@ -90,8 +90,10 @@ service TestService {
   entity TestRuns as
     projection on db.TestRuns {
       *,
+      // keep in sync with runOutcome() in srv/lib/test-runner.ts
       case
         when status = 'RUNNING' then 'RUNNING'
+        when status = 'FAILED'  then 'FAILED'
         when failedCount > 0    then 'FAILED'
         else 'PASSED'
       end as outcome : String(10),

@@ -1,13 +1,14 @@
 import cds from '@sap/cds'
-import { currentJwt } from './lib/credentials/resolve'
-import { TestCaseRecord } from './lib/test-case-spec'
 import { buildPreview } from './lib/preview'
-import { BrokerCredential, createRun, executeRunInBackground, toCredentials } from './lib/test-runner'
+import { BrokerCredential, startRun, toCredentials } from './lib/test-runner'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
 import { copyNodes } from './lib/copy-nodes'
 import { exportNodes, importNodes } from './lib/export-import'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/node-validation'
-import { compareSiblings, TreeNode } from './lib/tree'
+import { selectNodeDeep } from './lib/nodes'
+import { keyOf } from './lib/request'
+import type { TestCaseRecord } from './lib/test-case-spec'
+import { moveBefore } from './lib/tree'
 
 export default class TestService extends cds.ApplicationService {
   async init() {
@@ -22,6 +23,7 @@ export default class TestService extends cds.ApplicationService {
     })
 
     // name follows the topic while editing, until the user enters an own name
+    // (the UI refreshes the name through the side effect in app/testcases/annotations.cds)
     this.before('UPDATE', TestCases.drafts!, async (req) => {
       const d = req.data as Partial<TestCaseRecord>
       if (d.topic === undefined || d.name !== undefined) return
@@ -33,56 +35,25 @@ export default class TestService extends cds.ApplicationService {
       if (!draft?.name || draft.name === draft.topic) d.name = (d.topic ?? '').slice(0, 200)
     })
 
-    // tree: parent must be a folder and must not be the node itself or below it; new nodes go to the end
-    // (the rules live in lib/node-validation.ts - the AI agent service applies the same ones)
+    // the rules live in lib/node-validation.ts - the AI agent service, the import and the live view apply the same ones:
+    // parent must be a folder and must not be the node itself or below it; new nodes go to the end
     this.before(['CREATE', 'UPDATE'], TestCases, async (req) => {
       const d = req.data as NodeData
       const reject: Reject = (status, message, target) => req.error(status, message, target)
-      if (!(await validateParent(d, d.ID ?? keyOf(req).ID, reject))) return
-      if (req.event === 'CREATE' && !d.sortOrder) d.sortOrder = await nextSortOrder(d.parent_ID)
+      const parentOk = await validateParent(d, d.ID ?? keyOf(req).ID, reject)
+      if (parentOk && req.event === 'CREATE' && !d.sortOrder) d.sortOrder = await nextSortOrder(d.parent_ID)
+      validateNode(d, req.event, reject)
     })
 
-    this.before(['CREATE', 'UPDATE'], TestCases, (req) => {
-      validateNode(req.data as NodeData, req.event, (status, message, target) => req.error(status, message, target))
-    })
-
-    // drag & drop: place the node before NextSibling (null = at the end).
-    // Fiori sends the parent change (PATCH) in the same $batch change set, which may be processed
-    // concurrently - so the target parent is derived from NextSibling, not from the node itself.
+    // drag & drop: place the node before NextSibling (null = at the end)
     this.on('moveBefore', TestCases, async (req) => {
-      const { ID } = keyOf(req)
       const nextId = (req.data as { NextSibling?: { ID?: string } | null }).NextSibling?.ID ?? null
-      type Row = TreeNode & { modifiedAt: string; modifiedBy: string }
-      const cols = ['ID', 'parent_ID', 'kind', 'name', 'sortOrder', 'modifiedAt', 'modifiedBy']
-      const node = (await SELECT.one.from('aem.suite.TestCases').columns(...cols).where({ ID })) as Row | undefined
-      if (!node) return req.error(404, 'Node not found')
-      const keep = (r: Row) => ({ modifiedAt: r.modifiedAt, modifiedBy: r.modifiedBy }) // reordering is no content change
-
-      if (!nextId) {
-        // last position in whatever folder the node ends up in
-        const max = (await SELECT.one.from('aem.suite.TestCases').columns('max(sortOrder) as max')) as { max: number | null }
-        await UPDATE('aem.suite.TestCases', ID).with({ sortOrder: (max?.max ?? 0) + 10, ...keep(node) })
-        return
-      }
-      const next = (await SELECT.one.from('aem.suite.TestCases').columns('ID', 'parent_ID').where({ ID: nextId })) as
-        | { ID: string; parent_ID: string | null }
-        | undefined
-      if (!next) return req.error(404, 'Next sibling not found')
-      const siblings = ((await SELECT.from('aem.suite.TestCases')
-        .columns(...cols)
-        .where({ parent_ID: next.parent_ID ?? null })) as Row[])
-        .filter((x) => x.ID !== ID)
-        .sort(compareSiblings)
-      const order: Row[] = [...siblings]
-      order.splice(Math.max(0, siblings.findIndex((x) => x.ID === nextId)), 0, node)
-      for (const [i, row] of order.entries()) {
-        await UPDATE('aem.suite.TestCases', row.ID).with({ sortOrder: (i + 1) * 10, ...keep(row) })
-      }
+      await moveBefore(keyOf(req).ID, nextId)
     })
 
     this.on('runTest', TestCases, async (req) => {
       const { brokerIds, credentials } = req.data as { brokerIds: string[]; credentials?: BrokerCredential[] }
-      return startRun(req, [keyOf(req).ID], brokerIds, credentials)
+      return runFromUi(req, [keyOf(req).ID], brokerIds, credentials)
     })
 
     this.on('currentUser', (req) => req.user.id)
@@ -93,19 +64,14 @@ export default class TestService extends cds.ApplicationService {
         brokerIds: string[]
         credentials?: BrokerCredential[]
       }
-      return startRun(req, testCaseIds, brokerIds, credentials)
+      return runFromUi(req, testCaseIds, brokerIds, credentials)
     })
 
     // preview works on saved test cases and on drafts (lean draft routes draft calls to TestCases.drafts)
     this.on('preview', [TestCases, TestCases.drafts!], async (req) => {
       const { ID, IsActiveEntity } = keyOf(req)
       const { brokerId } = req.data as { brokerId?: string }
-      const source = IsActiveEntity === false ? TestCases.drafts! : TestCases
-      const tc = (await SELECT.one.from(source, ID, (t: any) => {
-        t`.*`
-        t.userProperties((p: any) => p`.*`)
-        t.variables((v: any) => v`.*`)
-      })) as TestCaseRecord | null
+      const tc = await selectNodeDeep(ID, IsActiveEntity === false ? TestCases.drafts! : TestCases)
       if (!tc) return req.error(404, 'Test case not found')
       return buildPreview(tc, brokerId)
     })
@@ -129,18 +95,8 @@ export default class TestService extends cds.ApplicationService {
   }
 }
 
-async function startRun(req: cds.Request, testCaseIds: string[], brokerIds: string[], credentials?: BrokerCredential[]) {
-  // passwords (and entered usernames) stay in memory of this run only - never persisted or logged
-  const entered = toCredentials(credentials)
-  const runId = await createRun(testCaseIds, brokerIds, entered)
-  const jwt = currentJwt()
-  // execute after the run rows are committed
-  req.on('succeeded', () => void executeRunInBackground(runId, jwt, entered))
+async function runFromUi(req: cds.Request, testCaseIds: string[], brokerIds: string[], credentials?: BrokerCredential[]) {
+  const runId = await startRun(req, testCaseIds, brokerIds, toCredentials(credentials))
   req.info(200, 'Test run started - see "Test Runs" for results')
   return { runId }
-}
-
-function keyOf(req: cds.Request): { ID: string; IsActiveEntity?: boolean } {
-  const p = req.params[0] as unknown
-  return typeof p === 'string' ? { ID: p } : (p as { ID: string; IsActiveEntity?: boolean })
 }
