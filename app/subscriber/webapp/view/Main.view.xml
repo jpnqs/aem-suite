@@ -8,20 +8,39 @@
   xmlns:ce="sap.ui.codeeditor"
   displayBlock="true"
   height="100%">
-  <f:DynamicPage id="page" toggleHeaderOnTitleClick="false" fitContent="true">
+  <f:DynamicPage
+    id="page"
+    class="aemPage sapUiResponsiveContentPadding"
+    toggleHeaderOnTitleClick="true"
+    fitContent="true">
     <f:title>
       <f:DynamicPageTitle>
         <f:heading>
-          <Title text="Live Subscriber" />
+          <HBox alignItems="Center">
+            <core:Icon src="sap-icon://feeder-arrow" size="1.5rem" color="Default" class="sapUiSmallMarginEnd aemTitleIcon" />
+            <Title text="Live Subscriber" />
+          </HBox>
         </f:heading>
+        <f:expandedContent>
+          <Text text="Listen to topics or queues and watch the messages arrive in real time." />
+        </f:expandedContent>
         <f:snappedContent>
-          <Text text="{state>/sourceLabel}" />
+          <HBox alignItems="Center" wrap="Wrap">
+            <ObjectStatus text="{state>/brokerName}" icon="sap-icon://chain-link" class="sapUiSmallMarginEnd" />
+            <Text text="{state>/sourceLabel}" class="aemMono" maxLines="1" />
+          </HBox>
         </f:snappedContent>
         <f:content>
           <ObjectStatus
             text="{state>/status}"
             state="{= ${state>/subscriptionId} ? 'Success' : 'None' }"
+            inverted="{= !!${state>/subscriptionId} }"
             icon="{= ${state>/subscriptionId} ? 'sap-icon://connected' : 'sap-icon://disconnected' }" />
+          <ObjectNumber
+            number="{state>/received}"
+            unit="messages"
+            visible="{= !!${state>/subscriptionId} || ${state>/received} > 0 }"
+            class="sapUiSmallMarginBegin" />
           <ObjectStatus
             text="WebSocket offline"
             state="Warning"
@@ -38,126 +57,155 @@
             press=".onStart" />
           <Button
             text="Stop"
+            type="{= ${state>/subscriptionId} ? 'Reject' : 'Default' }"
             icon="sap-icon://stop"
             enabled="{= !!${state>/subscriptionId} &amp;&amp; !${state>/busy} }"
             press=".onStop" />
           <Button
             text="Active Subscriptions"
+            type="Transparent"
             icon="sap-icon://list"
             press=".onShowActive" />
         </f:actions>
       </f:DynamicPageTitle>
     </f:title>
     <f:header>
-      <f:DynamicPageHeader pinnable="true">
-        <l:HorizontalLayout allowWrapping="true">
-          <VBox class="sapUiMediumMarginEnd">
-            <Label text="Broker" labelFor="broker" required="true" />
-            <Select
-              id="broker"
-              width="16rem"
-              forceSelection="false"
-              selectedKey="{state>/brokerId}"
-              enabled="{= !${state>/subscriptionId} }"
-              change=".onBrokerChange"
-              items="{path: '/Brokers', sorter: {path: 'name'}}">
-              <core:Item key="{ID}" text="{name}" />
-            </Select>
-          </VBox>
-          <VBox class="sapUiMediumMarginEnd" visible="{state>/needsUsername}">
-            <Label text="Username (not maintained on the broker)" required="true" />
-            <Input
-              width="14rem"
-              value="{state>/enteredUsername}"
-              placeholder="Username"
-              enabled="{= !${state>/subscriptionId} }"
-              submit=".onStart" />
-          </VBox>
-          <VBox class="sapUiMediumMarginEnd" visible="{state>/needsPassword}">
-            <Label text="{= ${state>/username} ? 'Password for ' + ${state>/username} + ' (not stored)' : 'Password (not stored)' }" required="true" />
-            <Input
-              type="Password"
-              width="14rem"
-              value="{state>/password}"
-              placeholder="Password"
-              enabled="{= !${state>/subscriptionId} }"
-              submit=".onStart" />
-          </VBox>
-          <VBox class="sapUiMediumMarginEnd">
-            <Label text="Source" />
-            <SegmentedButton
-              selectedKey="{state>/sourceType}"
-              enabled="{= !${state>/subscriptionId} }">
-              <items>
-                <SegmentedButtonItem key="TOPIC" text="Topics" icon="sap-icon://feeder-arrow" />
-                <SegmentedButtonItem key="QUEUE_BROWSE" text="Browse Queue" icon="sap-icon://show" />
-                <SegmentedButtonItem key="QUEUE_CONSUME" text="Consume Queue" icon="sap-icon://download" />
-              </items>
-            </SegmentedButton>
-          </VBox>
-          <VBox class="sapUiMediumMarginEnd" visible="{= ${state>/sourceType} === 'TOPIC' }">
-            <Label text="Topic subscriptions (comma separated, wildcards * and &gt;)" required="true" />
-            <Input
-              width="28rem"
-              value="{state>/topicsText}"
-              placeholder="acme/orders/>, acme/*/created/v1/>"
-              enabled="{= !${state>/subscriptionId} }"
-              submit=".onStart" />
-          </VBox>
-          <VBox class="sapUiMediumMarginEnd" visible="{= ${state>/sourceType} !== 'TOPIC' }">
-            <Label text="Queue name" required="true" />
-            <Input
-              width="20rem"
-              value="{state>/queue}"
-              placeholder="q.orders"
-              enabled="{= !${state>/subscriptionId} }"
-              submit=".onStart" />
-          </VBox>
-        </l:HorizontalLayout>
-        <MessageStrip
-          text="Consume removes messages from the queue (client acknowledgement). Browse leaves them on the queue."
-          type="Warning"
-          showIcon="true"
-          visible="{= ${state>/sourceType} === 'QUEUE_CONSUME' }"
-          class="sapUiTinyMarginTop" />
+      <f:DynamicPageHeader pinnable="false">
+        <VBox class="aemConnect">
+          <l:Grid defaultSpan="XL3 L4 M6 S12" hSpacing="1" vSpacing="0.5" containerQuery="true">
+            <VBox>
+              <Label text="Broker" labelFor="broker" required="true" />
+              <Select
+                id="broker"
+                width="100%"
+                forceSelection="false"
+                selectedKey="{state>/brokerId}"
+                enabled="{= !${state>/subscriptionId} }"
+                change=".onBrokerChange"
+                items="{path: '/Brokers', sorter: {path: 'name'}}">
+                <core:Item key="{ID}" text="{name}" />
+              </Select>
+            </VBox>
+            <VBox visible="{state>/needsUsername}">
+              <Label text="Username" required="true" tooltip="Not maintained on the broker" />
+              <Input
+                width="100%"
+                value="{state>/enteredUsername}"
+                placeholder="Not maintained on the broker"
+                enabled="{= !${state>/subscriptionId} }"
+                submit=".onStart" />
+            </VBox>
+            <VBox visible="{state>/needsPassword}">
+              <Label text="{= ${state>/username} ? 'Password for ' + ${state>/username} : 'Password' }" required="true" />
+              <Input
+                type="Password"
+                width="100%"
+                value="{state>/password}"
+                placeholder="Not stored"
+                enabled="{= !${state>/subscriptionId} }"
+                submit=".onStart" />
+            </VBox>
+            <VBox>
+              <Label text="Source" />
+              <SegmentedButton
+                width="100%"
+                selectedKey="{state>/sourceType}"
+                enabled="{= !${state>/subscriptionId} }">
+                <items>
+                  <SegmentedButtonItem key="TOPIC" text="Topics" icon="sap-icon://feeder-arrow" />
+                  <SegmentedButtonItem key="QUEUE_BROWSE" text="Browse Queue" icon="sap-icon://show" />
+                  <SegmentedButtonItem key="QUEUE_CONSUME" text="Consume Queue" icon="sap-icon://download" />
+                </items>
+              </SegmentedButton>
+            </VBox>
+            <VBox visible="{= ${state>/sourceType} === 'TOPIC' }">
+              <layoutData>
+                <l:GridData span="XL12 L12 M12 S12" />
+              </layoutData>
+              <Label text="Topic subscriptions" labelFor="topics" required="true" />
+              <MultiInput
+                id="topics"
+                width="100%"
+                placeholder="Type a topic and press Enter, e.g. acme/orders/&gt;"
+                editable="{= !${state>/subscriptionId} }"
+                showValueHelp="false"
+                showSuggestion="true"
+                suggestionItems="{path: 'state>/topicHistory', templateShareable: false}"
+                liveChange=".onTopicLiveChange">
+                <suggestionItems>
+                  <core:Item key="{state>text}" text="{state>text}" />
+                </suggestionItems>
+              </MultiInput>
+              <Text text="Press Enter or type a comma to add a topic. Wildcards: * matches one level, &gt; matches everything below." class="aemHint sapUiTinyMarginTop" />
+            </VBox>
+            <VBox visible="{= ${state>/sourceType} !== 'TOPIC' }">
+              <layoutData>
+                <l:GridData span="XL6 L8 M12 S12" />
+              </layoutData>
+              <Label text="Queue name" labelFor="queue" required="true" />
+              <Input
+                id="queue"
+                width="100%"
+                value="{state>/queue}"
+                placeholder="q.orders"
+                enabled="{= !${state>/subscriptionId} }"
+                submit=".onStart" />
+            </VBox>
+          </l:Grid>
+          <MessageStrip
+            text="Consume removes the messages from the queue (client acknowledgement). Browse leaves them on the queue."
+            type="Warning"
+            showIcon="true"
+            visible="{= ${state>/sourceType} === 'QUEUE_CONSUME' }"
+            class="sapUiTinyMarginTop" />
+        </VBox>
       </f:DynamicPageHeader>
     </f:header>
     <f:content>
-      <l:Splitter height="100%" width="100%">
+      <l:Splitter height="100%" width="100%" class="aemSplit">
         <Table
           id="messages"
+          class="aemCard"
           items="{path: 'state>/messages', templateShareable: false}"
           mode="SingleSelectMaster"
           selectionChange=".onSelect"
           sticky="ColumnHeaders,HeaderToolbar"
           growing="true"
           growingThreshold="100"
-          growingScrollToLoad="true"
-          noDataText="{= ${state>/subscriptionId} ? 'Waiting for messages…' : 'Start a subscription to see messages' }">
+          growingScrollToLoad="true">
           <layoutData>
             <l:SplitterLayoutData size="58%" />
           </layoutData>
           <headerToolbar>
             <OverflowToolbar>
-              <Title text="Messages ({state>/received})" />
+              <Title text="Messages" />
+              <ObjectNumber number="{state>/received}" emphasized="false" class="sapUiTinyMarginBegin" />
               <ToolbarSpacer />
-              <SearchField width="14rem" placeholder="Filter topic / payload" liveChange=".onFilter" />
+              <SearchField width="16rem" placeholder="Filter topic / payload" liveChange=".onFilter" />
               <ToggleButton
-                icon="sap-icon://media-pause"
-                text="{= ${state>/paused} ? 'Paused' : 'Pause' }"
+                icon="{= ${state>/paused} ? 'sap-icon://media-play' : 'sap-icon://media-pause' }"
+                text="{= ${state>/paused} ? 'Resume' : 'Pause' }"
                 pressed="{state>/paused}"
+                type="Transparent"
                 tooltip="Pause list updates (messages are still counted)" />
-              <Button icon="sap-icon://clear-all" text="Clear" press=".onClear" />
+              <Button icon="sap-icon://clear-all" text="Clear" type="Transparent" press=".onClear" />
             </OverflowToolbar>
           </headerToolbar>
+          <noData>
+            <IllustratedMessage
+              illustrationSize="Spot"
+              illustrationType="{= ${state>/subscriptionId} ? 'sapIllus-SimpleBell' : 'sapIllus-SimpleConnection' }"
+              title="{= ${state>/subscriptionId} ? 'Waiting for messages…' : 'Not listening yet' }"
+              description="{= ${state>/subscriptionId} ? 'New messages appear here as soon as they arrive.' : 'Choose a broker and a topic or queue, then press Start.' }" />
+          </noData>
           <columns>
-            <Column width="6rem">
+            <Column width="7.5rem">
               <Text text="Time" />
             </Column>
             <Column>
               <Text text="Topic" />
             </Column>
-            <Column width="7rem" minScreenWidth="Desktop" demandPopin="true">
+            <Column width="8rem" minScreenWidth="Desktop" demandPopin="true">
               <Text text="Delivery" />
             </Column>
             <Column width="5rem" hAlign="End" minScreenWidth="Desktop" demandPopin="true">
@@ -167,39 +215,61 @@
           <items>
             <ColumnListItem type="Active">
               <cells>
-                <Text text="{state>time}" />
-                <Text text="{state>topic}" wrapping="true" />
-                <Text text="{state>deliveryMode}" />
-                <Text text="{state>size}" />
+                <Text text="{state>time}" wrapping="false" class="aemMono aemMuted" />
+                <ObjectIdentifier title="{state>topic}" text="{state>correlationId}" class="aemMono" />
+                <ObjectStatus
+                  text="{state>deliveryMode}"
+                  state="{= ${state>deliveryMode} === 'PERSISTENT' ? 'Information' : 'None' }" />
+                <Text text="{state>size}" class="aemMuted" />
               </cells>
             </ColumnListItem>
           </items>
         </Table>
-        <ScrollContainer height="100%" vertical="true">
+        <ScrollContainer height="100%" vertical="true" class="aemCard">
           <layoutData>
             <l:SplitterLayoutData size="auto" />
           </layoutData>
-          <VBox class="sapUiSmallMargin" visible="{= !!${state>/selected} }">
-            <Title text="{state>/selected/topic}" wrapping="true" />
-            <Text
-              text="Received {state>/selected/receivedAt} · {state>/selected/deliveryMode} · {state>/selected/contentType}"
-              class="sapUiTinyMarginBottom" />
-            <Text text="Correlation ID: {state>/selected/correlationId}" visible="{= !!${state>/selected/correlationId} }" />
-            <OverflowToolbar style="Clear" class="sapUiSmallMarginTop">
+          <VBox class="aemDetail" visible="{= !!${state>/selected} }">
+            <Title text="{state>/selected/topic}" wrapping="true" titleStyle="H4" class="aemMono" />
+            <HBox wrap="Wrap" class="sapUiSmallMarginTop aemMeta">
+              <ObjectStatus title="Received" text="{state>/selected/receivedLocal}" class="sapUiMediumMarginEnd" />
+              <ObjectStatus
+                title="Delivery"
+                text="{state>/selected/deliveryMode}"
+                state="{= ${state>/selected/deliveryMode} === 'PERSISTENT' ? 'Information' : 'None' }"
+                class="sapUiMediumMarginEnd" />
+              <ObjectStatus title="Size" text="{state>/selected/size}" class="sapUiMediumMarginEnd" />
+              <ObjectStatus
+                title="Content type"
+                text="{state>/selected/contentType}"
+                visible="{= !!${state>/selected/contentType} }"
+                class="sapUiMediumMarginEnd" />
+              <ObjectStatus
+                title="Correlation ID"
+                text="{state>/selected/correlationId}"
+                visible="{= !!${state>/selected/correlationId} }" />
+            </HBox>
+            <OverflowToolbar style="Clear" class="aemActions">
               <ToolbarSpacer />
-              <Button text="Copy Payload" icon="sap-icon://copy" press=".onCopy" />
-              <Button text="Save" icon="sap-icon://save" press=".onSave" enabled="{= !${state>/selected/savedId} }" />
+              <Button text="Copy Payload" icon="sap-icon://copy" type="Transparent" press=".onCopy" />
+              <Button text="Save" icon="sap-icon://save" type="Transparent" press=".onSave" enabled="{= !${state>/selected/savedId} }" />
               <Button text="Save as Test Case" icon="sap-icon://add-document" type="Emphasized" press=".onSaveAsTestCase" />
             </OverflowToolbar>
-            <Title text="Payload" level="H5" />
-            <ce:CodeEditor type="{state>/selected/editorType}" value="{state>/selected/prettyPayload}" editable="false" height="22rem" />
-            <Title text="User Properties" level="H5" class="sapUiSmallMarginTop" />
-            <ce:CodeEditor type="json" value="{state>/selected/prettyProperties}" editable="false" height="8rem" />
+            <IconTabBar expandable="false" applyContentPadding="false" headerMode="Inline" class="aemTabs">
+              <items>
+                <IconTabFilter key="payload" text="Payload" icon="sap-icon://document-text">
+                  <ce:CodeEditor type="{state>/selected/editorType}" value="{state>/selected/prettyPayload}" editable="false" height="26rem" />
+                </IconTabFilter>
+                <IconTabFilter key="properties" text="User Properties" icon="sap-icon://tag" count="{state>/selected/propertyCount}">
+                  <ce:CodeEditor type="json" value="{state>/selected/prettyProperties}" editable="false" height="14rem" />
+                </IconTabFilter>
+              </items>
+            </IconTabBar>
           </VBox>
           <IllustratedMessage
             illustrationType="sapIllus-NoEntries"
             title="No message selected"
-            description="Select a message to see payload and properties"
+            description="Select a message to see its payload and properties"
             visible="{= !${state>/selected} }" />
         </ScrollContainer>
       </l:Splitter>

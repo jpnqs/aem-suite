@@ -1,0 +1,81 @@
+/* Live Subscriber - theme aware (uses SAP theming parameters only) */
+
+/* the page content sits on the shell background; the panels are soft cards */
+.aemPage .sapFDynamicPageContent {
+  background: transparent;
+}
+
+.aemCard {
+  background: var(--sapGroup_ContentBackground);
+  border: 1px solid var(--sapGroup_ContentBorderColor);
+  border-radius: 0.75rem;
+  box-shadow: var(--sapContent_Shadow0);
+  overflow: hidden;
+}
+
+/* connection form */
+.aemConnect {
+  padding-bottom: 0.5rem;
+}
+
+.aemConnect .sapUiRespGrid {
+  padding: 0;
+}
+
+.aemHint {
+  color: var(--sapContent_LabelColor);
+  font-size: var(--sapFontSmallSize);
+}
+
+.aemTitleIcon {
+  color: var(--sapContent_IconColor);
+}
+
+/* technical values */
+.aemMono,
+.aemMono .sapMObjectIdentifierTitle,
+.aemMono .sapMObjectIdentifierTitle .sapMLnk {
+  font-family: var(--sapFontMonospaceFamily, ui-monospace, Consolas, monospace);
+}
+
+.aemMono .sapMObjectIdentifierText {
+  font-family: var(--sapFontFamily);
+  color: var(--sapContent_LabelColor);
+}
+
+.aemMuted {
+  color: var(--sapContent_LabelColor);
+}
+
+/* splitter between the list and the detail panel */
+.aemSplit {
+  background: transparent;
+}
+
+.aemSplit > .sapUiLoSplitterBar {
+  background: transparent;
+  border: 0;
+}
+
+/* detail panel */
+.aemDetail {
+  padding: 1.25rem 1.5rem 1rem;
+}
+
+.aemMeta {
+  row-gap: 0.5rem;
+}
+
+.aemActions {
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.aemTabs.sapMITB {
+  background: transparent;
+}
+
+.aemTabs .sapMITBContent {
+  padding-top: 0.5rem;
+  background: transparent;
+}

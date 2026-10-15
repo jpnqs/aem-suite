@@ -1,3 +1,8 @@
+import DynamicPage from "sap/f/DynamicPage";
+import Select from "sap/m/Select";
+import MultiInput from "sap/m/MultiInput";
+import Token from "sap/m/Token";
+import { Input$LiveChangeEvent } from "sap/m/Input";
 import Controller from "sap/ui/core/mvc/Controller";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Filter from "sap/ui/model/Filter";
@@ -17,11 +22,15 @@ const MAX_MESSAGES = 500;
 const FLUSH_MS = 250;
 const HEARTBEAT_MS = 60 * 1000;
 const PREFS_KEY = "aem-suite.subscriber";
+const MAX_TOPIC_HISTORY = 30;
 
 interface SubscriberPrefs {
   brokerId?: string;
   sourceType?: string;
+  /** topics of the last subscription, comma separated */
   topicsText?: string;
+  /** topics used before (most recent first) - offered as suggestions */
+  topicHistory?: string[];
   queue?: string;
 }
 
@@ -42,6 +51,8 @@ interface LiveMessage {
 interface SelectedMessage extends LiveMessage {
   prettyPayload: string;
   prettyProperties: string;
+  propertyCount: number;
+  receivedLocal: string;
   editorType: string;
 }
 
@@ -60,7 +71,7 @@ export default class Main extends Controller {
     this.state = new JSONModel({
       brokerId: prefs.brokerId ?? null,
       sourceType: prefs.sourceType ?? "TOPIC",
-      topicsText: prefs.topicsText ?? "",
+      topicHistory: (prefs.topicHistory ?? []).map((text) => ({ text })),
       queue: prefs.queue ?? "",
       // password of DIRECT brokers: only in this page's memory until Start, never stored
       password: "",
@@ -70,6 +81,7 @@ export default class Main extends Controller {
       needsUsername: false,
       enteredUsername: "",
       subscriptionId: null,
+      brokerName: "",
       sourceLabel: "",
       status: "Not subscribed",
       busy: false,
@@ -89,6 +101,60 @@ export default class Main extends Controller {
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
     window.addEventListener("beforeunload", this.onUnload);
     void this.preselectBroker();
+
+    // topics are tokens: Enter / blur turns the typed text into a token (no duplicates)
+    const topics = this.topicsInput();
+    topics.addValidator((args: { text: string }) => {
+      const text = args.text.trim();
+      if (!text || this.topicTokens().includes(text)) return null;
+      return new Token({ key: text, text });
+    });
+    this.addTopics(splitTopics(prefs.topicsText ?? ""));
+  }
+
+  // ---------------------------------------------------------------- topics (tokens)
+
+  // methods, not getters: the UI5 transpiler evaluates getters when the controller class is defined
+  private topicsInput(): MultiInput {
+    return this.byId("topics") as MultiInput;
+  }
+
+  private topicTokens(): string[] {
+    return this.topicsInput()
+      .getTokens()
+      .map((t) => t.getKey());
+  }
+
+  private addTopics(texts: string[]): void {
+    const input = this.topicsInput();
+    for (const text of texts) {
+      if (text && !this.topicTokens().includes(text)) input.addToken(new Token({ key: text, text }));
+    }
+  }
+
+  /** A comma ends a topic: everything before the last comma becomes tokens (also works for pasted lists). */
+  public onTopicLiveChange(event: Input$LiveChangeEvent): void {
+    const value = event.getParameter("value") ?? "";
+    if (!value.includes(",")) return;
+    const parts = value.split(",");
+    const rest = parts.pop() ?? "";
+    this.addTopics(parts.map((p) => p.trim()));
+    this.topicsInput().setValue(rest.trimStart());
+  }
+
+  /** Tokens plus the text still being typed (so Start works without pressing Enter first). */
+  private collectTopics(): string[] {
+    return [...new Set([...this.topicTokens(), ...splitTopics(this.topicsInput().getValue())])];
+  }
+
+  private rememberTopics(topics: string[]): string[] {
+    const history = [...topics, ...((this.state.getProperty("/topicHistory") as { text: string }[]) ?? []).map((h) => h.text)];
+    const unique = [...new Set(history)].slice(0, MAX_TOPIC_HISTORY);
+    this.state.setProperty(
+      "/topicHistory",
+      unique.map((text) => ({ text }))
+    );
+    return unique;
   }
 
   /** Keeps the remembered broker if it still exists, otherwise picks the first one. */
@@ -145,10 +211,7 @@ export default class Main extends Controller {
     const s = this.state.getData() as Record<string, string>;
     if (this.state.getProperty("/subscriptionId")) return;
     if (!s.brokerId) return void MessageToast.show("Select a broker");
-    const topics = (s.topicsText || "")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const topics = this.collectTopics();
     if (s.sourceType === "TOPIC" && !topics.length) return void MessageToast.show("Enter at least one topic");
     if (s.sourceType !== "TOPIC" && !s.queue?.trim()) return void MessageToast.show("Enter a queue name");
     const needsPassword = this.state.getProperty("/needsPassword") as boolean;
@@ -170,13 +233,26 @@ export default class Main extends Controller {
       op.destroy(); // drop the request incl. password from the model
       this.state.setProperty("/password", "");
       await this.socket.enter(id);
-      savePrefs({ brokerId: s.brokerId, sourceType: s.sourceType, topicsText: s.topicsText, queue: s.queue });
+      // the text that was still being typed is now a topic, too
+      this.topicsInput().setValue("");
+      this.addTopics(topics);
+      const history = s.sourceType === "TOPIC" ? this.rememberTopics(topics) : ((this.state.getProperty("/topicHistory") as { text: string }[]) ?? []).map((h) => h.text);
+      savePrefs({
+        brokerId: s.brokerId,
+        sourceType: s.sourceType,
+        topicsText: topics.join(", "),
+        topicHistory: history,
+        queue: s.queue
+      });
 
       const label = s.sourceType === "TOPIC" ? topics.join(", ") : `${s.sourceType === "QUEUE_BROWSE" ? "Browsing" : "Consuming"} ${s.queue.trim()}`;
       this.state.setProperty("/subscriptionId", id);
+      this.state.setProperty("/brokerName", (this.byId("broker") as Select).getSelectedItem()?.getText() ?? "");
       this.state.setProperty("/sourceLabel", label);
-      this.state.setProperty("/status", `Subscribed: ${label}`);
+      this.state.setProperty("/status", "Subscribed");
       this.heartbeatTimer = setInterval(() => void this.heartbeat(), HEARTBEAT_MS);
+      // the form is not needed while listening - give the messages the room
+      this.setHeaderExpanded(false);
     } catch (e) {
       MessageBox.error(errorText(e));
     } finally {
@@ -212,6 +288,11 @@ export default class Main extends Controller {
     this.heartbeatTimer = undefined;
     this.state.setProperty("/subscriptionId", null);
     this.state.setProperty("/status", status);
+    this.setHeaderExpanded(true);
+  }
+
+  private setHeaderExpanded(expanded: boolean): void {
+    (this.byId("page") as DynamicPage | undefined)?.setHeaderExpanded(expanded);
   }
 
   private async heartbeat(): Promise<void> {
@@ -328,11 +409,14 @@ export default class Main extends Controller {
     const item = event.getParameter("listItem") as ColumnListItem;
     const msg = item.getBindingContext("state")!.getObject() as LiveMessage;
     const json = tryJson(msg.payload);
+    const properties = (tryJson(msg.userProperties) ?? {}) as Record<string, unknown>;
     this.state.setProperty("/selected", {
       ...msg,
       prettyPayload: json !== undefined ? JSON.stringify(json, null, 2) : msg.payload,
       editorType: json !== undefined ? "json" : "text",
-      prettyProperties: JSON.stringify(tryJson(msg.userProperties) ?? {}, null, 2)
+      prettyProperties: JSON.stringify(properties, null, 2),
+      propertyCount: Object.keys(properties).length,
+      receivedLocal: new Date(msg.receivedAt).toLocaleString()
     } as SelectedMessage);
   }
 
@@ -401,6 +485,13 @@ export default class Main extends Controller {
       MessageBox.error(errorText(e));
     }
   }
+}
+
+function splitTopics(text: string): string[] {
+  return text
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 function loadPrefs(): SubscriberPrefs {

@@ -200,7 +200,7 @@ The **Last Result** of each test case is also shown in the test case list and in
 
 1. **Broker** – choose a broker. For direct brokers enter the password (it is not stored), and the username if the broker has none maintained.
 2. **Source**:
-   - **Topics** – one or more topic subscriptions, comma-separated, wildcards allowed: `*` = one level, `>` = all remaining levels. Example: `shop/orders/>, shop/*/updated/v1`.
+   - **Topics** – one or more topic subscriptions. Type a topic and press **Enter** (or type a comma) to add it to the list; click the **×** on a topic to remove it. Topics you used before are suggested while you type. Wildcards are allowed: `*` = one level, `>` = all remaining levels. Example: `shop/orders/>`, `shop/*/updated/v1`.
    - **Browse Queue** – shows the messages in a queue **without removing them**.
    - **Consume Queue** – reads and **removes** the messages from the queue.
 3. **Start**.
@@ -220,7 +220,7 @@ Messages appear at the top of the list. Select one to see payload (formatted), u
 
 Good to know:
 
-- Broker, mode, topics and queue are remembered in your browser for next time.
+- Broker, mode, topics and queue are remembered in your browser for next time. While a subscription is running, the form collapses to a one-line summary; click the title (or the arrow) to open it again.
 - The list keeps the latest 500 messages. If more than 100 messages per second arrive, not all are displayed (you get a notice). Very large payloads are shortened in the display.
 - You can run up to 5 subscriptions at the same time. A subscription ends automatically about 5 minutes after you close the browser tab.
 - Messages from a topic subscription arrive as *DIRECT* even if they were published persistent – that is how the broker delivers to topic subscribers.
