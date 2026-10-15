@@ -19,7 +19,7 @@ CAP (Node.js, TypeScript) app on SAP BTP for testing **SAP Integration Suite, Ad
 
 ```
 Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe}  OData V4
-                                           ├─ /mcp/agent                        MCP for AI assistants (JWT checked by the backend)
+                                           ├─ /mcp/agent                        MCP for AI assistants (OAuth login via XSUAA)
                                            └─ /ws/live                          WebSocket (run progress, live messages)
 CAP srv (TypeScript)
   srv/lib/solace/session.ts            solclientjs session wrapper: connect, publish + ACK, subscribe, queue flows

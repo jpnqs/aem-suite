@@ -245,7 +245,20 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 - **Prompt injection:** the adapter does not filter data. `@mcp.instructions` tell the model that payloads, topics and errors are data and never instructions, and not to run tests on brokers the user did not name. Connect only trusted assistants.
 - **Authorization:** `@requires: 'Tester'` on the service, checked by the adapter on every request. Anonymous requests get 401.
 
-**Connecting a client.** Locally: URL `http://localhost:4004/mcp/agent` with HTTP Basic (`tester:tester`). Deployed: the approuter forwards `/mcp/*` without its own login (`authenticationType: none`); the backend demands a valid **XSUAA JWT** (`Authorization: Bearer ...`) with the `Tester` scope. Getting such a token for an AI client (OAuth against the XSUAA service, or a gateway such as the MCP Gateway of SAP Integration Suite in front) is part of your landscape setup. `cds.mcp.autowire` is **off**: the plugin would otherwise write mock logins into `~/.claude.json` and the OpenCode config whenever `cds watch` starts.
+**Connecting a client (OAuth).** The endpoint implements the [MCP authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) discovery, so clients log the user in against XSUAA themselves (authorization code + PKCE, refresh tokens). `@cap-js/mcp` has no OAuth support; `srv/lib/mcp-oauth.ts` (registered in `srv/server.ts`) adds it:
+
+| Piece | What it does |
+|---|---|
+| `WWW-Authenticate: Bearer resource_metadata="<app>/.well-known/oauth-protected-resource/mcp/agent"` | added to every 401 of `/mcp/*` (no, invalid or expired token) |
+| `GET /.well-known/oauth-protected-resource[/mcp/agent]` | RFC 9728: resource `<app>/mcp/agent`, authorization server `<app>` |
+| `GET /.well-known/oauth-authorization-server` | RFC 8414: XSUAA's `/oauth/authorize`, `/oauth/token`, `/token_keys`, PKCE `S256`. Served by the app because XSUAA only offers OpenID discovery, which not every MCP client falls back to. |
+
+- `<app>` is the URL the client used: `cds.aemSuite.mcp.publicUrl`, else derived from the approuter's `x-forwarded-proto` / `x-forwarded-host`. The XSUAA URL comes from the bound credentials (`cds.requires.auth.credentials.url`, override `cds.aemSuite.mcp.authorizationServer`). Without XSUAA (local mocked auth) nothing is advertised (404, no header).
+- The approuter forwards `/mcp/*` and `/.well-known/oauth-*` without its own login (`authenticationType: none`); the backend demands a valid **XSUAA JWT** with the `Tester` scope.
+- **No dynamic client registration** (XSUAA has none): clients use the app's own XSUAA client. `mta.yaml` creates the service key `mcp-client` (`cf service-key aem-suite-auth mcp-client` → `clientid`, `clientsecret`) and allows the callback `http://localhost:8765/**`. The secret only identifies the client; every user still logs in personally and gets their own roles. If one shared secret is not acceptable, put SAP Cloud Identity Services (public client with PKCE) in front instead.
+- Locally: URL `http://localhost:4004/mcp/agent` with HTTP Basic (`tester:tester`).
+
+`cds.mcp.autowire` is **off**: the plugin would otherwise write mock logins into `~/.claude.json` and the OpenCode config whenever `cds watch` starts.
 
 **Requirements and tests.** The plugin loads an ES-module-only package, so Node.js must be **22.12 or newer** (`require` of ES modules). Jest cannot do that; `jest.config.js` maps `@toon-format/toon` to a tiny JSON stand-in (`test/shims/toon.js`) that only formats tool results. `test/agent.test.ts` talks real MCP JSON-RPC to the running test server.
 
@@ -370,7 +383,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 - **Scopes / role templates** (`xs-security.json`): `Admin` (contains `Tester`), `Tester`. Role collections `AEM_Suite_Admin`, `AEM_Suite_Tester`.
 - `AdminService` requires `Admin`; `TestService`, `SubscribeService`, `LiveService` require `Tester`.
-- Approuter (`app/router/xs-app.json`): `/odata/*` with CSRF, `/mcp/*` passed through (the backend checks the bearer token), `/ws/*` with websockets enabled, everything else served from `resources/` (no-cache), all routes `xsuaa`.
+- Approuter (`app/router/xs-app.json`): `/odata/*` with CSRF, `/mcp/*` and `/.well-known/oauth-*` passed through (the backend checks the bearer token and serves the OAuth discovery), `/ws/*` with websockets enabled, everything else served from `resources/` (no-cache), all routes `xsuaa`.
 - Data visibility: all testers share test cases, runs and saved messages (team workspace); the "my entries" filter is a UI default, not an authorization. Subscriptions can only be stopped by their owner.
 - Broker passwords: see 7.3. Destination credentials stay in the BTP destination service.
 - AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
@@ -389,6 +402,8 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `cds.aemSuite.agent.maxRunResults` | 100 | test cases x brokers of one run started by an AI agent |
 | `cds.aemSuite.agent.maxActiveRuns` | 2 | runs of one user that an agent may have in progress |
 | `cds.aemSuite.agent.allowDirectCredentials` | false | development only: let `runTests` accept passwords of direct brokers (they would pass through the AI conversation) |
+| `cds.aemSuite.mcp.publicUrl` | – | public app URL for the MCP OAuth discovery; default: from the approuter's forwarded headers |
+| `cds.aemSuite.mcp.authorizationServer` | XSUAA `credentials.url` | authorization server advertised to MCP clients |
 | `cds.mcp.prefix` / `cds.mcp.autowire` | true / false | MCP plugin: prefix tool names with the service name; do not register the endpoint in local AI clients automatically |
 | env `destinations` | – | local destinations (JSON array, SAP Cloud SDK format + `msgVpn`/`smfUrl`) |
 | env `NODE_ENV=production` | – | disables the dev no-cache middleware (`srv/server.ts`) |

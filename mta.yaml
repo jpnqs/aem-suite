@@ -73,12 +73,17 @@ resources:
       service: xsuaa
       service-plan: application
       path: ./xs-security.json
+      # credentials for AI clients (MCP): cf service-key aem-suite-auth mcp-client
+      service-keys:
+        - name: mcp-client
       config:
         xsappname: aem-suite-${org}-${space}
         tenant-mode: dedicated
         oauth2-configuration:
           redirect-uris:
             - https://*.${default-domain}/**
+            # OAuth callback of local AI clients (e.g. claude mcp add ... --callback-port 8765)
+            - http://localhost:8765/**
   - name: aem-suite-db
     type: com.sap.xs.hdi-container
     parameters:

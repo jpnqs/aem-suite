@@ -348,13 +348,27 @@ The suite can be connected to an AI assistant (for example Claude Code or anothe
 
 **Connect**
 
-The address is `<your app>/mcp/agent`; you need the **Tester** role. Locally (`npm run watch`):
+The address is `<your app>/mcp/agent` (the same host as the launchpad); you need the **Tester** role. The assistant logs you in with your normal BTP login – you never copy a token by hand.
+
+1. Get the **client ID** and **client secret** of the app from your administrator. They identify the app, not you, and are the same for everyone.
+2. Add the server, for example in Claude Code:
+
+   ```sh
+   claude mcp add --transport http --client-id <client ID> --client-secret --callback-port 8765 aem-suite https://<your app>/mcp/agent
+   ```
+
+   The command asks for the client secret.
+3. Start the assistant and log in: in Claude Code run `/mcp`, choose `aem-suite` and **Authenticate**. A browser window opens with the BTP login; after you sign in, the assistant is connected. The login is renewed automatically; when it has expired, authenticate again the same way.
+
+Other assistants work the same way if they support MCP with OAuth: enter the address, client ID, client secret and the callback address `http://localhost:8765/callback`.
+
+The assistant acts as **you**: it sees and may do exactly what your roles allow, and everything it creates is stored under your user.
+
+*Local development* (`npm run watch`) has no BTP login; use the demo login `tester:tester` instead:
 
 ```sh
 claude mcp add --transport http aem-suite http://localhost:4004/mcp/agent --header "Authorization: Basic dGVzdGVyOnRlc3Rlcg=="
 ```
-
-(`dGVzdGVyOnRlc3Rlcg==` is the local demo login `tester:tester`.) For the deployed app the assistant must send a valid login token of your BTP user (`Authorization: Bearer …`); ask your administrator how your organisation hands those out.
 
 **Things you can ask**
 
