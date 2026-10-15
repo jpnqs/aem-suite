@@ -1,12 +1,12 @@
 import cds from '@sap/cds'
-import { currentJwt, loadBroker } from './lib/credentials/resolve'
-import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord } from './lib/test-case-spec'
+import { currentJwt } from './lib/credentials/resolve'
+import { TestCaseRecord } from './lib/test-case-spec'
+import { buildPreview } from './lib/preview'
 import { BrokerCredential, createRun, executeRunInBackground, toCredentials } from './lib/test-runner'
-import { detectContentType, inferPropertyType, STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
+import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
 import { copyNodes } from './lib/copy-nodes'
-import { compareSiblings, loadTree, TreeNode } from './lib/tree'
-
-const VAR_NAME = /^[A-Za-z_][\w.-]*$/
+import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/node-validation'
+import { compareSiblings, TreeNode } from './lib/tree'
 
 export default class TestService extends cds.ApplicationService {
   async init() {
@@ -33,72 +33,16 @@ export default class TestService extends cds.ApplicationService {
     })
 
     // tree: parent must be a folder and must not be the node itself or below it; new nodes go to the end
+    // (the rules live in lib/node-validation.ts - the AI agent service applies the same ones)
     this.before(['CREATE', 'UPDATE'], TestCases, async (req) => {
-      const d = req.data as TestCaseRecord & { sortOrder?: number | null }
-      const id = d.ID ?? keyOf(req).ID
-      if (d.parent_ID !== undefined && d.parent_ID !== null) {
-        const tree = await loadTree()
-        const parent = tree.byId.get(d.parent_ID)
-        if (!parent) return req.error(400, 'Parent folder not found', 'in/parent_ID')
-        if (parent.kind !== 'FOLDER') return req.error(400, 'Test cases can only be placed in folders', 'in/parent_ID')
-        if (id && tree.isWithin(d.parent_ID, id)) return req.error(400, 'A folder cannot be moved into itself', 'in/parent_ID')
-      }
-      if (req.event === 'CREATE' && !d.sortOrder) {
-        const siblings = (await SELECT.from('aem.suite.TestCases')
-          .columns('sortOrder')
-          .where({ parent_ID: d.parent_ID ?? null })) as { sortOrder: number | null }[]
-        d.sortOrder = Math.max(0, ...siblings.map((x) => x.sortOrder ?? 0)) + 10
-      }
+      const d = req.data as NodeData
+      const reject: Reject = (status, message, target) => req.error(status, message, target)
+      if (!(await validateParent(d, d.ID ?? keyOf(req).ID, reject))) return
+      if (req.event === 'CREATE' && !d.sortOrder) d.sortOrder = await nextSortOrder(d.parent_ID)
     })
 
     this.before(['CREATE', 'UPDATE'], TestCases, (req) => {
-      const d = req.data as TestCaseRecord
-      const isFolder = d.kind === 'FOLDER'
-      if (isFolder) {
-        if ((req.event === 'CREATE' || d.name !== undefined) && !d.name?.trim())
-          req.error(400, 'Folder name is required', 'in/name')
-      } else if (d.kind === 'TEST' || req.event === 'CREATE') {
-        if (!d.topic?.trim()) req.error(400, 'Topic is required', 'in/topic')
-      }
-      // fill what was left empty
-      if (!d.name && d.topic) d.name = d.topic.slice(0, 200)
-      if (!d.contentType && d.payload !== undefined) d.contentType = detectContentType(d.payload)
-      d.userProperties?.forEach((p) => {
-        if (!p.type) p.type = inferPropertyType(p.value)
-      })
-      if (d.payload) {
-        // placeholders are replaced by 0 so templated numbers ({{count}}) stay valid JSON
-        const probe = d.payload.replace(/\{\{[^}]*\}\}/g, '0')
-        const isJson = !d.contentType || /json/i.test(d.contentType)
-        if (isJson) {
-          try {
-            JSON.parse(probe)
-          } catch (e) {
-            req.error(400, `Payload is not valid JSON: ${(e as Error).message}`, 'in/payload')
-          }
-        }
-      }
-      if (d.ackTimeoutMs != null && (d.ackTimeoutMs < 100 || d.ackTimeoutMs > 120000))
-        req.error(400, 'ACK timeout must be between 100 and 120000 ms', 'in/ackTimeoutMs')
-      if (d.priority != null && (d.priority < 0 || d.priority > 255))
-        req.error(400, 'Priority must be between 0 and 255', 'in/priority')
-
-      const seen = new Set<string>()
-      d.userProperties?.forEach((p, i) => {
-        if (seen.has(p.name)) req.error(400, `Duplicate user property "${p.name}"`, `in/userProperties(${i})/name`)
-        seen.add(p.name)
-        const templated = /\{\{/.test(p.value ?? '')
-        if (p.type === 'INT' && !templated && !/^-?\d+$/.test(p.value ?? ''))
-          req.error(400, `User property "${p.name}" must be an integer`, `in/userProperties(${i})/value`)
-        if (p.type === 'BOOL' && !templated && !/^(true|false|1|0|yes|no)$/i.test(p.value ?? ''))
-          req.error(400, `User property "${p.name}" must be true or false`, `in/userProperties(${i})/value`)
-      })
-      const seenVars = new Set<string>()
-      d.variables?.forEach((v, i) => {
-        if (!VAR_NAME.test(v.name ?? '')) req.error(400, `Invalid variable name "${v.name}"`, `in/variables(${i})/name`)
-        if (seenVars.has(v.name)) req.error(400, `Duplicate variable "${v.name}"`, `in/variables(${i})/name`)
-        seenVars.add(v.name)
-      })
+      validateNode(req.data as NodeData, req.event, (status, message, target) => req.error(status, message, target))
     })
 
     // drag & drop: place the node before NextSibling (null = at the end).
@@ -162,26 +106,7 @@ export default class TestService extends cds.ApplicationService {
         t.variables((v: any) => v`.*`)
       })) as TestCaseRecord | null
       if (!tc) return req.error(404, 'Test case not found')
-
-      try {
-        const broker = brokerId ? await loadBroker(brokerId) : undefined
-        const vars = await loadVariableScopes(broker ? [broker.ID] : [])
-        const spec = buildSpec(tc, scopeFor(tc, broker, vars))
-        return {
-          topic: spec.topic,
-          payload: prettyJson(spec.payload),
-          correlationId: spec.correlationId ?? null,
-          userProperties: JSON.stringify(
-            Object.fromEntries((spec.userProperties ?? []).map((p) => [p.name, p.value])),
-            null,
-            2
-          ),
-          valid: true,
-          message: broker ? `Resolved for broker ${broker.name}` : 'Resolved with global variables only'
-        }
-      } catch (e) {
-        return { valid: false, message: (e as Error).message }
-      }
+      return buildPreview(tc, brokerId)
     })
 
     // copy of a test case or a folder (with everything below it), placed right after the original
@@ -210,12 +135,4 @@ async function startRun(req: cds.Request, testCaseIds: string[], brokerIds: stri
 function keyOf(req: cds.Request): { ID: string; IsActiveEntity?: boolean } {
   const p = req.params[0] as unknown
   return typeof p === 'string' ? { ID: p } : (p as { ID: string; IsActiveEntity?: boolean })
-}
-
-function prettyJson(s: string): string {
-  try {
-    return JSON.stringify(JSON.parse(s), null, 2)
-  } catch {
-    return s
-  }
 }
