@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test'
 
 /** The tiles of the sandbox launchpad (app/launchpad/webapp/index.html). */
 export const apps = {
+  home: { intent: 'AEMSuiteHome-display', title: 'AEM Suite – Home' },
   testCases: { intent: 'AEMSuiteTestCases-manage', title: 'AEM Suite – Test Cases' },
   runs: { intent: 'AEMSuiteTestRuns-display', title: 'AEM Suite – Test Runs' },
   subscriber: { intent: 'AEMSuiteSubscriber-display', title: 'AEM Suite – Live Subscriber' },

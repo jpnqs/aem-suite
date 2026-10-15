@@ -28,6 +28,7 @@ Open the launchpad – the suite's own start page, or your SAP Build Work Zone s
 
 | Tile | What for | Role |
 |---|---|---|
+| **Home** | start page: the state of the suite at a glance, your apps and the latest runs | everyone |
 | **Test Cases** | create, organize and run test cases | Tester |
 | **Test Runs** | results of all runs | Tester |
 | **Live Subscriber** | watch topics and queues live | Tester |

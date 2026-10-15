@@ -110,6 +110,10 @@ modules:
           artifacts:
             - comaemsuitehelp.zip
           target-path: resources/
+        - name: aem-suite-home
+          artifacts:
+            - comaemsuitehome.zip
+          target-path: resources/
 
   # Instance-level destinations for the managed approuter (SAP Build Work Zone), sap.cloud.service "aemsuite"
   # (= "sap.cloud" in the manifests). Also creates the XSUAA service key used by AI clients (MCP).
@@ -219,6 +223,15 @@ modules:
   - name: aem-suite-help
     type: html5
     path: app/help
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-home
+    type: html5
+    path: app/home
     build-parameters:
       build-result: dist
       builder: custom

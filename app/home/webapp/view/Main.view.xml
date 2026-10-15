@@ -1,0 +1,106 @@
+<mvc:View
+  controllerName="com.aem.suite.home.controller.Main"
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns:core="sap.ui.core"
+  xmlns:f="sap.f"
+  xmlns:card="sap.f.cards"
+  xmlns="sap.m"
+  displayBlock="true"
+  height="100%">
+  <Page showHeader="false" class="aemHome">
+
+    <!-- header with greeting -->
+    <VBox renderType="Bare" class="aemHomeHero">
+      <VBox renderType="Bare" class="aemHomeHeroInner">
+        <HBox renderType="Bare" justifyContent="SpaceBetween" alignItems="Start" class="aemHomeHeroTop">
+          <VBox renderType="Bare">
+            <Text text="{i18n>hero.eyebrow}" class="aemHomeEyebrow" />
+            <Title text="{i18n>hero.title}" level="H1" wrapping="true" class="aemHomeTitle" />
+          </VBox>
+          <Button
+            icon="sap-icon://refresh"
+            tooltip="{i18n>hero.refresh}"
+            type="Transparent"
+            busy="{home>/busy}"
+            busyIndicatorDelay="0"
+            press=".onRefresh"
+            class="aemHomeHeroIconButton" />
+        </HBox>
+        <Text text="{home>/greeting}" visible="{home>/loaded}" class="aemHomeGreeting" />
+        <Text text="{i18n>hero.tagline}" class="aemHomeTagline" />
+        <HBox renderType="Bare" wrap="Wrap" class="aemHomeHeroActions">
+          <Button text="{i18n>hero.testCases}" icon="sap-icon://lab" visible="{home>/tester}" press=".onOpenKey">
+            <customData><core:CustomData key="app" value="testcases" /></customData>
+          </Button>
+          <Button text="{i18n>hero.live}" icon="sap-icon://feeder-arrow" visible="{home>/tester}" press=".onOpenKey">
+            <customData><core:CustomData key="app" value="subscriber" /></customData>
+          </Button>
+          <Button text="{i18n>hero.help}" icon="sap-icon://sys-help" press=".onOpenKey">
+            <customData><core:CustomData key="app" value="help" /></customData>
+          </Button>
+        </HBox>
+      </VBox>
+    </VBox>
+
+    <VBox renderType="Bare" class="aemHomeBody">
+      <!-- needs attention: only when something is wrong, else one quiet line -->
+      <MessageStrip text="{home>/error}" type="Error" showIcon="true" visible="{= !!${home>/error} }" class="aemHomeStrip" />
+      <VBox renderType="Bare" visible="{= ${home>/attention}.length > 0 }" class="aemHomeAttention">
+        <Title text="{i18n>attention.title}" level="H2" class="aemHomeAttentionTitle" />
+        <List items="{path: 'home>/attention', templateShareable: false}" showSeparators="Inner" backgroundDesign="Transparent">
+          <CustomListItem highlight="{home>state}">
+            <HBox renderType="Bare" justifyContent="SpaceBetween" alignItems="Center" class="aemHomeAttentionItem">
+              <ObjectStatus text="{home>text}" state="{home>state}" icon="{home>icon}" />
+              <Link text="{home>action}" visible="{= !!${home>target} }" press=".onOpenApp" />
+            </HBox>
+          </CustomListItem>
+        </List>
+      </VBox>
+      <ObjectStatus
+        text="{i18n>attention.none}"
+        state="Success"
+        icon="sap-icon://sys-enter-2"
+        visible="{= ${home>/tester} &amp;&amp; ${home>/attention}.length === 0 }"
+        class="aemHomeAllGood" />
+
+      <!-- the apps -->
+      <Title text="{i18n>apps.title}" level="H2" class="aemHomeSectionTitle" />
+      <FlexBox renderType="Bare" items="{path: 'home>/apps', templateShareable: false}" class="aemHomeTiles">
+        <f:Card class="aemHomeTile">
+          <f:header>
+            <card:Header
+              title="{home>title}"
+              subtitle="{home>line}"
+              iconSrc="{home>icon}"
+              iconDisplayShape="Square"
+              iconBackgroundColor="{home>color}"
+              press=".onOpenApp" />
+          </f:header>
+        </f:Card>
+      </FlexBox>
+
+      <!-- latest runs -->
+      <VBox renderType="Bare" visible="{home>/tester}" class="aemHomeRunsSection">
+        <HBox renderType="Bare" justifyContent="SpaceBetween" alignItems="Baseline" class="aemHomeSectionTitle">
+          <Title text="{i18n>runs.title}" level="H2" />
+          <Link text="{i18n>runs.all}" press=".onOpenKey">
+            <customData><core:CustomData key="app" value="runs" /></customData>
+          </Link>
+        </HBox>
+        <List items="{path: 'home>/lastRuns', templateShareable: false}" showSeparators="Inner" class="aemHomeRuns">
+          <noData>
+            <IllustratedMessage illustrationType="sapIllus-NoActivities" illustrationSize="Dot" title="{i18n>runs.empty.title}" description="{i18n>runs.empty}" />
+          </noData>
+          <StandardListItem
+            title="{home>summary}"
+            info="{home>when}"
+            icon="{home>icon}"
+            highlight="{home>state}"
+            wrapping="false"
+            type="Active"
+            press=".onOpenRun" />
+        </List>
+      </VBox>
+    </VBox>
+  </Page>
+</mvc:View>

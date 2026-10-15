@@ -1,0 +1,205 @@
+/* Home app - theme aware (SAP theming parameters only), works in light and dark themes */
+
+.aemHome {
+  background: var(--sapBackgroundColor);
+}
+
+/* ---- header with greeting */
+.aemHomeHero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(120deg, var(--sapBrandColor) 0%, var(--sapButton_Emphasized_Hover_Background, var(--sapBrandColor)) 55%, var(--sapChart_OrderedColor_5, var(--sapBrandColor)) 100%);
+  color: var(--sapButton_Emphasized_TextColor);
+}
+
+/* two soft circles as decoration */
+.aemHomeHero::before,
+.aemHomeHero::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.07;
+  pointer-events: none;
+}
+
+.aemHomeHero::before {
+  width: 28rem;
+  height: 28rem;
+  right: -6rem;
+  top: -12rem;
+}
+
+.aemHomeHero::after {
+  width: 16rem;
+  height: 16rem;
+  right: 18rem;
+  bottom: -9rem;
+}
+
+.aemHomeHeroInner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 2rem;
+  box-sizing: border-box;
+}
+
+.aemHomeHeroTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.aemHomeEyebrow.sapMText {
+  color: inherit;
+  opacity: 0.85;
+  font-size: var(--sapFontSmallSize);
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.aemHomeTitle.sapMTitle {
+  color: inherit;
+  font-size: 2.5rem;
+  line-height: 1.15;
+  font-family: var(--sapFontHeaderFamily);
+  margin-top: 0.25rem;
+}
+
+.aemHomeGreeting.sapMText {
+  color: inherit;
+  font-size: var(--sapFontHeader4Size);
+  margin-top: 0.5rem;
+}
+
+.aemHomeTagline.sapMText {
+  color: inherit;
+  opacity: 0.9;
+  max-width: 44rem;
+}
+
+.aemHomeHeroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.aemHomeHeroIconButton.sapMBtn .sapMBtnInner {
+  background: transparent;
+  border-color: transparent;
+}
+
+.aemHomeHeroIconButton.sapMBtn .sapMBtnIcon {
+  color: var(--sapButton_Emphasized_TextColor);
+}
+
+/* ---- body: one calm column */
+.aemHomeBody {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.5rem 2rem 3rem;
+  box-sizing: border-box;
+}
+
+.aemHomeStrip {
+  margin-bottom: 1rem;
+}
+
+.aemHomeSectionTitle {
+  display: flex;
+  margin: 1.5rem 0 0.75rem;
+}
+
+.aemHomeSectionTitle.sapMTitle,
+.aemHomeSectionTitle .sapMTitle {
+  font-size: var(--sapFontHeader5Size);
+}
+
+/* needs attention */
+.aemHomeAttention {
+  display: flex;
+  flex-direction: column;
+  background: var(--sapTile_Background);
+  border-radius: var(--sapElement_BorderCornerRadius, 0.75rem);
+  box-shadow: var(--sapContent_Shadow0);
+  padding: 0.75rem 0 0.25rem;
+  overflow: hidden;
+}
+
+.aemHomeAttentionTitle.sapMTitle {
+  font-size: var(--sapFontHeader5Size);
+  padding: 0 1rem 0.25rem;
+}
+
+.aemHomeAttentionItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.aemHomeAllGood {
+  padding: 0.25rem 0;
+}
+
+/* app tiles: icon + title + one line, as many columns as fit */
+.aemHomeTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+
+.aemHomeTile {
+  transition: box-shadow 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.aemHomeTile:hover {
+  box-shadow: var(--sapContent_Shadow2);
+  transform: translateY(-2px);
+}
+
+/* latest runs */
+.aemHomeRunsSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.aemHomeRuns {
+  border-radius: var(--sapElement_BorderCornerRadius, 0.75rem);
+  box-shadow: var(--sapContent_Shadow0);
+  overflow: hidden;
+}
+
+@media (max-width: 600px) {
+  .aemHomeHeroInner,
+  .aemHomeBody {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .aemHomeTitle.sapMTitle {
+    font-size: 2rem;
+  }
+
+  .aemHomeHero::after {
+    display: none;
+  }
+
+  .aemHomeAttentionItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}

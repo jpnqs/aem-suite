@@ -187,7 +187,19 @@ Rules of the rendering (so write the guide accordingly):
 
 **Help app** (`app/help`, `com.aem.suite.help`, tile "AEM Suite – Help"): freestyle UI5 app with a `sap.tnt.SideNavigation` (sections with their `###` headings, search field that filters sections and **highlights** hits), the section as `sap.ui.core.HTML`, and previous / next buttons. The address after the app's own part is a heading anchor: `#AEMSuiteHelp-display&/6-run-tests` opens that section, `…&/export-and-import` the section containing that sub heading and scrolls to it. Links inside the text that point to a heading stay in the app.
 
-**Help buttons.** Every Fiori elements page has a *Help* action in its header (`content.header.actions.help` in the manifests, handler `ext/Help.js`), the Live Subscriber has a *Help* button, and the Run dialog a help link. They open the matching section **in a new browser tab** (`window.open`, so a draft being edited is not lost): inside the launchpad `<launchpad address>#AEMSuiteHelp-display&/<anchor>`, standalone `/help/index.html#/<anchor>`. Each `Help.js` names its section in a constant (`SECTION…`, in the subscriber `HELP_SECTION`); `test/help.test.ts` checks that every one of them is an existing heading of the guide, so renaming a heading cannot silently break a Help button.
+**Help buttons.** Every Fiori elements page has a *Help* action in its header (`content.header.actions.help` in the manifests, handler `shared/Help.js`), the Live Subscriber has a *Help* button, and the Run dialog a help link. They open the matching section **in a new browser tab** (`window.open`, so a draft being edited is not lost): inside the launchpad `<launchpad address>#AEMSuiteHelp-display&/<anchor>`, standalone the sibling app `…/comaemsuitehelp/index.html#/<anchor>` (`shared/Navigation.js`). The sections per app are listed once in `SECTIONS` of `app/_shared/Help.js`; `test/help.test.ts` checks that every one of them is an existing heading of the guide, so renaming a heading cannot silently break a Help button.
+
+### HomeService – `/odata/v4/home` (every logged-in user)
+
+One function for the **Home app**: `overview()` returns who is logged in, whether they are tester / admin, and the figures of the start page – number of test cases and folders, runs and results of the last 7 days (pass rate), the 5 latest runs (with the same `outcome` as the Test Runs app), the active brokers by their last connection test (with the names of the failing ones), saved messages and the user's live subscriptions. The figures are only filled for users with role `Tester`; for everyone else the function returns just the user and the role flags, so the page shows only the Help card and a note to ask for a role.
+
+**Home app** (`app/home`, `com.aem.suite.home`, tile "AEM Suite – Home"): freestyle UI5 start page, kept calm on purpose – every fact appears once:
+- header with greeting and shortcuts;
+- **Needs attention**, only when something is wrong (failed results of the last 7 days, brokers whose last connection test failed, no broker / no test case yet, no role); otherwise one green "All good" line;
+- one compact tile per app the user may open (admin apps only for admins): icon, title and one short line from `overview()`;
+- the 3 latest runs, one line each.
+
+All texts are in `i18n/i18n.properties`; the layout uses CSS grid and SAP theming parameters only, so it works in light and dark themes and on phones. While a run is in progress the page reloads every 10 s. It navigates with `shared/Navigation.js`, like the other apps.
 
 ### Export and import file (`srv/lib/export-import.ts`)
 
@@ -354,6 +366,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `messages` | Fiori elements | Saved messages, *Create Test Case*. |
 | `brokers`, `variables` | Fiori elements | Admin apps. |
 | `help` | Freestyle UI5 | The user guide from `docs/user-guide.md`, see HelpService in section 6. |
+| `home` | Freestyle UI5 | Start page: figures, the apps of the user's roles, latest runs – see HomeService in section 6. |
 
 ### 8.2 Test case app extensions (`app/testcases/webapp/ext`)
 

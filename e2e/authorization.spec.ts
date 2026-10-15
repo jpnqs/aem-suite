@@ -5,7 +5,7 @@ import { apps, openApp, expectAppOpen, expectLoadError } from './launchpad'
 test.use({ httpCredentials: { username: 'tester', password: 'tester' } })
 
 test.describe('authorization (tester)', () => {
-  for (const app of [apps.testCases, apps.runs, apps.subscriber, apps.messages, apps.help]) {
+  for (const app of [apps.home, apps.testCases, apps.runs, apps.subscriber, apps.messages, apps.help]) {
     test(`opens ${app.title}`, async ({ page }) => {
       await openApp(page, app)
       await expectAppOpen(page, app)

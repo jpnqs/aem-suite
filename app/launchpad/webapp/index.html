@@ -9,10 +9,18 @@
       defaultRenderer: "fiori2",
       renderers: { fiori2: { componentData: { config: { enableSearch: false, rootIntent: "Shell-home" } } } },
       applications: {
+        "AEMSuiteHome-display": {
+          title: "AEM Suite – Home",
+          description: "Everyone · All apps and the state of the suite",
+          icon: "sap-icon://home",
+          additionalInformation: "SAPUI5.Component=com.aem.suite.home",
+          applicationType: "URL",
+          url: "../comaemsuitehome/"
+        },
         "AEMSuiteTestCases-manage": {
           title: "AEM Suite – Test Cases",
           description: "Tester · Maintain and run test cases",
-          icon: "sap-icon://test",
+          icon: "sap-icon://lab",
           additionalInformation: "SAPUI5.Component=com.aem.suite.testcases",
           applicationType: "URL",
           url: "../comaemsuitetestcases/"

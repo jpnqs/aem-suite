@@ -38,6 +38,7 @@ HANA Cloud · Destination service · XSUAA
 | `messages` | Fiori elements, saved messages | Tester |
 | `brokers`, `variables` | Fiori elements | Admin |
 | `help` | Freestyle UI5 | Everyone: the user guide, rendered from `docs/user-guide.md` |
+| `home` | Freestyle UI5 | Everyone: start page with figures, the apps of your roles and the latest runs |
 
 `app/launchpad` is a sandbox launchpad that shows all apps as tiles; the standalone approuter uses it as its welcome page. All apps are deployed to the **HTML5 Application Repository** (`comaemsuite<app>`, e.g. `comaemsuitebrokers`), so they are listed under *HTML5 Applications* in the BTP cockpit and can be added to **SAP Build Work Zone** – see [Build and deployment](docs/technical-documentation.md#12-build-and-deployment-cloud-foundry).
 
