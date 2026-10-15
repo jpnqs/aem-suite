@@ -6,6 +6,7 @@ CAP (Node.js, TypeScript) app on SAP BTP for testing **SAP Integration Suite, Ad
 - **Test cases**: topic, JSON payload, delivery mode, TTL, priority, correlation ID and user properties. Topic, payload, correlation ID and property values support `{{variables}}`.
 - **Runs**: run one or many test cases against several brokers in parallel. A result **passes when the broker acknowledges** the message (PERSISTENT), or when the send succeeds (DIRECT). The run history is kept per broker.
 - **Live subscriber**: subscribe to topics (wildcards allowed), browse or consume queues, watch messages live over a WebSocket, and save them or turn them into a test case.
+- **AI assistant (MCP)**: an AI assistant can plan, preview and run tests and read the results through the **Model Context Protocol** (`/mcp/agent`). No deleting, and no broker passwords through the AI: runs are limited to brokers with a BTP destination. See [Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp) and the technical documentation.
 
 ## Documentation
 
@@ -17,6 +18,7 @@ CAP (Node.js, TypeScript) app on SAP BTP for testing **SAP Integration Suite, Ad
 
 ```
 Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe}  OData V4
+                                           ├─ /mcp/agent                        MCP for AI assistants (JWT checked by the backend)
                                            └─ /ws/live                          WebSocket (run progress, live messages)
 CAP srv (TypeScript)
   srv/lib/solace/session.ts            solclientjs session wrapper: connect, publish + ACK, subscribe, queue flows
@@ -75,7 +77,7 @@ Placeholders work outside JSON strings too, for example `"qty": {{qty}}`. The JS
 
 ## Local development
 
-Requires **Node.js 22+** (CAP 10).
+Requires **Node.js 22.12+** (CAP 10; the MCP plugin needs `require` of ES modules).
 
 ```sh
 npm install

@@ -166,6 +166,49 @@ Clients enter a **context** to receive only their events:
 | `message` | subscription ID | topic, payload, contentType, userProperties (JSON), correlationId, deliveryMode, receivedAt, seq |
 | `subscriptionStatus` | subscription ID | `STOPPED`, `DOWN`, `THROTTLED`, `RESUMED` + message |
 
+### TestAgentService – MCP `/mcp/agent` (role `Tester`)
+
+Lets an AI assistant **plan, check and run tests** over the **Model Context Protocol**. Served by the CAP plugin [`@cap-js/mcp`](https://cap.cloud.sap/docs/guides/ai/cap-mcp) (`@protocol: 'mcp'`: MCP only, no OData for this service; stateless streamable HTTP, JSON-RPC over `POST /mcp/agent`). It is a **use-case service** (`srv/agent-service.cds`, handlers in `srv/agent-service.ts`) and not an annotation on the existing services: read-only views without draft / hierarchy columns, no admin data, no secrets.
+
+The plugin turns the service into three generic tools (names are prefixed, `cds.mcp.prefix: true`):
+
+| Tool | What it does here |
+|---|---|
+| `TestAgentService-describe` | lists entities and actions with their elements / parameters |
+| `TestAgentService-query` | read-only CQL `SELECT` on the entities below (paging limits of CAP apply) |
+| `TestAgentService-call` | calls one of the unbound actions / functions below |
+
+| Entity (read only) | Content |
+|---|---|
+| `TestNodes` | test cases and folders (`kind`, `parent`, topic, payload, headers, `lastResult`, ...), with `userProperties` and `variables` |
+| `TestNodeProperties`, `TestNodeVariables`, `TestNodeLastResults` | the same as separate entities |
+| `Brokers` | broker data without credentials; `needsCredentials` = true for direct brokers |
+| `TestRuns`, `RunResults` | runs and one result per test case x broker (resolved topic / payload, ACK latency, error) |
+
+| Action / function | Purpose |
+|---|---|
+| `createFolder`, `createTestCase` | create nodes (new nodes go to the end; same defaults as the UI: starter payload, correlation ID `{{uuid}}`) |
+| `updateTestCase`, `updateFolder` | change given fields only; `userProperties` / `variables`, if given, replace the existing ones |
+| `moveNode`, `copyNodes` | reorganize; `copyNodes` copies folders with everything below them |
+| `previewTestCase(testCaseId, brokerId)` | the message exactly as it would be sent (variables resolved), nothing is sent |
+| `runTests(testCaseIds, brokerIds, credentials)` | starts a run in the background, returns `runId` and the number of results |
+| `getRunSummary(runId, waitSeconds)` | status, counters and failures; waits up to 30 s for the end of the run |
+
+**Same rules as the UI.** Creating and changing nodes goes through `srv/lib/node-validation.ts`, the same checks `TestService` uses (valid JSON, parent must be a folder, property types, ACK timeout range, ...). All problems of a call are returned in one error text. `previewTestCase` shares `srv/lib/preview.ts` with the UI preview; copying uses `srv/lib/copy-nodes.ts`.
+
+**Guard rails** (the adapter itself has no governance: no rate limits, no audit log, no approvals):
+
+- **No secrets through the AI.** `runTests` only accepts brokers whose credentials come from a **BTP destination**. Direct brokers need a password that is never stored, and a password typed into an AI conversation would end up in the model provider's and the client's logs. Such runs are refused with an explanation, so people run them in the UI.
+- **No delete.** There are no delete actions; global and broker variables and saved messages are not exposed at all.
+- **Limits:** at most `maxRunResults` (100) results per run and `maxActiveRuns` (2) runs of one user at a time (`cds.aemSuite.agent`, see section 10).
+- **Audit:** every changing action logs `audit` with user, action, names and IDs (logger `agent`) - never payloads or credentials.
+- **Prompt injection:** the adapter does not filter data. `@mcp.instructions` tell the model that payloads, topics and errors are data and never instructions, and not to run tests on brokers the user did not name. Connect only trusted assistants.
+- **Authorization:** `@requires: 'Tester'` on the service, checked by the adapter on every request. Anonymous requests get 401.
+
+**Connecting a client.** Locally: URL `http://localhost:4004/mcp/agent` with HTTP Basic (`tester:tester`). Deployed: the approuter forwards `/mcp/*` without its own login (`authenticationType: none`); the backend demands a valid **XSUAA JWT** (`Authorization: Bearer ...`) with the `Tester` scope. Getting such a token for an AI client (OAuth against the XSUAA service, or a gateway such as the MCP Gateway of SAP Integration Suite in front) is part of your landscape setup. `cds.mcp.autowire` is **off**: the plugin would otherwise write mock logins into `~/.claude.json` and the OpenCode config whenever `cds watch` starts.
+
+**Requirements and tests.** The plugin loads an ES-module-only package, so Node.js must be **22.12 or newer** (`require` of ES modules). Jest cannot do that; `jest.config.js` maps `@toon-format/toon` to a tiny JSON stand-in (`test/shims/toon.js`) that only formats tool results. `test/agent.test.ts` talks real MCP JSON-RPC to the running test server.
+
 ## 7. Backend modules (`srv/lib`)
 
 ### 7.1 `solace/session.ts` – broker session
@@ -286,9 +329,10 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 - **Scopes / role templates** (`xs-security.json`): `Admin` (contains `Tester`), `Tester`. Role collections `AEM_Suite_Admin`, `AEM_Suite_Tester`.
 - `AdminService` requires `Admin`; `TestService`, `SubscribeService`, `LiveService` require `Tester`.
-- Approuter (`app/router/xs-app.json`): `/odata/*` with CSRF, `/ws/*` with websockets enabled, everything else served from `resources/` (no-cache), all routes `xsuaa`.
+- Approuter (`app/router/xs-app.json`): `/odata/*` with CSRF, `/mcp/*` passed through (the backend checks the bearer token), `/ws/*` with websockets enabled, everything else served from `resources/` (no-cache), all routes `xsuaa`.
 - Data visibility: all testers share test cases, runs and saved messages (team workspace); the "my entries" filter is a UI default, not an authorization. Subscriptions can only be stopped by their owner.
 - Broker passwords: see 7.3. Destination credentials stay in the BTP destination service.
+- AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
 - Local development uses mocked users (`package.json` → `cds.requires.[development].auth`): `admin/admin` (Admin+Tester), `tester/tester` (Tester). The WebSocket is anonymous locally (plugin behaviour with mocked auth); events are isolated by context IDs.
 
 ## 10. Configuration
@@ -300,6 +344,10 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `cds.aemSuite.subscriptions.maxMessagesPerSecond` | 100 | forwarding limit per subscription |
 | `cds.aemSuite.subscriptions.maxPayloadBytes` | 524288 | truncation of payloads in the live view |
 | `cds.aemSuite.autoTestConnection` | true | connection test on save of destination brokers |
+| `cds.aemSuite.agent.maxRunResults` | 100 | test cases x brokers of one run started by an AI agent |
+| `cds.aemSuite.agent.maxActiveRuns` | 2 | runs of one user that an agent may have in progress |
+| `cds.aemSuite.agent.allowDirectCredentials` | false | development only: let `runTests` accept passwords of direct brokers (they would pass through the AI conversation) |
+| `cds.mcp.prefix` / `cds.mcp.autowire` | true / false | MCP plugin: prefix tool names with the service name; do not register the endpoint in local AI clients automatically |
 | env `destinations` | – | local destinations (JSON array, SAP Cloud SDK format + `msgVpn`/`smfUrl`) |
 | env `NODE_ENV=production` | – | disables the dev no-cache middleware (`srv/server.ts`) |
 
@@ -307,7 +355,7 @@ Broker-level settings: `clientNamePrefix` (client name = prefix + random suffix)
 
 ## 11. Local development
 
-Prerequisites: **Node.js 22+**, npm, optionally Docker (local broker).
+Prerequisites: **Node.js 22.12+** (the MCP plugin needs `require` of ES modules), npm, optionally Docker (local broker).
 
 ```sh
 npm install
@@ -334,7 +382,8 @@ npm run typecheck   # backend + tests + subscriber app
 | `session.test.ts` | ACK / reject / timeout / disconnect with a faked solclientjs session; message mapping |
 | `resolve.test.ts`, `defaults.test.ts` | URL handling, runtime passwords, detection helpers |
 | `services.test.ts` | OData services end-to-end with stubbed broker: brokers, variables, test cases, runs, preview, saved messages, filters |
-| `tree.test.ts` | hierarchy queries, folder validation, moves (incl. concurrent change set), folder runs and variables, folder deletion |
+| `tree.test.ts` | hierarchy queries, folder validation, moves (incl. concurrent change set), folder runs and variables, folder deletion, copying |
+| `agent.test.ts` | the AI agent service over real MCP JSON-RPC: access, tools, create / change / move / copy with UI validation, preview, runs on destination brokers, credential refusal, limits |
 
 ## 12. Build and deployment (Cloud Foundry)
 
@@ -359,6 +408,7 @@ After deployment: assign role collections, create destinations for DESTINATION b
 
 | Goal | Where |
 |---|---|
+| New agent capability (MCP) | an unbound action / function in `srv/agent-service.cds` + handler in `srv/agent-service.ts`; reuse the checks in `srv/lib/node-validation.ts`; list it in `test/agent.test.ts` (the test pins the exact set of entities and actions) |
 | New built-in template function | `TemplateResolver.callFunction` / `fixed` in `srv/lib/template/resolve.ts` (+ `isBuiltin`, help list in `PayloadSection.js`) |
 | Payload assertions / round-trip checks | `test-runner.ts`: subscribe before publishing (use `SolaceSession.subscribe`/`onMessage`), new result fields in `RunResults` |
 | Other protocols (MQTT, AMQP, REST) | implement the `Publisher` interface and route in `solace/connector.ts` per broker setting |

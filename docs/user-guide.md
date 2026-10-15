@@ -17,7 +17,8 @@ save messages as **test cases**, send them to one or several brokers with one cl
 8. [Watch messages live (Live Subscriber)](#8-watch-messages-live-live-subscriber)
 9. [Saved messages](#9-saved-messages)
 10. [Variables and templates](#10-variables-and-templates)
-11. [Tips and troubleshooting](#11-tips-and-troubleshooting)
+11. [Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
+12. [Tips and troubleshooting](#12-tips-and-troubleshooting)
 
 ---
 
@@ -286,7 +287,51 @@ If a variable cannot be found, the result is **ERROR** with "Unknown variable(s)
 
 ---
 
-## 11. Tips and troubleshooting
+## 11. Use an AI assistant (MCP)
+
+The suite can be connected to an AI assistant (for example Claude Code or another tool that supports the *Model Context Protocol*). The assistant can then **look at your test cases and brokers, plan new tests, preview messages, run tests and explain the results** – you describe what you want in plain language.
+
+**What the assistant can do**
+
+| | |
+|---|---|
+| Look | read test cases, folders, variables of folders, brokers (without credentials), runs and results |
+| Plan | create and change folders and test cases, move and copy them – with the same checks as in the apps (e.g. the payload must be valid JSON) |
+| Check | **preview** a message exactly as it would be sent to a broker |
+| Run | run test cases or whole folders, wait for the result, list what failed and why |
+
+**What it cannot do (on purpose)**
+
+- **No deleting**, and no access to global variables, broker variables or saved messages.
+- **No runs on direct brokers.** For those you enter a password for every run, and a password typed into an AI chat would be stored in logs. The assistant can run tests on brokers that use a **BTP destination** (*Credentials: BTP Destination*). For direct brokers it tells you to run the tests in the app.
+- At most 100 results (test cases × brokers) per run and 2 runs at a time per user.
+
+**Connect**
+
+The address is `<your app>/mcp/agent`; you need the **Tester** role. Locally (`npm run watch`):
+
+```sh
+claude mcp add --transport http aem-suite http://localhost:4004/mcp/agent --header "Authorization: Basic dGVzdGVyOnRlc3Rlcg=="
+```
+
+(`dGVzdGVyOnRlc3Rlcg==` is the local demo login `tester:tester`.) For the deployed app the assistant must send a valid login token of your BTP user (`Authorization: Bearer …`); ask your administrator how your organisation hands those out.
+
+**Things you can ask**
+
+- *"Which test cases exist for orders, and which of them failed last time?"*
+- *"Create a folder 'Inventory' with a test case for `acme/inventory/updated/v1/{{sku}}`, payload with sku and quantity, and show me how it looks for broker `aem-dev`."*
+- *"Run all tests in the folder Orders on `aem-dev` and tell me what failed."*
+- *"Copy the folder Orders to 'Orders EU' and change the variable `region` to `eu`."*
+
+**Good to know**
+
+- Everything the assistant creates shows up in the apps like your own test cases (created by *your* user).
+- Messages, topics and error texts from the broker are only shown to the assistant as data; it is told never to follow instructions found in them. Still: connect only assistants you trust, and look at what it plans to run.
+- Every change the assistant makes is logged on the server (who, what – never payloads or passwords).
+
+---
+
+## 12. Tips and troubleshooting
 
 | Message / situation | What to do |
 |---|---|
