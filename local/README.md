@@ -62,3 +62,50 @@ the Docker host's open-file limit is too low. This is fixed via the `ulimits.nof
 - Message VPN: `default`
 
 Use these credentials/host values when configuring the Solace connection in the service's environment (e.g. `default-env.json` or local `.env`).
+
+## Provisioning users and queues (Terragrunt)
+
+[terragrunt/](terragrunt/) creates a dedicated Message VPN `aem-local` on the running broker, with ACL profiles, client usernames and queues. Terraform/Terragrunt run in Docker, so nothing has to be installed locally:
+
+```powershell
+cd terragrunt
+.\tg.ps1 plan
+.\tg.ps1 apply
+.\tg.ps1 destroy   # removes the whole aem-local VPN again
+```
+
+Edit users, queues and topic subscriptions in [terragrunt/local/terragrunt.hcl](terragrunt/local/terragrunt.hcl), then run `.\tg.ps1 apply` again.
+
+### Sample users
+
+> Local test credentials only – never reuse them on a shared or cloud broker.
+
+All users live in Message VPN `aem-local` and connect via `tcp://localhost:55555` (SMF) or `ws://localhost:9000` (WebSocket). Topic access is deny-by-default; only the topics listed are allowed.
+
+| Username         | Password     | ACL profile  | May publish | May subscribe | Demo broker in the app      |
+| ---------------- | ------------ | ------------ | ----------- | ------------- | --------------------------- |
+| `aem-suite`      | `aemsuite`   | `full`       | `>` (all)   | `>` (all)     | `local-docker`              |
+| `aem-publisher`  | `publisher`  | `publisher`  | `aem/>`     | –             | `local-docker (publisher)`  |
+| `aem-subscriber` | `subscriber` | `subscriber` | –           | `aem/>`       | `local-docker (subscriber)` |
+
+All three use client profile `app`, which allows sending and receiving guaranteed (persistent) messages and creating endpoints. In the app, the password is entered on every run, connection test or subscription; it is never stored. With `local-docker (ask for user)` you enter any of the usernames above together with its password.
+
+Typical results when publishing:
+
+| User             | `aem/orders/...` | `other/...`                  |
+| ---------------- | ---------------- | ---------------------------- |
+| `aem-suite`      | PASSED           | PASSED                       |
+| `aem-publisher`  | PASSED           | FAILED – Publish ACL Denied  |
+| `aem-subscriber` | FAILED – Publish ACL Denied | FAILED – Publish ACL Denied |
+
+### Queues
+
+| Queue          | Access        | Owner            | Topic subscriptions                     |
+| -------------- | ------------- | ---------------- | --------------------------------------- |
+| `q.aem.orders` | exclusive     | `aem-subscriber` | `aem/orders/>`                          |
+| `q.aem.events` | non-exclusive | –                | `aem/events/>`, `aem/notifications/*`   |
+| `q.aem.dlq`    | exclusive     | –                | none                                    |
+
+Every client username may consume from every queue (`permission = consume`). `aem/notifications/*` matches exactly one level, so `aem/notifications/email` is queued but `aem/notifications/email/sent` is not.
+
+To browse the queues, open PubSub+ Manager at <http://localhost:8080> (`admin`/`admin`), select VPN `aem-local` and go to **Queues**.

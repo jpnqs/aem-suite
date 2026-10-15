@@ -405,7 +405,7 @@ npm run watch                 # cds watch (TypeScript, SQLite in memory, demo da
 ```
 
 - Launchpad: <http://localhost:4004/launchpad.html> – users `admin/admin`, `tester/tester`.
-- **Local broker**: `local/docker-compose.yml` (see [local/README.md](../local/README.md)) → demo broker `local-docker` uses `tcp://localhost:55555`, VPN `default`, user `default`; any password works on the default VPN.
+- **Local broker**: `local/docker-compose.yml` (see [local/README.md](../local/README.md)) → demo broker `local-docker` uses `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite`/`aemsuite`. The VPN, users and queues are provisioned by `local/terragrunt` (`tg.ps1 apply`).
 - `cds watch` does **not** restart on changes in `test/data`; restart manually. Data is in memory and reset on every restart.
 - UI files are served with `Cache-Control: no-store` in development (`srv/server.ts`), so a normal reload shows UI changes.
 - Local destinations: set env `destinations`, e.g.

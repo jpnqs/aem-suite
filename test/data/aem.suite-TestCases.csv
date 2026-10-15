@@ -1,7 +1,9 @@
 ID;name;description;topic;payload;contentType;deliveryMode;timeToLiveMs;dmqEligible;priority;correlationId;ackTimeoutMs;kind;parent_ID;sortOrder;createdBy;modifiedBy
-f1000000-0000-4000-8000-000000000001;Orders;Order events;;;;;;;;;;FOLDER;;10;admin;admin
-f1000000-0000-4000-8000-000000000002;Inventory;Stock updates;;;;;;;;;;FOLDER;;20;admin;admin
-c1000000-0000-4000-8000-000000000001;Order created;Persistent order event with user properties and a local variable;{{app}}/orders/{{region}}/created/v1/{{uuid}};"{
+f1000000-0000-4000-8000-000000000001;Orders;Lands in queue q.aem.orders (subscription aem/orders/>);;;;;;;;;;FOLDER;;10;admin;admin
+f1000000-0000-4000-8000-000000000002;Events;Lands in queue q.aem.events (subscription aem/events/>);;;;;;;;;;FOLDER;;20;admin;admin
+f1000000-0000-4000-8000-000000000003;Notifications;Lands in queue q.aem.events (subscription aem/notifications/* - exactly one level);;;;;;;;;;FOLDER;;30;admin;admin
+f1000000-0000-4000-8000-000000000004;ACL checks;Run against all local-docker brokers to compare the users - see the test descriptions for the expected result per broker;;;;;;;;;;FOLDER;;40;admin;admin
+c1000000-0000-4000-8000-000000000001;Order created;Persistent order event with user properties and a local variable - lands in q.aem.orders;{{app}}/orders/{{region}}/created/v1/{{uuid}};"{
   ""orderId"": ""{{uuid}}"",
   ""createdAt"": ""{{now}}"",
   ""region"": ""{{region}}"",
@@ -10,12 +12,39 @@ c1000000-0000-4000-8000-000000000001;Order created;Persistent order event with u
   ],
   ""total"": 49.95
 }";application/json;PERSISTENT;;;;{{uuid}};5000;TEST;f1000000-0000-4000-8000-000000000001;10;admin;admin
-c1000000-0000-4000-8000-000000000002;Ping;Direct message - passes when sent;{{app}}/ping/{{broker.name}};"{
-  ""ts"": {{timestamp}},
-  ""broker"": ""{{broker.name}}""
-}";application/json;DIRECT;;;;;5000;TEST;;30;admin;admin
-c1000000-0000-4000-8000-000000000003;Inventory updated;Persistent message with random values and TTL;{{app}}/inventory/{{region}}/updated/v1;"{
+c1000000-0000-4000-8000-000000000004;Order cancelled;High priority persistent order event - lands in q.aem.orders;{{app}}/orders/{{region}}/cancelled/v1/{{uuid}};"{
+  ""orderId"": ""{{uuid}}"",
+  ""cancelledAt"": ""{{now}}"",
+  ""reason"": ""customer request""
+}";application/json;PERSISTENT;;true;9;{{uuid}};5000;TEST;f1000000-0000-4000-8000-000000000001;20;admin;admin
+c1000000-0000-4000-8000-000000000003;Inventory updated;Persistent message with random values and TTL - lands in q.aem.events;{{app}}/events/inventory/{{region}}/updated/v1;"{
   ""sku"": ""SKU-{{randomInt(100,999)}}"",
   ""stock"": {{randomInt(0,500)}},
   ""warehouse"": ""WH-{{region}}""
 }";application/json;PERSISTENT;60000;true;;;5000;TEST;f1000000-0000-4000-8000-000000000002;10;admin;admin
+c1000000-0000-4000-8000-000000000005;Shipment dispatched;Persistent event with a carrier user property - lands in q.aem.events;{{app}}/events/shipping/{{region}}/dispatched/v1;"{
+  ""shipmentId"": ""{{uuid}}"",
+  ""dispatchedAt"": ""{{now}}"",
+  ""carrier"": ""{{carrier}}""
+}";application/json;PERSISTENT;;;;{{uuid}};5000;TEST;f1000000-0000-4000-8000-000000000002;20;admin;admin
+c1000000-0000-4000-8000-000000000006;Email notification;One level below aem/notifications/ - matches aem/notifications/* and lands in q.aem.events;{{app}}/notifications/email;"{
+  ""to"": ""customer@example.com"",
+  ""template"": ""order-confirmation"",
+  ""sentAt"": ""{{now}}""
+}";application/json;PERSISTENT;;;;;5000;TEST;f1000000-0000-4000-8000-000000000003;10;admin;admin
+c1000000-0000-4000-8000-000000000007;Notification too deep;Two levels below aem/notifications/ - PASSED (the broker acks it) but NOT queued because * matches only one level;{{app}}/notifications/email/sent;"{
+  ""to"": ""customer@example.com"",
+  ""sentAt"": ""{{now}}""
+}";application/json;PERSISTENT;;;;;5000;TEST;f1000000-0000-4000-8000-000000000003;20;admin;admin
+c1000000-0000-4000-8000-000000000008;Publish below aem/;Expected: PASSED on local-docker and local-docker (publisher) - FAILED (Publish ACL Denied) on local-docker (subscriber);{{app}}/acl/check/v1/{{uuid}};"{
+  ""check"": ""publish-inside-namespace"",
+  ""ts"": {{timestamp}}
+}";application/json;PERSISTENT;;;;;5000;TEST;f1000000-0000-4000-8000-000000000004;10;admin;admin
+c1000000-0000-4000-8000-000000000009;Publish outside aem/;Expected: PASSED on local-docker only - FAILED (Publish ACL Denied) on local-docker (publisher) and local-docker (subscriber);other/acl/check/v1/{{uuid}};"{
+  ""check"": ""publish-outside-namespace"",
+  ""ts"": {{timestamp}}
+}";application/json;PERSISTENT;;;;;5000;TEST;f1000000-0000-4000-8000-000000000004;20;admin;admin
+c1000000-0000-4000-8000-000000000002;Ping;Direct message - passes when sent (not queued);{{app}}/ping/{{broker.name}};"{
+  ""ts"": {{timestamp}},
+  ""broker"": ""{{broker.name}}""
+}";application/json;DIRECT;;;;;5000;TEST;;50;admin;admin

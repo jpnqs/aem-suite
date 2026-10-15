@@ -1,0 +1,5 @@
+.state/
+.plugin-cache/
+.terragrunt-cache/
+.terraform/
+.terraform.lock.hcl

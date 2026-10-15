@@ -91,15 +91,17 @@ Open http://localhost:4004/launchpad.html and log in as `admin`/`admin` (Admin +
 
 **Local demo setup** (`test/data/`, loaded by `cds watch` only, never deployed):
 
-- Broker `local-docker`: `tcp://localhost:55555`, VPN `default`, user `default`. Enter any password when running (the default VPN of the Docker broker doesn't check it). Start a local broker with:
-  ```sh
-  docker run -d --name solace-broker --shm-size=1g -p 8080:8080 -p 55555:55555 -p 8008:8008 \
-    -e username_admin_globalaccesslevel=admin -e username_admin_password=admin solace/solace-pubsub-standard
-  ```
-- Broker `local-docker (ask for user)`: the same Docker broker without a username, to try the username prompt (enter user `default`).
+- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md) (`docker compose up -d`, then `local/terragrunt/tg.ps1 apply`).
+- Brokers `local-docker (publisher)` (user `aem-publisher`/`publisher`, may only publish below `aem/`) and `local-docker (subscriber)` (user `aem-subscriber`/`subscriber`, may not publish) – the same broker, to compare ACLs.
+- Broker `local-docker (ask for user)`: the same broker without a username, to try the username prompt.
 - Broker `aem-dev (destination)`: an inactive example for DESTINATION mode.
-- Global variables `app`, `region` and `source`, plus a broker override `region=local`.
-- Test cases "Order created" (persistent, user properties, local variable), "Ping" (direct) and "Inventory updated" (persistent, TTL, random values).
+- Global variables `app` (`aem`, so all topics fall under the `aem/>` ACLs), `region` and `source`, plus broker overrides `region=local`.
+- Test cases, one folder per target:
+  - **Orders** → queue `q.aem.orders`: "Order created" (user properties, local variable), "Order cancelled" (priority, DMQ eligible).
+  - **Events** → queue `q.aem.events`: "Inventory updated" (TTL, random values), "Shipment dispatched".
+  - **Notifications** → `q.aem.events` via `aem/notifications/*`: "Email notification" is queued, while "Notification too deep" passes but is not queued (`*` matches one level only).
+  - **ACL checks**: "Publish below `aem/`" and "Publish outside `aem/`" – run them against all `local-docker` brokers; the descriptions list the expected PASSED/FAILED per broker.
+  - "Ping" (direct, not queued).
 
 The data lives in memory and is reset on every restart. `cds watch` does not restart when `test/data` changes, so restart it manually.
 
