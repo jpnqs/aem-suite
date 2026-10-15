@@ -6,11 +6,12 @@
   "license": "UNLICENSED",
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "dependencies": {
     "@cap-js-community/websocket": "^1.11.2",
     "@cap-js/hana": "^3",
+    "@cap-js/mcp": "^1.5.0",
     "@sap-cloud-sdk/connectivity": "^4.9.1",
     "@sap/cds": "^10",
     "@sap/xssec": "^4",
@@ -23,15 +24,15 @@
     "@cap-js/cds-types": "^0.20",
     "@cap-js/sqlite": "^3",
     "@sap/cds-dk": "^10",
+    "@sapui5/types": "1.148.12",
     "@types/jest": "^30",
     "@types/node": "^22",
+    "@ui5/cli": "^4",
     "cds-plugin-ui5": "^0.17.4",
     "jest": "^30",
     "ts-jest": "^29.4.14",
     "tsx": "^4",
     "typescript": "^5",
-    "@ui5/cli": "^4",
-    "@sapui5/types": "1.148.12",
     "ui5-tooling-transpile": "^3.13.1"
   },
   "scripts": {
@@ -71,6 +72,10 @@
         }
       },
       "destinations": true
+    },
+    "mcp": {
+      "autowire": false,
+      "prefix": true
     },
     "websocket": {
       "kind": "ws"
