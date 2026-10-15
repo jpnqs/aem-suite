@@ -88,8 +88,14 @@ sap.ui.define(
       var dialog;
       var preselected = false;
 
+      // found by what it is, not by its position: the dialog layout may change (a help link once shifted it)
       function brokerList() {
-        return dialog.getContent()[0].getItems()[1];
+        return dialog
+          .getContent()[0]
+          .getItems()
+          .filter(function (item) {
+            return item.isA("sap.m.List") && item.getMode() === "MultiSelect";
+          })[0];
       }
 
       /**
