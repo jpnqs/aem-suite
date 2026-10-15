@@ -33,8 +33,41 @@ export async function nextSortOrder(parentId: string | null | undefined): Promis
   return Math.max(0, ...siblings.map((x) => x.sortOrder ?? 0)) + 10
 }
 
+const DELIVERY_MODES = ['PERSISTENT', 'DIRECT']
+const PROPERTY_TYPES = ['STRING', 'INT', 'BOOL']
+
+/** Enum values the UI offers as dropdowns - the database does not check them. */
+export function validateEnums(d: NodeData, reject: Reject): void {
+  if (d.deliveryMode && !DELIVERY_MODES.includes(d.deliveryMode))
+    reject(400, `deliveryMode must be ${DELIVERY_MODES.join(' or ')}`, 'in/deliveryMode')
+  d.userProperties?.forEach((p, i) => {
+    if (p.type && !PROPERTY_TYPES.includes(p.type)) reject(400, `type must be ${PROPERTY_TYPES.join(', ')}`, `in/userProperties(${i})/type`)
+  })
+}
+
+/** Column sizes of db/schema.cds: OData requests are checked by CAP, direct database writes (copy, import, agent) are not. */
+function validateLengths(d: NodeData, reject: Reject): void {
+  const max = (value: string | null | undefined, limit: number, field: string, target: string) => {
+    if (typeof value === 'string' && value.length > limit) reject(400, `${field} is too long (${value.length} characters, maximum ${limit})`, target)
+  }
+  max(d.name, 200, 'name', 'in/name')
+  max((d as { description?: string | null }).description, 1000, 'description', 'in/description')
+  max(d.topic, 500, 'topic', 'in/topic')
+  max(d.contentType, 100, 'contentType', 'in/contentType')
+  max(d.correlationId, 200, 'correlationId', 'in/correlationId')
+  d.userProperties?.forEach((p, i) => {
+    max(p.name, 100, 'user property name', `in/userProperties(${i})/name`)
+    max(p.value, 1000, `user property "${p.name}" value`, `in/userProperties(${i})/value`)
+  })
+  d.variables?.forEach((v, i) => {
+    max(v.name, 100, 'variable name', `in/variables(${i})/name`)
+    max(v.value, 2000, `variable "${v.name}" value`, `in/variables(${i})/value`)
+  })
+}
+
 /** Field rules of a folder / test case; also fills what was left empty (name, content type, property types). */
 export function validateNode(d: NodeData, event: string, reject: Reject): void {
+  validateLengths(d, reject)
   const isFolder = d.kind === 'FOLDER'
   if (isFolder) {
     if ((event === 'CREATE' || d.name !== undefined) && !d.name?.trim()) reject(400, 'Folder name is required', 'in/name')

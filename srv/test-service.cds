@@ -3,6 +3,8 @@ using {aem.suite as db} from '../db/schema';
 /** Test case maintenance and execution. */
 @path    : '/odata/v4/test'
 @requires: 'Tester'
+// imports of whole test suites are sent as one request
+@cds.server.body_parser.limit: '5mb'
 service TestService {
 
   @odata.draft.enabled
@@ -147,6 +149,44 @@ service TestService {
   type CopyResult {
     ID   : UUID;
     name : String;
+  }
+
+  /**
+   * Exports test cases and folders (a folder with everything below it) as the content of a JSON file.
+   * Without ids the whole tree is exported.
+   */
+  action exportNodes(ids : many UUID) returns ExportResult;
+
+  type ExportResult {
+    /** suggested file name */
+    filename  : String;
+    content   : LargeString;
+    folders   : Integer;
+    testCases : Integer;
+  }
+
+  /**
+   * Imports the content of an export file as new test cases and folders below parentId (empty = top level).
+   * Existing nodes are never changed. All or nothing: if anything in the file is invalid, nothing is imported.
+   * With dryRun the file is only checked and counted.
+   */
+  action importNodes(content : LargeString not null, parentId : UUID, dryRun : Boolean) returns ImportResult;
+
+  type ImportRoot {
+    ID   : UUID;
+    name : String;
+    kind : String;
+  }
+
+  type ImportResult {
+    dryRun         : Boolean;
+    folders        : Integer;
+    testCases      : Integer;
+    userProperties : Integer;
+    variables      : Integer;
+    roots          : many ImportRoot;
+    /** name of the target folder, empty = top level */
+    target         : String;
   }
 
   /** ID of the logged-in user - used to prefill "Created by" / "Started by" filters. */

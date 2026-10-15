@@ -5,6 +5,7 @@ import { buildPreview } from './lib/preview'
 import { BrokerCredential, createRun, executeRunInBackground, toCredentials } from './lib/test-runner'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
 import { copyNodes } from './lib/copy-nodes'
+import { exportNodes, importNodes } from './lib/export-import'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/node-validation'
 import { compareSiblings, TreeNode } from './lib/tree'
 
@@ -116,6 +117,13 @@ export default class TestService extends cds.ApplicationService {
     })
 
     this.on('copyNodes', async (req) => copyNodes((req.data as { ids: string[] }).ids))
+
+    // export / import as JSON file (the file content travels in the action, the browser saves / reads the file)
+    this.on('exportNodes', async (req) => exportNodes((req.data as { ids?: string[] }).ids))
+    this.on('importNodes', async (req) => {
+      const { content, parentId, dryRun } = req.data as { content: string; parentId?: string; dryRun?: boolean }
+      return importNodes(content, { parentId, dryRun: !!dryRun })
+    })
 
     return super.init()
   }
