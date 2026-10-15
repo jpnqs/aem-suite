@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@sapui5/types": "1.148.12",
-    "ui5-tooling-transpile": "^3.13.1"
+    "ui5-tooling-transpile": "^3.13.1",
+    "ui5-task-zipper": "^3.7.0"
   }
 }

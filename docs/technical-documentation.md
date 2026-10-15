@@ -60,26 +60,26 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
 
 ```
 app/
-  launchpad.html              sandbox Fiori launchpad (all tiles)
-  appconfig/                  sandbox config (removes the SAP sample tiles)
+  launchpad/                  sandbox Fiori launchpad (all tiles)
   services.cds                imports all UI annotation files
   brokers/ variables/ runs/ messages/   Fiori elements apps (annotations.cds + webapp/)
   testcases/                  Fiori elements app with extensions (webapp/ext/*)
   subscriber/                 freestyle UI5 app in TypeScript
-  router/                     standalone approuter (xs-app.json; resources/ is generated)
+  router/                     standalone approuter (xs-app.json: MCP, OAuth discovery, everything else from the HTML5 repo)
+  <app>/xs-app.json           routes of each app in the HTML5 repo (odata/, ws/ -> destination srv-api)
 db/
   schema.cds                  domain model (namespace aem.suite)
   data/                       code lists (deployed)
 srv/
   admin-service.*, test-service.*, subscribe-service.*, live-service.cds
-  server.ts                   dev-only no-cache header for UI files
+  server.ts                   MCP OAuth discovery; dev only: app-relative odata/ws rewrite, no-cache header for UI files
   lib/                        business logic (see section 7)
   types/solclientjs.d.ts      typings for solclientjs (the package ships none)
 test/
   *.test.ts                   unit and service tests
   data/                       demo data – loaded by cds watch / tests only, never deployed
 local/                        docker-compose for a local Solace broker
-scripts/build-ui.js           ui5 build of all apps + assembly into app/router/resources
+scripts/build-ui.js           ui5 build of all apps (each writes its HTML5 repo zip into dist/)
 scripts/build-docs.js         copies docs/user-guide.md next to the built server (gen/srv/docs) for the Help app
 mta.yaml, xs-security.json    deployment
 ```
@@ -255,7 +255,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 
 - `<app>` is the URL the client used: `cds.aemSuite.mcp.publicUrl`, else derived from the approuter's `x-forwarded-proto` / `x-forwarded-host`. The XSUAA URL comes from the bound credentials (`cds.requires.auth.credentials.url`, override `cds.aemSuite.mcp.authorizationServer`). Without XSUAA (local mocked auth) nothing is advertised (404, no header).
 - The approuter forwards `/mcp/*` and `/.well-known/oauth-*` without its own login (`authenticationType: none`); the backend demands a valid **XSUAA JWT** with the `Tester` scope.
-- **No dynamic client registration** (XSUAA has none): clients use the app's own XSUAA client. `mta.yaml` creates the service key `mcp-client` (`cf service-key aem-suite-auth mcp-client` → `clientid`, `clientsecret`) and allows the callback `http://localhost:8765/**`. The secret only identifies the client; every user still logs in personally and gets their own roles. If one shared secret is not acceptable, put SAP Cloud Identity Services (public client with PKCE) in front instead.
+- **No dynamic client registration** (XSUAA has none): clients use the app's own XSUAA client. the MTA creates the service key `aem-suite-auth-key` (module `aem-suite-destination-content`; read it with `cf service-key aem-suite-auth aem-suite-auth-key` → `clientid`, `clientsecret`) and allows the callback `http://localhost:8765/**`. The secret only identifies the client; every user still logs in personally and gets their own roles. If one shared secret is not acceptable, put SAP Cloud Identity Services (public client with PKCE) in front instead.
 - Locally: URL `http://localhost:4004/mcp/agent` with HTTP Basic (`tester:tester`).
 
 `cds.mcp.autowire` is **off**: the plugin would otherwise write mock logins into `~/.claude.json` and the OpenCode config whenever `cds watch` starts.
@@ -377,13 +377,15 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 ### 8.4 Launchpad
 
-`app/launchpad.html` uses the ushell **sandbox** (`sap-ushell-config.applications` creates the tiles/intents). `app/appconfig/fioriSandboxConfig.json` empties the sandbox's sample groups. In BTP this page is the approuter welcome page. For a central launchpad use SAP Build Work Zone and the HTML5 application repository instead.
+`app/launchpad/webapp/index.html` uses the ushell **sandbox** (`sap-ushell-config.applications` creates the tiles/intents). `services.LaunchPage` in the same config empties the sandbox's sample groups (inline, because the sandbox would look for `/appconfig/fioriSandboxConfig.json` at the host root). It is an HTML5 app itself (`comaemsuitelaunchpad`, the standalone approuter's welcome page), because an approuter bound to the HTML5 repo cannot also serve local files. For a central launchpad use SAP Build Work Zone (section 12); the sandbox launchpad has no `crossNavigation` inbounds, so it does not show up there.
+
+**URLs.** In the HTML5 repo an app lives at `/<app name>/` (`sap.app.id` without dots, e.g. `/comaemsuitebrokers/`); Work Zone adds a prefix (`/<sap.cloud.service>.<app name>-<version>/`). The apps therefore call the backend **relative to themselves**: `odata/v4/...` in the manifests, `ws/live` via `sap.ui.require.toUrl(...)` in the two `LiveSocket` clients. Each app's `xs-app.json` routes `odata/` (and `ws/`, websockets enabled) to the destination `srv-api`. Locally `cds-plugin-ui5` mounts the apps at the same names (`mountPath` in `ui5.yaml`), and `srv/server.ts` strips the `/comaemsuite<app>/` prefix from `odata/` and `ws/` requests (development only).
 
 ## 9. Security
 
 - **Scopes / role templates** (`xs-security.json`): `Admin` (contains `Tester`), `Tester`. Role collections `AEM_Suite_Admin`, `AEM_Suite_Tester`.
 - `AdminService` requires `Admin`; `TestService`, `SubscribeService`, `LiveService` require `Tester`.
-- Approuter (`app/router/xs-app.json`): `/odata/*` with CSRF, `/mcp/*` and `/.well-known/oauth-*` passed through (the backend checks the bearer token and serves the OAuth discovery), `/ws/*` with websockets enabled, everything else served from `resources/` (no-cache), all routes `xsuaa`.
+- Standalone approuter (`app/router/xs-app.json`): `/mcp/*` and `/.well-known/oauth-*` passed through (the backend checks the bearer token and serves the OAuth discovery), everything else from the HTML5 repo (`html5-apps-repo-rt`, `xsuaa`). The apps' own `xs-app.json` (also used by the Work Zone managed approuter): `odata/*` with CSRF, `ws/*` with websockets enabled, static files no-cache, all routes `xsuaa`.
 - Data visibility: all testers share test cases, runs and saved messages (team workspace); the "my entries" filter is a UI default, not an authorization. Subscriptions can only be stopped by their owner.
 - Broker passwords: see 7.3. Destination credentials stay in the BTP destination service.
 - AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
@@ -448,7 +450,7 @@ npm run typecheck   # backend + tests + subscriber app
 
 ```sh
 npm i -g mbt
-mbt build                                   # npm ci → cds build --production → node scripts/build-docs.js → node scripts/build-ui.js
+mbt build                                   # npm ci → cds build --production → node scripts/build-docs.js, then ui5 build per html5 module
 cf deploy mta_archives/aem-suite_1.0.0.mtar
 ```
 
@@ -456,12 +458,27 @@ cf deploy mta_archives/aem-suite_1.0.0.mtar
 |---|---|
 | `aem-suite-srv` | CAP backend (`gen/srv`, compiled JS), **1 instance**, 512 MB |
 | `aem-suite-db-deployer` | HDI deployer |
-| `aem-suite` | standalone approuter with the built UI apps in `resources/` |
+| `aem-suite` | standalone approuter: sandbox launchpad (welcome page), MCP; UI files from the HTML5 repo (bound to `app-runtime`) |
+| `aem-suite-launchpad`, `aem-suite-testcases`, `-runs`, `-subscriber`, `-messages`, `-brokers`, `-variables`, `-help` | `html5` modules: `npm run build` → `dist/comaemsuite<app>.zip` (incl. `xs-app.json`) |
+| `aem-suite-app-deployer` | uploads the zips to the HTML5 Application Repository (`app-host`) |
+| `aem-suite-destination-content` | instance-level destinations for the managed approuter, `sap.cloud.service: aemsuite`: HTML5 repo, XSUAA (`OAuth2UserTokenExchange`), `srv-api` (forwards the token). Creates the service keys `aem-suite-auth-key` and `aem-suite-html5-repo-host-key`. |
 | `aem-suite-auth` | XSUAA (`xs-security.json`) |
 | `aem-suite-db` | HDI container (HANA Cloud required in the space) |
-| `aem-suite-destination` | destination service (lite) |
+| `aem-suite-destination` | destination service (lite), `HTML5Runtime_enabled: true` |
+| `aem-suite-html5-repo-host`, `aem-suite-html5-runtime` | HTML5 Application Repository, plans `app-host` (content) and `app-runtime` (standalone approuter) |
 
 After deployment: assign role collections, create destinations for DESTINATION brokers (layout in 7.3). `test/data` is not part of the build; `db/data` (code lists) is.
+
+**HTML5 apps.** All apps (incl. the sandbox launchpad) are listed in the BTP cockpit under *HTML5 Applications*. From there they open through the managed approuter; the standalone approuter URL keeps working as before.
+
+**SAP Build Work Zone (standard edition).** Requires a Work Zone subscription in the same subaccount.
+
+1. Work Zone → *Channel Manager* → refresh the **HTML5 Apps** content provider. The seven apps appear with title, description and the `crossNavigation` intents from their manifests (e.g. `AEMSuiteTestCases-manage`).
+2. *Content Manager* → *Content Explorer* → *HTML5 Apps* → add the apps to *My Content*.
+3. Create a group (e.g. "AEM Test Suite") and a role, assign the apps, add the role to a site, and assign the Work Zone role to users.
+4. Authorization still comes from the app's own roles: the managed approuter exchanges the login token for one of `aem-suite-auth` (destination `aem-suite-auth`), so users also need **AEM_Suite_Admin** / **AEM_Suite_Tester**.
+
+The live views (Test Cases run progress, Live Subscriber) use WebSockets through the app's `xs-app.json` (`websockets.enabled`), which the approuter supports for HTML5 repo apps. MCP is not part of Work Zone: AI clients keep using the standalone approuter URL (`/mcp/agent`).
 
 ## 13. Extending the application
 

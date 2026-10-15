@@ -24,7 +24,7 @@ save messages as **test cases**, send them to one or several brokers with one cl
 
 ## 1. Getting started
 
-Open the launchpad. Depending on your role you see these tiles:
+Open the launchpad – the suite's own start page, or your SAP Build Work Zone site if your administrator added the apps there. Depending on your role you see these tiles:
 
 | Tile | What for | Role |
 |---|---|---|

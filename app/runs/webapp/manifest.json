@@ -1,5 +1,9 @@
 {
   "_version": "1.65.0",
+  "sap.cloud": {
+    "public": true,
+    "service": "aemsuite"
+  },
   "sap.app": {
     "id": "com.aem.suite.runs",
     "type": "application",
@@ -17,7 +21,7 @@
     "description": "{{appDescription}}",
     "dataSources": {
       "mainService": {
-        "uri": "/odata/v4/test/",
+        "uri": "odata/v4/test/",
         "type": "OData",
         "settings": {
           "odataVersion": "4.0"

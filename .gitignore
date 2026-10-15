@@ -34,4 +34,5 @@ mta_archives/
 @cds-models
 # UI builds
 app/*/dist/
-app/router/resources/
+# app deployer build result (mta.yaml)
+/resources/

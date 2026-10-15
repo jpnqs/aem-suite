@@ -39,7 +39,7 @@ HANA Cloud · Destination service · XSUAA
 | `brokers`, `variables` | Fiori elements | Admin |
 | `help` | Freestyle UI5 | Everyone: the user guide, rendered from `docs/user-guide.md` |
 
-`app/launchpad.html` is a sandbox launchpad that shows all apps as tiles. The approuter uses it as its welcome page.
+`app/launchpad` is a sandbox launchpad that shows all apps as tiles; the standalone approuter uses it as its welcome page. All apps are deployed to the **HTML5 Application Repository** (`comaemsuite<app>`, e.g. `comaemsuitebrokers`), so they are listed under *HTML5 Applications* in the BTP cockpit and can be added to **SAP Build Work Zone** – see [Build and deployment](docs/technical-documentation.md#12-build-and-deployment-cloud-foundry).
 
 ## Defaults and automatic settings
 
@@ -87,7 +87,7 @@ npm install
 npm run watch          # cds watch with TypeScript, SQLite in memory
 ```
 
-Open http://localhost:4004/launchpad.html and log in as `admin`/`admin` (Admin + Tester) or `tester`/`tester`.
+Open http://localhost:4004/launchpad.html (redirects to `/comaemsuitelaunchpad/index.html`) and log in as `admin`/`admin` (Admin + Tester) or `tester`/`tester`.
 
 **Local demo setup** (`test/data/`, loaded by `cds watch` only, never deployed):
 
@@ -140,7 +140,9 @@ cf deploy mta_archives/aem-suite_1.0.0.mtar
 
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.
 
-The MTA build runs `cds build --production` (which compiles the TypeScript), `node scripts/build-docs.js` (copies the user guide next to the server for the Help app) and `node scripts/build-ui.js`. That script runs `ui5 build` for every app and copies the results into `app/router/resources`, where the standalone approuter serves them.
+The MTA build runs `cds build --production` (which compiles the TypeScript), `node scripts/build-docs.js` (copies the user guide next to the server for the Help app). Every UI app is an `html5` module: `ui5 build` writes a zip (`ui5-task-zipper`), and `aem-suite-app-deployer` uploads all zips to the HTML5 Application Repository. `node scripts/build-ui.js` runs the same builds locally.
+
+**SAP Build Work Zone**: the apps carry `sap.cloud.service: aemsuite` and the MTA creates the matching instance-level destinations, so after deployment they appear in Work Zone (*Channel Manager* → *HTML5 Apps* → refresh, then add them in the *Content Manager* to a group, a role and a site). Details in the [technical documentation](docs/technical-documentation.md#12-build-and-deployment-cloud-foundry).
 
 ### Operational notes
 

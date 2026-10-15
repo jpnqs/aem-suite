@@ -16,7 +16,9 @@ export default class LiveSocket {
   }
 
   private connect(): Promise<void> {
-    const url = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/live`;
+    // relative to the app (HTML5 repo / Work Zone serve it below a prefix; its xs-app.json routes ws/ to the backend)
+    const url = new URL(sap.ui.require.toUrl("com/aem/suite/subscriber/ws/live"), window.location.href);
+    url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     return new Promise((resolve) => {
       const ws = new WebSocket(url);
       this.ws = ws;

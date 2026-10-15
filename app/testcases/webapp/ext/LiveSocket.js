@@ -14,7 +14,9 @@ sap.ui.define([], function () {
 
   LiveSocket.prototype._connect = function () {
     var that = this;
-    var url = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws/live";
+    // relative to the app (HTML5 repo / Work Zone serve it below a prefix; its xs-app.json routes ws/ to the backend)
+    var url = new URL(sap.ui.require.toUrl("com/aem/suite/testcases/ws/live"), window.location.href);
+    url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     return new Promise(function (resolve, reject) {
       var ws = new WebSocket(url);
       that._ws = ws;

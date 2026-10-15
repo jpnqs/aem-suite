@@ -11,7 +11,6 @@ build-parameters:
         - npm ci
         - npx cds build --production
         - node scripts/build-docs.js
-        - node scripts/build-ui.js
 modules:
   - name: aem-suite-srv
     type: nodejs
@@ -40,6 +39,7 @@ modules:
     requires:
       - name: aem-suite-db
 
+  # Standalone approuter: sandbox launchpad, MCP (/mcp, /.well-known) - UI content comes from the HTML5 repo
   - name: aem-suite
     type: approuter.nodejs
     path: app/router
@@ -60,11 +60,171 @@ modules:
           forwardAuthToken: true
           timeout: 120000
       - name: aem-suite-auth
+      - name: aem-suite-html5-runtime
     provides:
       - name: app-api
         properties:
           app-protocol: ${protocol}
           app-uri: ${default-uri}
+
+  # Uploads the UI apps (zips built by the html5 modules below) to the HTML5 Application Repository
+  - name: aem-suite-app-deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: aem-suite-html5-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: aem-suite-launchpad
+          artifacts:
+            - comaemsuitelaunchpad.zip
+          target-path: resources/
+        - name: aem-suite-testcases
+          artifacts:
+            - comaemsuitetestcases.zip
+          target-path: resources/
+        - name: aem-suite-runs
+          artifacts:
+            - comaemsuiteruns.zip
+          target-path: resources/
+        - name: aem-suite-subscriber
+          artifacts:
+            - comaemsuitesubscriber.zip
+          target-path: resources/
+        - name: aem-suite-messages
+          artifacts:
+            - comaemsuitemessages.zip
+          target-path: resources/
+        - name: aem-suite-brokers
+          artifacts:
+            - comaemsuitebrokers.zip
+          target-path: resources/
+        - name: aem-suite-variables
+          artifacts:
+            - comaemsuitevariables.zip
+          target-path: resources/
+        - name: aem-suite-help
+          artifacts:
+            - comaemsuitehelp.zip
+          target-path: resources/
+
+  # Instance-level destinations for the managed approuter (SAP Build Work Zone), sap.cloud.service "aemsuite"
+  # (= "sap.cloud" in the manifests). Also creates the XSUAA service key used by AI clients (MCP).
+  - name: aem-suite-destination-content
+    type: com.sap.application.content
+    requires:
+      - name: aem-suite-auth
+        parameters:
+          service-key:
+            name: aem-suite-auth-key
+      - name: aem-suite-html5-repo-host
+        parameters:
+          service-key:
+            name: aem-suite-html5-repo-host-key
+      - name: srv-api
+      - name: aem-suite-destination
+        parameters:
+          content-target: true
+    build-parameters:
+      no-source: true
+    parameters:
+      content:
+        instance:
+          existing_destinations_policy: update
+          destinations:
+            - Name: aem-suite-html5-repository
+              ServiceInstanceName: aem-suite-html5-repo-host
+              ServiceKeyName: aem-suite-html5-repo-host-key
+              sap.cloud.service: aemsuite
+            - Name: aem-suite-auth
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: aem-suite-auth
+              ServiceKeyName: aem-suite-auth-key
+              sap.cloud.service: aemsuite
+            # used by the apps' xs-app.json (same name as the standalone approuter's destination)
+            - Name: srv-api
+              URL: ~{srv-api/srv-url}
+              Authentication: NoAuthentication
+              Type: HTTP
+              ProxyType: Internet
+              HTML5.ForwardAuthToken: true
+              HTML5.Timeout: 120000
+
+  - name: aem-suite-launchpad
+    type: html5
+    path: app/launchpad
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-testcases
+    type: html5
+    path: app/testcases
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-runs
+    type: html5
+    path: app/runs
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-subscriber
+    type: html5
+    path: app/subscriber
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-messages
+    type: html5
+    path: app/messages
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-brokers
+    type: html5
+    path: app/brokers
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-variables
+    type: html5
+    path: app/variables
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-help
+    type: html5
+    path: app/help
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
 
 resources:
   - name: aem-suite-auth
@@ -73,9 +233,6 @@ resources:
       service: xsuaa
       service-plan: application
       path: ./xs-security.json
-      # credentials for AI clients (MCP): cf service-key aem-suite-auth mcp-client
-      service-keys:
-        - name: mcp-client
       config:
         xsappname: aem-suite-${org}-${space}
         tenant-mode: dedicated
@@ -94,3 +251,16 @@ resources:
     parameters:
       service: destination
       service-plan: lite
+      config:
+        # lets the managed approuter (Work Zone) use the instance-level destinations above
+        HTML5Runtime_enabled: true
+  - name: aem-suite-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+  - name: aem-suite-html5-runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-runtime
