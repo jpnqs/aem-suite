@@ -105,7 +105,8 @@ entity TestCases : cuid, managed {
   payload        : LargeString;
   /** empty = detected from the payload on save (JSON or text) */
   contentType    : String(100) default 'application/json';
-  deliveryMode   : DeliveryMode default 'PERSISTENT' @mandatory;
+  /** only used by tests; folders (and old data) may leave it empty = PERSISTENT */
+  deliveryMode   : DeliveryMode default 'PERSISTENT';
   /** empty / 0 = no TTL; empty priority / DMQ = broker defaults */
   timeToLiveMs   : Integer;
   dmqEligible    : Boolean;

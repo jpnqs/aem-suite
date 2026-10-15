@@ -278,3 +278,22 @@ describe('Tree helper', () => {
     expect(t.isWithin('f1', 'f2')).toBe(false)
   })
 })
+
+describe('folder variables on the object page', () => {
+  it('can be maintained on a folder that has no delivery mode (draft edit + save)', async () => {
+    axios.defaults.validateStatus = () => true
+    const folder = await create({ kind: 'FOLDER', name: 'VarFolder' })
+    // folders created before the field was optional have no delivery mode
+    await UPDATE('aem.suite.TestCases').set({ deliveryMode: null }).where({ ID: folder.ID })
+    const base = `/odata/v4/test/TestCases(ID=${folder.ID},IsActiveEntity=true)`
+    const edit = await POST(`${base}/TestService.draftEdit`, { PreserveChanges: true }, tester)
+    expect(edit.status).toBeLessThan(300)
+    const draft = `/odata/v4/test/TestCases(ID=${folder.ID},IsActiveEntity=false)`
+    const add = await POST(`${draft}/variables`, { name: 'domain', value: 'orders' }, tester)
+    expect(add.status).toBeLessThan(300)
+    const save = await POST(`${draft}/TestService.draftActivate`, {}, tester)
+    expect(save.status).toBeLessThan(300)
+    const vars = await GET(`${base}/variables?$select=name,value`, tester)
+    expect(vars.data.value).toEqual([expect.objectContaining({ name: 'domain', value: 'orders' })])
+  })
+})
