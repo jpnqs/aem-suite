@@ -59,6 +59,7 @@ The test case list is a tree table with nested **folders**:
 - **Folder variables** apply to all test cases inside the folder and its subfolders.
 - **Run a folder**: "Run…" on a folder (list or object page) runs every test case below it, in tree order.
 - **Copy**: "Copy" duplicates the selected test cases and folders. A folder is copied with everything below it, named "… (Copy)" and placed right after the original.
+- **Export / Import**: save selected test cases and folders (with everything below them) as a JSON file and import such a file again, as new items below the selected folder. Imports are checked with the same rules as the apps and are all-or-nothing. Handy for backups, sharing between systems and keeping tests in Git.
 - **Delete** a folder to delete its whole content.
 
 ## Templates

@@ -131,6 +131,8 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `TestCases.runTest(brokerIds, credentials)` | Runs one node (a folder runs its subtree). |
 | `TestCases.preview(brokerId)` | Resolves topic, payload, correlation ID and properties without sending. Works on drafts. |
 | `TestCases.duplicate()` | Copies a test case or a folder with everything below it (`srv/lib/copy-nodes.ts`); the copy is named "… (Copy)" and placed right after the original. |
+| `exportNodes(ids)` | Returns `{ filename, content, folders, testCases }`: the JSON file for the given nodes (folders with everything below them; without ids the whole tree). The browser saves `content` as a file. |
+| `importNodes(content, parentId, dryRun)` | Creates the nodes of an export file below `parentId` (empty = top level) as **new** nodes; with `dryRun` it only checks and counts. All or nothing, see "Export and import file" below. The service accepts request bodies up to 5 MB (`@cds.server.body_parser.limit`). |
 | `copyNodes(ids)` | Same for several nodes; a node below another selected node is copied with that node only. Returns `{ ID, name }` per copy. Used by the *Copy* buttons. |
 | `TestCases.moveBefore(NextSibling)` | `ChangeNextSiblingAction` of the tree table (drag & drop ordering). |
 | `runTests(testCaseIds, brokerIds, credentials)` | Runs several nodes against several brokers in one run. |
@@ -166,6 +168,22 @@ Clients enter a **context** to receive only their events:
 | `message` | subscription ID | topic, payload, contentType, userProperties (JSON), correlationId, deliveryMode, receivedAt, seq |
 | `subscriptionStatus` | subscription ID | `STOPPED`, `DOWN`, `THROTTLED`, `RESUMED` + message |
 
+### Export and import file (`srv/lib/export-import.ts`)
+
+```json
+{ "format": "aem-suite.test-cases", "version": 1, "exportedAt": "2026-10-15T09:39:25.031Z",
+  "nodes": [ { "kind": "FOLDER", "name": "...", "description": "...", "variables": [{ "name": "...", "value": "..." }],
+               "children": [ { "kind": "TEST", "name": "...", "topic": "...", "payload": "...", "contentType": "...",
+                               "deliveryMode": "...", "timeToLiveMs": 0, "dmqEligible": false, "priority": 0,
+                               "correlationId": "...", "ackTimeoutMs": 0,
+                               "userProperties": [{ "name": "...", "type": "...", "value": "..." }], "variables": [] } ] } ] }
+```
+
+- **Export** is a nested tree without IDs, authors, sort order or run data (the order of the arrays is the order in the tree: folders first, then manual order; variables and properties are sorted by name, empty fields are left out). A folder comes with everything below it; nodes below another selected node are exported once.
+- **Import** reads the same format but is lenient: `kind` may be left out (`children` = folder), `payload` may be a JSON value (it is stored as pretty-printed text), property / variable values may be numbers or booleans. `format` must match and `version` must not be newer than the system's. Limits: 5 000 nodes, 20 levels.
+- **All or nothing, one pass.** First every node is type-checked (wrong types, children on a test case, ...), then the same rules as the UI are applied via `srv/lib/node-validation.ts` (`validateEnums`, `validateNode`, `validateParent`, including text lengths because the import writes to the database directly). All problems are collected with their position (`Orders / EU / Order created: payload: ...`) and the request is rejected with the first 20 of them. Only a file without problems is written.
+- **Write.** New IDs are generated; nodes are inserted level by level (parents first) in one transaction behind the existing nodes of the target folder. Existing nodes are never changed, so importing a file twice creates two copies.
+
 ### TestAgentService – MCP `/mcp/agent` (role `Tester`)
 
 Lets an AI assistant **plan, check and run tests** over the **Model Context Protocol**. Served by the CAP plugin [`@cap-js/mcp`](https://cap.cloud.sap/docs/guides/ai/cap-mcp) (`@protocol: 'mcp'`: MCP only, no OData for this service; stateless streamable HTTP, JSON-RPC over `POST /mcp/agent`). It is a **use-case service** (`srv/agent-service.cds`, handlers in `srv/agent-service.ts`) and not an annotation on the existing services: read-only views without draft / hierarchy columns, no admin data, no secrets.
@@ -190,6 +208,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 | `createFolder`, `createTestCase` | create nodes (new nodes go to the end; same defaults as the UI: starter payload, correlation ID `{{uuid}}`) |
 | `updateTestCase`, `updateFolder` | change given fields only; `userProperties` / `variables`, if given, replace the existing ones |
 | `moveNode`, `copyNodes` | reorganize; `copyNodes` copies folders with everything below them |
+| `exportNodes(ids)`, `importNodes(content, parentId, dryRun)` | the export / import file above: an agent can generate a whole suite as one file, check it with `dryRun`, and import it in one call (request bodies up to 5 MB) |
 | `previewTestCase(testCaseId, brokerId)` | the message exactly as it would be sent (variables resolved), nothing is sent |
 | `runTests(testCaseIds, brokerIds, credentials)` | starts a run in the background, returns `runId` and the number of results |
 | `getRunSummary(runId, waitSeconds)` | status, counters and failures; waits up to 30 s for the end of the run |
@@ -295,7 +314,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 | App (`app/…`) | Type | Highlights |
 |---|---|---|
-| `testcases` | Fiori elements LR/OP | **Tree table** (`hierarchyQualifier: TestTree`, create menu Folder/Test Case, drag & drop, Cut/Paste, Move Up/Down); custom sections `MessageSection` (full-width topic + name) and `PayloadSection` (`sap.ui.codeeditor` JSON editor, validation, format, template help); custom actions *Run…*, *Copy* and *Preview*. |
+| `testcases` | Fiori elements LR/OP | **Tree table** (`hierarchyQualifier: TestTree`, create menu Folder/Test Case, drag & drop, Cut/Paste, Move Up/Down); custom sections `MessageSection` (full-width topic + name) and `PayloadSection` (`sap.ui.codeeditor` JSON editor, validation, format, template help); custom actions *Run…*, *Copy*, *Export*, *Import* and *Preview*. |
 | `runs` | Fiori elements LR/OP | List on `RunResults` (one row per test case × broker, filters for test case, broker, status, started by/at); link columns to the test case, broker and run (`testCaseLink`, `brokerLink`, `runLink` in `TestService.RunResults` are launchpad intents). Run page (`TestRuns`) with totals and its results. |
 | `subscriber` | Freestyle UI5, **TypeScript** | Live subscriptions over WebSocket, message list (batched, max. 500), detail panel, save / save as test case. |
 | `messages` | Fiori elements | Saved messages, *Create Test Case*. |
@@ -383,6 +402,7 @@ npm run typecheck   # backend + tests + subscriber app
 | `resolve.test.ts`, `defaults.test.ts` | URL handling, runtime passwords, detection helpers |
 | `services.test.ts` | OData services end-to-end with stubbed broker: brokers, variables, test cases, runs, preview, saved messages, filters |
 | `tree.test.ts` | hierarchy queries, folder validation, moves (incl. concurrent change set), folder runs and variables, folder deletion, copying |
+| `export-import.test.ts` | export content (nested, no IDs, sorted), selections, round trip, dry run, import into a folder, lenient hand-written files, files above 100 kb, all-or-nothing validation with positions |
 | `agent.test.ts` | the AI agent service over real MCP JSON-RPC: access, tools, create / change / move / copy with UI validation, preview, runs on destination brokers, credential refusal, limits |
 
 ## 12. Build and deployment (Cloud Foundry)
