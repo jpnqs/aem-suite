@@ -36,3 +36,6 @@ mta_archives/
 app/*/dist/
 # app deployer build result (mta.yaml)
 /resources/
+# Playwright
+test-results/
+playwright-report/

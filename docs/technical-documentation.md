@@ -27,7 +27,7 @@ A test result passes when the broker **acknowledges** the message (guaranteed me
 | UI | SAPUI5 **1.148 (LTS)** from CDN: Fiori elements V4 (List Report / Object Page, tree table) and one freestyle UI5 app in TypeScript |
 | UI tooling | `cds-plugin-ui5` (serves the apps inside `cds watch`), `@ui5/cli` 4, `ui5-tooling-transpile` |
 | Security | XSUAA, standalone approuter (`@sap/approuter` 23) |
-| Tests | Jest 30 + ts-jest, `@cap-js/cds-test` |
+| Tests | Jest 30 + ts-jest, `@cap-js/cds-test`; Playwright (UI, e2e) |
 
 ## 3. Architecture
 
@@ -60,7 +60,7 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
 
 ```
 app/
-  launchpad/                  sandbox Fiori launchpad (all tiles)
+  launchpad/                  sandbox Fiori launchpad (all tiles; webapp/appconfig removes the SAP sample tiles)
   services.cds                imports all UI annotation files
   brokers/ variables/ runs/ messages/   Fiori elements apps (annotations.cds + webapp/)
   testcases/                  Fiori elements app with extensions (webapp/ext/*)
@@ -377,7 +377,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 ### 8.4 Launchpad
 
-`app/launchpad/webapp/index.html` uses the ushell **sandbox** (`sap-ushell-config.applications` creates the tiles/intents). `services.LaunchPage` in the same config empties the sandbox's sample groups (inline, because the sandbox would look for `/appconfig/fioriSandboxConfig.json` at the host root). It is an HTML5 app itself (`comaemsuitelaunchpad`, the standalone approuter's welcome page), because an approuter bound to the HTML5 repo cannot also serve local files. For a central launchpad use SAP Build Work Zone (section 12); the sandbox launchpad has no `crossNavigation` inbounds, so it does not show up there.
+`app/launchpad/webapp/index.html` uses the ushell **sandbox** (`sap-ushell-config.applications` creates the tiles/intents). `webapp/appconfig/fioriSandboxConfig.json` empties the sandbox's sample groups. The sandbox always reads it from the host root (`/appconfig/...`), so the standalone approuter routes `/appconfig/*` into the launchpad app in the HTML5 repo, and the dev server rewrites it the same way. It is an HTML5 app itself (`comaemsuitelaunchpad`, the standalone approuter's welcome page), because an approuter bound to the HTML5 repo cannot also serve local files. For a central launchpad use SAP Build Work Zone (section 12); the sandbox launchpad has no `crossNavigation` inbounds, so it does not show up there.
 
 **URLs.** In the HTML5 repo an app lives at `/<app name>/` (`sap.app.id` without dots, e.g. `/comaemsuitebrokers/`); Work Zone adds a prefix (`/<sap.cloud.service>.<app name>-<version>/`). The apps therefore call the backend **relative to themselves**: `odata/v4/...` in the manifests, `ws/live` via `sap.ui.require.toUrl(...)` in the two `LiveSocket` clients. Each app's `xs-app.json` routes `odata/` (and `ws/`, websockets enabled) to the destination `srv-api`. Locally `cds-plugin-ui5` mounts the apps at the same names (`mountPath` in `ui5.yaml`), and `srv/server.ts` strips the `/comaemsuite<app>/` prefix from `odata/` and `ws/` requests (development only).
 
@@ -432,7 +432,8 @@ Quality checks:
 
 ```sh
 npm test            # Jest: unit + service tests (broker connection stubbed)
-npm run typecheck   # backend + tests + subscriber app
+npm run e2e         # Playwright: UI apps in a browser (e2e:ui, e2e:headed, e2e:trace)
+npm run typecheck   # backend + tests + subscriber app + e2e
 ```
 
 | Test file | Covers |
@@ -445,6 +446,19 @@ npm run typecheck   # backend + tests + subscriber app
 | `help.test.ts` | rendering of the guide (sections, GitHub anchors, every link of the guide resolves, raw HTML escaped, tables), that every Help button names an existing heading, the service (access, one section, file changes, missing file) |
 | `export-import.test.ts` | export content (nested, no IDs, sorted), selections, round trip, dry run, import into a folder, lenient hand-written files, files above 100 kb, all-or-nothing validation with positions |
 | `agent.test.ts` | the AI agent service over real MCP JSON-RPC: access, tools, create / change / move / copy with UI validation, preview, runs on destination brokers, credential refusal, limits |
+| `mcp-oauth.test.ts` | MCP OAuth discovery: 401 hint, protected resource and authorization server metadata, public URL from forwarded headers, nothing advertised without XSUAA |
+| `dev-server.test.ts` | app-relative `odata/` under `/comaemsuite<app>/`, `/launchpad.html` redirect |
+
+**End-to-end (`e2e/*.spec.ts`, Playwright).** `playwright.config.ts` starts `cds-tsx serve` with mocked users and the demo data on port 4005 (`E2E_PORT`; an already running server on that port is reused outside CI) and drives the sandbox launchpad in Chromium, locale en-US. Browser: on Windows the installed Edge, elsewhere Playwright's Chromium (`npx playwright install chromium` once); `PW_CHANNEL` overrides it. No broker is needed.
+
+| Spec | Covers |
+|---|---|
+| `launchpad.spec.ts` | the seven tiles, no sandbox sample apps (`/appconfig` routing), a tile opens its app |
+| `apps.spec.ts` | every app opens through its intent and shows the demo data; test case detail page by deep link |
+| `subscriber.spec.ts` | Live Subscriber form, live socket connects app-relative (`/comaemsuitesubscriber/ws/live`) |
+| `authorization.spec.ts` | user `tester`: tester apps open, Brokers / Global Variables fail to load (admin service 403) |
+
+`e2e/launchpad.ts` holds the intents and helpers (`openApp`, `expectAppOpen` waits for the window title the shell sets). Failures keep a trace in `test-results/` (`npx playwright show-trace ...`).
 
 ## 12. Build and deployment (Cloud Foundry)
 

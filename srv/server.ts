@@ -12,7 +12,10 @@ if (process.env.NODE_ENV !== 'production') {
   cds.on('bootstrap', (app) => {
     app.get('/launchpad.html', (_req, res) => res.redirect('/comaemsuitelaunchpad/index.html'))
     app.use((req, _res, next) => {
-      req.url = req.url.replace(appPrefix, '/')
+      req.url = req.url
+        .replace(appPrefix, '/')
+        // the launchpad sandbox reads its config from the host root (BTP: route in app/router/xs-app.json)
+        .replace(/^\/appconfig\//, '/comaemsuitelaunchpad/appconfig/')
       next()
     })
     // Never let the browser cache UI files (fragments, controllers, manifests).

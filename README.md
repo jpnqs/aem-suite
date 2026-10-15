@@ -115,8 +115,13 @@ You can also bind a real destination service with `cds bind`.
 
 ```sh
 npm test               # jest: unit + service integration tests (broker connection stubbed)
-npm run typecheck      # backend + subscriber app
+npm run e2e            # Playwright: the UI apps in a browser (starts its own dev server on port 4005)
+npm run e2e:ui         # interactive Playwright runner
+npm run e2e:headed     # watch the browser while the tests run
+npm run typecheck      # backend + subscriber app + e2e tests
 ```
+
+On Windows the e2e tests use the installed Edge. Elsewhere install Chromium once (`npx playwright install chromium`); `PW_CHANNEL=chrome` / `msedge` picks another installed browser. A failed test leaves a trace: `npm run e2e:trace -- test-results/<test>/trace.zip`.
 
 ## BTP destination layout
 
