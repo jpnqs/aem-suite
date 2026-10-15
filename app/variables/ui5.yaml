@@ -1,6 +1,6 @@
 specVersion: "4.0"
 metadata:
-  name: aem.suite.variables
+  name: com.aem.suite.variables
 type: application
 customConfiguration:
   cds-plugin-ui5:

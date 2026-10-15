@@ -1,7 +1,7 @@
 import UIComponent from "sap/ui/core/UIComponent";
 
 /**
- * @namespace aem.suite.subscriber
+ * @namespace com.aem.suite.subscriber
  */
 export default class Component extends UIComponent {
   public static metadata = {

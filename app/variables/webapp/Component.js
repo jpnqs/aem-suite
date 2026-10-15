@@ -1,6 +1,6 @@
 sap.ui.define(["sap/fe/core/AppComponent"], function (AppComponent) {
   "use strict";
-  return AppComponent.extend("aem.suite.variables.Component", {
+  return AppComponent.extend("com.aem.suite.variables.Component", {
     metadata: { manifest: "json" }
   });
 });

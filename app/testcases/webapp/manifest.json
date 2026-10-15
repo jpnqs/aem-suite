@@ -1,7 +1,7 @@
 {
   "_version": "1.65.0",
   "sap.app": {
-    "id": "aem.suite.testcases",
+    "id": "com.aem.suite.testcases",
     "type": "application",
     "i18n": {
       "bundleUrl": "i18n/i18n.properties",
@@ -27,7 +27,7 @@
     "crossNavigation": {
       "inbounds": {
         "intent": {
-          "semanticObject": "TestCases",
+          "semanticObject": "AEMSuiteTestCases",
           "action": "manage",
           "title": "{{appTitle}}",
           "signature": {
@@ -65,7 +65,7 @@
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",
         "settings": {
-          "bundleName": "aem.suite.testcases.i18n.i18n",
+          "bundleName": "com.aem.suite.testcases.i18n.i18n",
           "supportedLocales": [
             ""
           ],
@@ -119,10 +119,10 @@
                     "type": "TreeTable",
                     "hierarchyQualifier": "TestTree",
                     "selectionMode": "Multi",
-                    "isMoveToPositionAllowed": "aem.suite.testcases.ext.TreeRules.isMoveToPositionAllowed",
+                    "isMoveToPositionAllowed": "com.aem.suite.testcases.ext.TreeRules.isMoveToPositionAllowed",
                     "creationMode": {
                       "name": "NewPage",
-                      "isCreateEnabled": "aem.suite.testcases.ext.TreeRules.isCreateEnabled",
+                      "isCreateEnabled": "com.aem.suite.testcases.ext.TreeRules.isCreateEnabled",
                       "nodeType": {
                         "propertyName": "kind",
                         "values": {
@@ -134,7 +134,7 @@
                   },
                   "actions": {
                     "runSelected": {
-                      "press": "aem.suite.testcases.ext.TestCaseActions.runSelected",
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.runSelected",
                       "text": "Run…",
                       "requiresSelection": true
                     }
@@ -156,12 +156,12 @@
                 "header": {
                   "actions": {
                     "runThis": {
-                      "press": "aem.suite.testcases.ext.TestCaseActions.runFromObjectPage",
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.runFromObjectPage",
                       "text": "Run…",
                       "visible": "{= ${IsActiveEntity} === true }"
                     },
                     "preview": {
-                      "press": "aem.suite.testcases.ext.TestCaseActions.preview",
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.preview",
                       "text": "Preview"
                     }
                   }
@@ -169,7 +169,7 @@
                 "body": {
                   "sections": {
                     "message": {
-                      "template": "aem.suite.testcases.ext.MessageSection",
+                      "template": "com.aem.suite.testcases.ext.MessageSection",
                       "title": "Message",
                       "position": {
                         "placement": "Before",
@@ -177,7 +177,7 @@
                       }
                     },
                     "payload": {
-                      "template": "aem.suite.testcases.ext.PayloadSection",
+                      "template": "com.aem.suite.testcases.ext.PayloadSection",
                       "title": "Payload",
                       "position": {
                         "placement": "After",
@@ -195,11 +195,11 @@
     "extends": {
       "extensions": {
         "sap.ui.controllerExtensions": {
-          "sap.fe.templates.ObjectPage.ObjectPageController#aem.suite.testcases::TestCasesObjectPage": {
-            "controllerName": "aem.suite.testcases.ext.ObjectPageExt"
+          "sap.fe.templates.ObjectPage.ObjectPageController#com.aem.suite.testcases::TestCasesObjectPage": {
+            "controllerName": "com.aem.suite.testcases.ext.ObjectPageExt"
           },
-          "sap.fe.templates.ListReport.ListReportController#aem.suite.testcases::TestCasesList": {
-            "controllerName": "aem.suite.testcases.ext.MyEntriesFilter"
+          "sap.fe.templates.ListReport.ListReportController#com.aem.suite.testcases::TestCasesList": {
+            "controllerName": "com.aem.suite.testcases.ext.MyEntriesFilter"
           }
         }
       }

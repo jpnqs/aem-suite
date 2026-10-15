@@ -2,7 +2,7 @@
   xmlns:core="sap.ui.core"
   xmlns="sap.m">
   <VBox
-    core:require="{handler: 'aem/suite/testcases/ext/MessageSection'}"
+    core:require="{handler: 'com/aem/suite/testcases/ext/MessageSection'}"
     width="100%">
     <Label text="Topic" required="{ui>/isEditable}" design="Bold" visible="{= !${aem>/isFolder} }" />
     <TextArea

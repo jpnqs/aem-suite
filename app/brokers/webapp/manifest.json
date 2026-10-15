@@ -1,7 +1,7 @@
 {
   "_version": "1.65.0",
   "sap.app": {
-    "id": "aem.suite.brokers",
+    "id": "com.aem.suite.brokers",
     "type": "application",
     "i18n": {
       "bundleUrl": "i18n/i18n.properties",
@@ -27,7 +27,7 @@
     "crossNavigation": {
       "inbounds": {
         "intent": {
-          "semanticObject": "Brokers",
+          "semanticObject": "AEMSuiteBrokers",
           "action": "manage",
           "title": "{{appTitle}}",
           "signature": {
@@ -64,7 +64,7 @@
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",
         "settings": {
-          "bundleName": "aem.suite.brokers.i18n.i18n",
+          "bundleName": "com.aem.suite.brokers.i18n.i18n",
           "supportedLocales": [
             ""
           ],

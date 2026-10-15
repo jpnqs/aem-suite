@@ -1,5 +1,5 @@
 <mvc:View
-  controllerName="aem.suite.subscriber.controller.Main"
+  controllerName="com.aem.suite.subscriber.controller.Main"
   xmlns:mvc="sap.ui.core.mvc"
   xmlns:core="sap.ui.core"
   xmlns="sap.m"

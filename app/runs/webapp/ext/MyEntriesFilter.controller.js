@@ -8,7 +8,7 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension"], function (ControllerExten
    * Prefills the "Started By" filter with the logged-in user (from the CAP backend - the
    * launchpad user may differ). Remove or change the filter to see entries of others.
    */
-  return ControllerExtension.extend("aem.suite.runs.ext.MyEntriesFilter", {
+  return ControllerExtension.extend("com.aem.suite.runs.ext.MyEntriesFilter", {
     override: {
       onInit: function () {
         if (prefilled) {

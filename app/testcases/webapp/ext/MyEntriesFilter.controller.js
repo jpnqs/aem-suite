@@ -8,7 +8,7 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension"], function (ControllerExten
    * Prefills the "Created By" filter with the logged-in user (from the CAP backend - the
    * launchpad user may differ). Remove or change the filter to see entries of others.
    */
-  return ControllerExtension.extend("aem.suite.testcases.ext.MyEntriesFilter", {
+  return ControllerExtension.extend("com.aem.suite.testcases.ext.MyEntriesFilter", {
     override: {
       onInit: function () {
         if (prefilled) {

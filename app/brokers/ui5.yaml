@@ -1,6 +1,6 @@
 specVersion: "4.0"
 metadata:
-  name: aem.suite.brokers
+  name: com.aem.suite.brokers
 type: application
 customConfiguration:
   cds-plugin-ui5:

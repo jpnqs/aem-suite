@@ -3,7 +3,7 @@
   xmlns="sap.m"
   xmlns:ce="sap.ui.codeeditor">
   <VBox
-    core:require="{handler: 'aem/suite/testcases/ext/PayloadSection'}"
+    core:require="{handler: 'com/aem/suite/testcases/ext/PayloadSection'}"
     width="100%">
     <OverflowToolbar style="Clear">
       <ObjectStatus

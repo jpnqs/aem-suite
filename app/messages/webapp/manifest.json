@@ -1,7 +1,7 @@
 {
   "_version": "1.65.0",
   "sap.app": {
-    "id": "aem.suite.messages",
+    "id": "com.aem.suite.messages",
     "type": "application",
     "i18n": {
       "bundleUrl": "i18n/i18n.properties",
@@ -27,7 +27,7 @@
     "crossNavigation": {
       "inbounds": {
         "intent": {
-          "semanticObject": "SavedMessages",
+          "semanticObject": "AEMSuiteSavedMessages",
           "action": "display",
           "title": "{{appTitle}}",
           "signature": {
@@ -64,7 +64,7 @@
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",
         "settings": {
-          "bundleName": "aem.suite.messages.i18n.i18n",
+          "bundleName": "com.aem.suite.messages.i18n.i18n",
           "supportedLocales": [
             ""
           ],

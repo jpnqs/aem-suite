@@ -1,6 +1,6 @@
 specVersion: "4.0"
 metadata:
-  name: aem.suite.subscriber
+  name: com.aem.suite.subscriber
 type: application
 customConfiguration:
   cds-plugin-ui5:

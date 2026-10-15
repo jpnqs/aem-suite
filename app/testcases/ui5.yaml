@@ -1,6 +1,6 @@
 specVersion: "4.0"
 metadata:
-  name: aem.suite.testcases
+  name: com.aem.suite.testcases
 type: application
 customConfiguration:
   cds-plugin-ui5:

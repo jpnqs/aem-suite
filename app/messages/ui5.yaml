@@ -1,6 +1,6 @@
 specVersion: "4.0"
 metadata:
-  name: aem.suite.messages
+  name: com.aem.suite.messages
 type: application
 customConfiguration:
   cds-plugin-ui5:

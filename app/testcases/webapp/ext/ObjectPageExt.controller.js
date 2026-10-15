@@ -6,7 +6,7 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension", "sap/ui/model/json/JSONMod
    * Manifest "visible" expressions are evaluated at templating time (no data yet), so the
    * test-case-only parts are toggled here once the page is bound. Fragments bind to aem>/isFolder.
    */
-  return ControllerExtension.extend("aem.suite.testcases.ext.ObjectPageExt", {
+  return ControllerExtension.extend("com.aem.suite.testcases.ext.ObjectPageExt", {
     override: {
       onInit: function () {
         this.base.getView().setModel(new JSONModel({ isFolder: false }), "aem");

@@ -5,7 +5,7 @@ sap.ui.define(
     "sap/m/List",
     "sap/m/StandardListItem",
     "sap/m/Text",
-    "aem/suite/testcases/ext/JsonTemplate"
+    "com/aem/suite/testcases/ext/JsonTemplate"
   ],
   function (MessageToast, ResponsivePopover, List, StandardListItem, Text, JsonTemplate) {
   "use strict";

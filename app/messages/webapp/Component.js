@@ -1,6 +1,6 @@
 sap.ui.define(["sap/fe/core/AppComponent"], function (AppComponent) {
   "use strict";
-  return AppComponent.extend("aem.suite.messages.Component", {
+  return AppComponent.extend("com.aem.suite.messages.Component", {
     metadata: { manifest: "json" }
   });
 });

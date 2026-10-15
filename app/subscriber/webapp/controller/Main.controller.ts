@@ -46,7 +46,7 @@ interface SelectedMessage extends LiveMessage {
 }
 
 /**
- * @namespace aem.suite.subscriber.controller
+ * @namespace com.aem.suite.subscriber.controller
  */
 export default class Main extends Controller {
   private state: JSONModel;
@@ -413,7 +413,7 @@ function savePrefs(prefs: SubscriberPrefs): void {
 function openTestCase(id: string): void {
   const path = `TestCases(ID=${id},IsActiveEntity=true)`;
   const ushell = (window as unknown as { sap?: { ushell?: { Container?: unknown } } }).sap?.ushell;
-  if (ushell?.Container) window.location.hash = `#TestCases-manage&/${path}`;
+  if (ushell?.Container) window.location.hash = `#AEMSuiteTestCases-manage&/${path}`;
   else window.open(`/testcases/index.html#/${path}`, "_blank");
 }
 

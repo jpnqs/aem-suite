@@ -4,15 +4,15 @@ sap.ui.define(
     "sap/m/MessageToast",
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
-    "aem/suite/testcases/ext/LiveSocket",
-    "aem/suite/testcases/ext/Prefs"
+    "com/aem/suite/testcases/ext/LiveSocket",
+    "com/aem/suite/testcases/ext/Prefs"
   ],
   function (MessageBox, MessageToast, JSONModel, Filter, LiveSocket, Prefs) {
     "use strict";
 
     /** Navigates to the run in the runs app (FLP intent or standalone app). */
     function openRun(runId) {
-      var hash = "TestRuns-display&/TestRuns(" + runId + ")";
+      var hash = "AEMSuiteTestRuns-display&/TestRuns(" + runId + ")";
       if (window.sap && sap.ushell && sap.ushell.Container) {
         window.location.hash = "#" + hash;
       } else {
@@ -214,7 +214,7 @@ sap.ui.define(
       return api
         .loadFragment({
           id: "runDialog" + Date.now(),
-          name: "aem.suite.testcases.ext.RunDialog",
+          name: "com.aem.suite.testcases.ext.RunDialog",
           controller: handler
         })
         .then(function (d) {
@@ -302,7 +302,7 @@ sap.ui.define(
           });
 
         return Promise.all([
-          api.loadFragment({ id: "previewDialog" + Date.now(), name: "aem.suite.testcases.ext.PreviewDialog", controller: handler }),
+          api.loadFragment({ id: "previewDialog" + Date.now(), name: "com.aem.suite.testcases.ext.PreviewDialog", controller: handler }),
           brokersLoaded
         ])
           .then(function (results) {
