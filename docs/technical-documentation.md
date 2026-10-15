@@ -80,6 +80,7 @@ test/
   data/                       demo data – loaded by cds watch / tests only, never deployed
 local/                        docker-compose for a local Solace broker
 scripts/build-ui.js           ui5 build of all apps + assembly into app/router/resources
+scripts/build-docs.js         copies docs/user-guide.md next to the built server (gen/srv/docs) for the Help app
 mta.yaml, xs-security.json    deployment
 ```
 
@@ -167,6 +168,26 @@ Clients enter a **context** to receive only their events:
 | `runProgress` | run ID | `status` RUNNING/DONE, `total`, `done`, `passed`, `failed`, `resultId` |
 | `message` | subscription ID | topic, payload, contentType, userProperties (JSON), correlationId, deliveryMode, receivedAt, seq |
 | `subscriptionStatus` | subscription ID | `STOPPED`, `DOWN`, `THROTTLED`, `RESUMED` + message |
+
+### HelpService – `/odata/v4/help` (every logged-in user)
+
+Serves the user guide for the **Help app**. `docs/user-guide.md` stays the only source: `srv/lib/help-content.ts` reads it on the server, renders it with `markdown-it` and cuts it into sections, so the browser gets finished HTML and needs no Markdown library.
+
+| Element | Description |
+|---|---|
+| `Sections` (read only, no database) | one row per `## ` heading: `id` (anchor), `number`, `title`, `html`, `text` (plain text for the search), `headings` (JSON list of the `###` / `####` headings with their anchors) |
+
+Rules of the rendering (so write the guide accordingly):
+
+- Section 1 "Overview" is everything before the first `## ` (title and introduction). A section called "Contents" is skipped, the Help app has its own navigation.
+- **Anchors are the same as on GitHub** (`## 8. Watch messages live (Live Subscriber)` → `8-watch-messages-live-live-subscriber`, repeated headings get `-1`, `-2`), so the `[…](#anchor)` links of the guide's table of contents work in the Help app. `###` headings become the sub items of the navigation.
+- **Raw HTML in the Markdown is not passed through** (it is shown as text); links to other sites open in a new tab; wide tables scroll inside the page.
+- The file is re-rendered when its modification time changes, so edits show up while developing. `cds.aemSuite.help.file` overrides the location (relative to the project root). Deployed, `scripts/build-docs.js` copies the guide to `gen/srv/docs/` (MTA build step, after `cds build`) - a system without the file answers 404 "The user guide is not available".
+- `@requires: 'authenticated-user'`: help is not tied to a role.
+
+**Help app** (`app/help`, `com.aem.suite.help`, tile "AEM Suite – Help"): freestyle UI5 app with a `sap.tnt.SideNavigation` (sections with their `###` headings, search field that filters sections and **highlights** hits), the section as `sap.ui.core.HTML`, and previous / next buttons. The address after the app's own part is a heading anchor: `#AEMSuiteHelp-display&/6-run-tests` opens that section, `…&/export-and-import` the section containing that sub heading and scrolls to it. Links inside the text that point to a heading stay in the app.
+
+**Help buttons.** Every Fiori elements page has a *Help* action in its header (`content.header.actions.help` in the manifests, handler `ext/Help.js`), the Live Subscriber has a *Help* button, and the Run dialog a help link. They open the matching section **in a new browser tab** (`window.open`, so a draft being edited is not lost): inside the launchpad `<launchpad address>#AEMSuiteHelp-display&/<anchor>`, standalone `/help/index.html#/<anchor>`. Each `Help.js` names its section in a constant (`SECTION…`, in the subscriber `HELP_SECTION`); `test/help.test.ts` checks that every one of them is an existing heading of the guide, so renaming a heading cannot silently break a Help button.
 
 ### Export and import file (`srv/lib/export-import.ts`)
 
@@ -319,6 +340,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `subscriber` | Freestyle UI5, **TypeScript** | Live subscriptions over WebSocket, message list (batched, max. 500), detail panel, save / save as test case. |
 | `messages` | Fiori elements | Saved messages, *Create Test Case*. |
 | `brokers`, `variables` | Fiori elements | Admin apps. |
+| `help` | Freestyle UI5 | The user guide from `docs/user-guide.md`, see HelpService in section 6. |
 
 ### 8.2 Test case app extensions (`app/testcases/webapp/ext`)
 
@@ -363,6 +385,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `cds.aemSuite.subscriptions.maxMessagesPerSecond` | 100 | forwarding limit per subscription |
 | `cds.aemSuite.subscriptions.maxPayloadBytes` | 524288 | truncation of payloads in the live view |
 | `cds.aemSuite.autoTestConnection` | true | connection test on save of destination brokers |
+| `cds.aemSuite.help.file` | `docs/user-guide.md` | location of the user guide the Help app shows (relative to the project root) |
 | `cds.aemSuite.agent.maxRunResults` | 100 | test cases x brokers of one run started by an AI agent |
 | `cds.aemSuite.agent.maxActiveRuns` | 2 | runs of one user that an agent may have in progress |
 | `cds.aemSuite.agent.allowDirectCredentials` | false | development only: let `runTests` accept passwords of direct brokers (they would pass through the AI conversation) |
@@ -402,6 +425,7 @@ npm run typecheck   # backend + tests + subscriber app
 | `resolve.test.ts`, `defaults.test.ts` | URL handling, runtime passwords, detection helpers |
 | `services.test.ts` | OData services end-to-end with stubbed broker: brokers, variables, test cases, runs, preview, saved messages, filters |
 | `tree.test.ts` | hierarchy queries, folder validation, moves (incl. concurrent change set), folder runs and variables, folder deletion, copying |
+| `help.test.ts` | rendering of the guide (sections, GitHub anchors, every link of the guide resolves, raw HTML escaped, tables), that every Help button names an existing heading, the service (access, one section, file changes, missing file) |
 | `export-import.test.ts` | export content (nested, no IDs, sorted), selections, round trip, dry run, import into a folder, lenient hand-written files, files above 100 kb, all-or-nothing validation with positions |
 | `agent.test.ts` | the AI agent service over real MCP JSON-RPC: access, tools, create / change / move / copy with UI validation, preview, runs on destination brokers, credential refusal, limits |
 
@@ -409,7 +433,7 @@ npm run typecheck   # backend + tests + subscriber app
 
 ```sh
 npm i -g mbt
-mbt build                                   # npm ci → cds build --production → node scripts/build-ui.js
+mbt build                                   # npm ci → cds build --production → node scripts/build-docs.js → node scripts/build-ui.js
 cf deploy mta_archives/aem-suite_1.0.0.mtar
 ```
 
@@ -428,6 +452,7 @@ After deployment: assign role collections, create destinations for DESTINATION b
 
 | Goal | Where |
 |---|---|
+| Change or add help text | edit `docs/user-guide.md` - nothing else. Keep headings stable (apps link to them, see the Help buttons above); a new `## ` heading becomes a new section automatically |
 | New agent capability (MCP) | an unbound action / function in `srv/agent-service.cds` + handler in `srv/agent-service.ts`; reuse the checks in `srv/lib/node-validation.ts`; list it in `test/agent.test.ts` (the test pins the exact set of entities and actions) |
 | New built-in template function | `TemplateResolver.callFunction` / `fixed` in `srv/lib/template/resolve.ts` (+ `isBuiltin`, help list in `PayloadSection.js`) |
 | Payload assertions / round-trip checks | `test-runner.ts`: subscribe before publishing (use `SolaceSession.subscribe`/`onMessage`), new result fields in `RunResults` |

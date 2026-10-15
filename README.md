@@ -6,6 +6,7 @@ CAP (Node.js, TypeScript) app on SAP BTP for testing **SAP Integration Suite, Ad
 - **Test cases**: topic, JSON payload, delivery mode, TTL, priority, correlation ID and user properties. Topic, payload, correlation ID and property values support `{{variables}}`.
 - **Runs**: run one or many test cases against several brokers in parallel. A result **passes when the broker acknowledges** the message (PERSISTENT), or when the send succeeds (DIRECT). The run history is kept per broker.
 - **Live subscriber**: subscribe to topics (wildcards allowed), browse or consume queues, watch messages live over a WebSocket, and save them or turn them into a test case.
+- **Help in the app**: the tile **AEM Suite – Help** shows the [user guide](docs/user-guide.md) with navigation, search and links to every heading. It is rendered from the Markdown file on the server (edit the file, nothing else), and every app has a *Help* button that opens the matching section in a new tab.
 - **AI assistant (MCP)**: an AI assistant can plan, preview and run tests and read the results through the **Model Context Protocol** (`/mcp/agent`). No deleting, and no broker passwords through the AI: runs are limited to brokers with a BTP destination. See [Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp) and the technical documentation.
 
 ## Documentation
@@ -36,6 +37,7 @@ HANA Cloud · Destination service · XSUAA
 | `subscriber` | Freestyle UI5 in TypeScript | Tester |
 | `messages` | Fiori elements, saved messages | Tester |
 | `brokers`, `variables` | Fiori elements | Admin |
+| `help` | Freestyle UI5 | Everyone: the user guide, rendered from `docs/user-guide.md` |
 
 `app/launchpad.html` is a sandbox launchpad that shows all apps as tiles. The approuter uses it as its welcome page.
 
@@ -136,7 +138,7 @@ cf deploy mta_archives/aem-suite_1.0.0.mtar
 
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.
 
-The MTA build runs `cds build --production` (which compiles the TypeScript) and `node scripts/build-ui.js`. That script runs `ui5 build` for every app and copies the results into `app/router/resources`, where the standalone approuter serves them.
+The MTA build runs `cds build --production` (which compiles the TypeScript), `node scripts/build-docs.js` (copies the user guide next to the server for the Help app) and `node scripts/build-ui.js`. That script runs `ui5 build` for every app and copies the results into `app/router/resources`, where the standalone approuter serves them.
 
 ### Operational notes
 

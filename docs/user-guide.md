@@ -34,6 +34,9 @@ Open the launchpad. Depending on your role you see these tiles:
 | **Saved Messages** | messages you kept from the live subscriber | Tester |
 | **Brokers** | connections to the brokers | Admin |
 | **Global Variables** | variables for all test cases | Admin |
+| **Help** | this guide, inside the app | everyone |
+
+**Help is always at hand:** every page has a **Help** button (top right) that opens the matching part of this guide in a new tab, so you do not lose what you are doing. The **Help** tile shows the whole guide with a contents list on the left and a **search** that highlights what it finds.
 
 Your administrator assigns the roles (**AEM_Suite_Tester** or **AEM_Suite_Admin**). Admins can do everything testers can.
 
