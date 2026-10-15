@@ -56,6 +56,7 @@ The test case list is a tree table with nested **folders**:
 - **Arrange**: drag & drop (or Cut/Paste, Move Up/Down) moves nodes into folders and orders siblings. Folders are always listed before test cases. Nodes can only be placed in folders, and a folder cannot be moved into itself.
 - **Folder variables** apply to all test cases inside the folder and its subfolders.
 - **Run a folder**: "Run…" on a folder (list or object page) runs every test case below it, in tree order.
+- **Copy**: "Copy" duplicates the selected test cases and folders. A folder is copied with everything below it, named "… (Copy)" and placed right after the original.
 - **Delete** a folder to delete its whole content.
 
 ## Templates

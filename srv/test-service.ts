@@ -3,6 +3,7 @@ import { currentJwt, loadBroker } from './lib/credentials/resolve'
 import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord } from './lib/test-case-spec'
 import { BrokerCredential, createRun, executeRunInBackground, toCredentials } from './lib/test-runner'
 import { detectContentType, inferPropertyType, STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
+import { copyNodes } from './lib/copy-nodes'
 import { compareSiblings, loadTree, TreeNode } from './lib/tree'
 
 const VAR_NAME = /^[A-Za-z_][\w.-]*$/
@@ -183,27 +184,13 @@ export default class TestService extends cds.ApplicationService {
       }
     })
 
+    // copy of a test case or a folder (with everything below it), placed right after the original
     this.on('duplicate', TestCases, async (req) => {
-      const { ID } = keyOf(req)
-      const tc = (await SELECT.one.from('aem.suite.TestCases', ID, (t: any) => {
-        t`.*`
-        t.userProperties((p: any) => p`.*`)
-        t.variables((v: any) => v`.*`)
-      })) as (TestCaseRecord & Record<string, unknown>) | null
-      if (!tc) return req.error(404, 'Test case not found')
-      const newId = cds.utils.uuid()
-      const strip = (row: Record<string, unknown>, keys: string[]) =>
-        Object.fromEntries(Object.entries(row).filter(([k]) => !keys.includes(k)))
-      const child = ['ID', 'testCase_ID']
-      await INSERT.into('aem.suite.TestCases').entries({
-        ...strip(tc, ['createdAt', 'createdBy', 'modifiedAt', 'modifiedBy']),
-        ID: newId,
-        name: `${tc.name} (Copy)`.slice(0, 200),
-        userProperties: (tc.userProperties ?? []).map((p) => strip(p as unknown as Record<string, unknown>, child)),
-        variables: (tc.variables ?? []).map((v) => strip(v as unknown as Record<string, unknown>, child))
-      })
-      return SELECT.one.from(TestCases, newId)
+      const [copy] = await copyNodes([keyOf(req).ID])
+      return SELECT.one.from(TestCases, copy.ID)
     })
+
+    this.on('copyNodes', async (req) => copyNodes((req.data as { ids: string[] }).ids))
 
     return super.init()
   }

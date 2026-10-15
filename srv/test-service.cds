@@ -24,6 +24,7 @@ service TestService {
       /** Resolves topic, payload and properties against a broker's variables without sending anything. */
       action preview(brokerId : UUID) returns Preview;
 
+      /** Copies this test case or folder (a folder with everything below it); the copy is placed right after the original. */
       @Core.OperationAvailable: in.IsActiveEntity
       action duplicate() returns TestCases;
 
@@ -135,6 +136,18 @@ service TestService {
 
   @readonly
   entity PropertyTypes as projection on db.PropertyTypes;
+
+  /**
+   * Copies test cases and folders (folders with everything below them: subfolders, test cases, variables,
+   * user properties). A selected node below another selected folder is copied with that folder only.
+   * Each copy is placed right after its original and named "<name> (Copy)".
+   */
+  action copyNodes(ids : many UUID not null) returns many CopyResult;
+
+  type CopyResult {
+    ID   : UUID;
+    name : String;
+  }
 
   /** ID of the logged-in user - used to prefill "Created by" / "Started by" filters. */
   function currentUser() returns String;

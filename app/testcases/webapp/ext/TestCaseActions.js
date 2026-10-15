@@ -251,7 +251,59 @@ sap.ui.define(
         });
     }
 
+    /**
+     * Copies test cases / folders (folders with everything below them) on the server.
+     * Resolves with the copies; the copy is placed right after its original.
+     */
+    function copyNodes(api, ids) {
+      var op = api.getModel().bindContext("/copyNodes(...)");
+      op.setParameter("ids", ids);
+      return op.invoke().then(function () {
+        var copies = op.getBoundContext().getObject().value || [];
+        op.destroy();
+        return copies;
+      });
+    }
+
+    function copiedMessage(copies) {
+      return copies.length === 1 ? 'Copied as "' + copies[0].name + '"' : copies.length + " copies created";
+    }
+
     return {
+      /** List report toolbar action (multi selection): copies the selected test cases and folders. */
+      copySelected: function (context, selectedContexts) {
+        var api = this;
+        var contexts = selectedContexts || [];
+        var ids = contexts
+          .filter(function (c) {
+            return c.getProperty("IsActiveEntity") !== false;
+          })
+          .map(function (c) {
+            return c.getProperty("ID");
+          });
+        if (ids.length !== contexts.length) {
+          MessageToast.show("Unsaved drafts are skipped");
+        }
+        if (!ids.length) {
+          return;
+        }
+        return copyNodes(api, ids)
+          .then(function (copies) {
+            MessageToast.show(copiedMessage(copies));
+            return api.refresh();
+          })
+          .catch(showError);
+      },
+
+      /** Object page header action: copies this test case or folder. */
+      copyFromObjectPage: function (context) {
+        return copyNodes(this, [context.getProperty("ID")])
+          .then(function (copies) {
+            MessageToast.show(copiedMessage(copies) + " - find it next to the original in the list");
+          })
+          .catch(showError);
+      },
+
       /** List report toolbar action (multi selection). */
       runSelected: function (context, selectedContexts) {
         var contexts = selectedContexts || [];

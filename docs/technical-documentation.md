@@ -130,7 +130,8 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `TestCases` (draft, **hierarchy**) | Folder/test case tree. Computed columns `LimitedDescendantCount`, `DistanceFromRoot`, `DrillState`, `LimitedRank` and `@Aggregation.RecursiveHierarchy #TestTree` / `@Hierarchy.RecursiveHierarchy #TestTree` enable CAP hierarchy queries for the Fiori tree table. `kindText` is a display text for `kind`. |
 | `TestCases.runTest(brokerIds, credentials)` | Runs one node (a folder runs its subtree). |
 | `TestCases.preview(brokerId)` | Resolves topic, payload, correlation ID and properties without sending. Works on drafts. |
-| `TestCases.duplicate()` | Copies a test case including children (API only). |
+| `TestCases.duplicate()` | Copies a test case or a folder with everything below it (`srv/lib/copy-nodes.ts`); the copy is named "… (Copy)" and placed right after the original. |
+| `copyNodes(ids)` | Same for several nodes; a node below another selected node is copied with that node only. Returns `{ ID, name }` per copy. Used by the *Copy* buttons. |
 | `TestCases.moveBefore(NextSibling)` | `ChangeNextSiblingAction` of the tree table (drag & drop ordering). |
 | `runTests(testCaseIds, brokerIds, credentials)` | Runs several nodes against several brokers in one run. |
 | `currentUser()` | Logged-in user ID – used to prefill the "Created by" / "Started by" filters. |
@@ -251,7 +252,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 | App (`app/…`) | Type | Highlights |
 |---|---|---|
-| `testcases` | Fiori elements LR/OP | **Tree table** (`hierarchyQualifier: TestTree`, create menu Folder/Test Case, drag & drop, Cut/Paste, Move Up/Down); custom sections `MessageSection` (full-width topic + name) and `PayloadSection` (`sap.ui.codeeditor` JSON editor, validation, format, template help); custom actions *Run…* and *Preview*. |
+| `testcases` | Fiori elements LR/OP | **Tree table** (`hierarchyQualifier: TestTree`, create menu Folder/Test Case, drag & drop, Cut/Paste, Move Up/Down); custom sections `MessageSection` (full-width topic + name) and `PayloadSection` (`sap.ui.codeeditor` JSON editor, validation, format, template help); custom actions *Run…*, *Copy* and *Preview*. |
 | `runs` | Fiori elements LR/OP | List on `RunResults` (one row per test case × broker, filters for test case, broker, status, started by/at); link columns to the test case, broker and run (`testCaseLink`, `brokerLink`, `runLink` in `TestService.RunResults` are launchpad intents). Run page (`TestRuns`) with totals and its results. |
 | `subscriber` | Freestyle UI5, **TypeScript** | Live subscriptions over WebSocket, message list (batched, max. 500), detail panel, save / save as test case. |
 | `messages` | Fiori elements | Saved messages, *Create Test Case*. |

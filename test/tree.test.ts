@@ -194,6 +194,62 @@ describe('test case tree (folders)', () => {
     void admin
   })
 
+  it('copies a folder with everything below it, right after the original', async () => {
+    const res = await POST('/odata/v4/test/copyNodes', { ids: [orders.ID] }, tester)
+    expect(res.status).toBe(200)
+    expect(res.data.value).toHaveLength(1)
+    const copy = res.data.value[0] as { ID: string; name: string }
+    expect(copy.name).toBe('Orders (Copy)')
+    expect(copy.ID).not.toBe(orders.ID)
+
+    // placed directly behind the original
+    const rootNames = (await treeRows()).filter((r) => r.DistanceFromRoot === 0).map((r) => r.name)
+    expect(rootNames.indexOf('Orders (Copy)')).toBe(rootNames.indexOf('Orders') + 1)
+
+    // same structure below the copy, with new IDs
+    const all = (await SELECT.from('aem.suite.TestCases').columns('ID', 'parent_ID', 'name', 'kind')) as {
+      ID: string
+      parent_ID: string | null
+      name: string
+      kind: string
+    }[]
+    const below = (parent: string) => all.filter((n) => n.parent_ID === parent)
+    const copyEu = below(copy.ID).find((n) => n.name === 'EU')!
+    expect(copyEu.ID).not.toBe(eu.ID)
+    expect(below(copyEu.ID).map((n) => n.name).sort()).toEqual(['{{domain}}/{{region}}/cancelled', '{{domain}}/{{region}}/created'])
+    expect(below(copy.ID).some((n) => n.name === 'ping')).toBe(true)
+
+    // folder variables are copied, the original is untouched
+    const vars = (id: string) => SELECT.from('aem.suite.TestCaseVariables').where({ testCase_ID: id })
+    expect(await vars(copy.ID)).toMatchObject([{ name: 'domain', value: 'orders' }])
+    expect(await vars(copyEu.ID)).toMatchObject([{ name: 'region', value: 'eu' }])
+    expect(below(orders.ID).map((n) => n.name)).toContain('EU')
+    expect(below(eu.ID)).toHaveLength(2)
+  })
+
+  it('copies a node below a selected folder only together with that folder', async () => {
+    const res = await POST('/odata/v4/test/copyNodes', { ids: [created.ID, orders.ID, eu.ID] }, tester)
+    expect(res.status).toBe(200)
+    expect(res.data.value.map((c: { name: string }) => c.name)).toEqual(['Orders (Copy)'])
+  })
+
+  it('copies single test cases next to the original and rejects unknown nodes', async () => {
+    const { data } = await POST('/odata/v4/test/copyNodes', { ids: [created.ID] }, tester)
+    expect(data.value[0].name).toBe('{{domain}}/{{region}}/created (Copy)')
+    const siblings = (await SELECT.from('aem.suite.TestCases').columns('ID', 'sortOrder').where({ parent_ID: eu.ID })) as {
+      ID: string
+      sortOrder: number
+    }[]
+    const order = (id: string) => siblings.find((s) => s.ID === id)!.sortOrder
+    expect(order(data.value[0].ID)).toBeGreaterThan(order(created.ID))
+    expect(order(data.value[0].ID)).toBeLessThan(order(cancelled.ID))
+
+    const missing = await POST('/odata/v4/test/copyNodes', { ids: [cds.utils.uuid()] }, tester)
+    expect(missing.status).toBe(404)
+    const none = await POST('/odata/v4/test/copyNodes', { ids: [] }, tester)
+    expect(none.status).toBe(400)
+  })
+
   it('deletes a folder including its content', async () => {
     const res = await axios.delete(`/odata/v4/test/TestCases(ID=${orders.ID},IsActiveEntity=true)`, tester)
     expect(res.status).toBe(204)

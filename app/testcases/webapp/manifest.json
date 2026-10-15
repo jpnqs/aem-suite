@@ -152,6 +152,11 @@
             "settings": {
               "editableHeaderContent": false,
               "contextPath": "/TestCases",
+                    },
+                    "copySelected": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.copySelected",
+                      "text": "Copy",
+                      "requiresSelection": true
               "content": {
                 "header": {
                   "actions": {
@@ -175,6 +180,11 @@
                         "placement": "Before",
                         "anchor": "AdvancedSection"
                       }
+                    "copy": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.copyFromObjectPage",
+                      "text": "Copy",
+                      "visible": "{= ${IsActiveEntity} === true }"
+                    },
                     },
                     "payload": {
                       "template": "com.aem.suite.testcases.ext.PayloadSection",

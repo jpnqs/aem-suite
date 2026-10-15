@@ -87,6 +87,7 @@ The **Test Cases** list is a tree: folders can contain test cases and other fold
 | Create a test case | **Create → Test Case** (inside the selected folder, or on top level if nothing is selected) |
 | Move | **drag & drop** a row onto a folder, or **Cut** and **Paste** |
 | Change order | drag & drop between rows, or **Move Up / Move Down**. Folders are always shown before test cases. |
+| Copy | select one or more rows → **Copy** (or **Copy** on the test case / folder page). A folder is copied **with everything below it** (subfolders, test cases, variables, user properties). The copy is named "… (Copy)" and placed right after the original. If you select a folder and something inside it, that is copied once, with the folder. |
 | Expand / collapse | arrow in front of a folder |
 | Delete a folder | **Delete** – this deletes the folder **with all its content** |
 
