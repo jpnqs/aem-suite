@@ -105,6 +105,16 @@
               "contextPath": "/ReceivedMessages",
               "variantManagement": "Page",
               "initialLoad": "Enabled",
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.messages.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "navigation": {
                 "ReceivedMessages": {
                   "detail": {
@@ -130,6 +140,16 @@
           "options": {
             "settings": {
               "editableHeaderContent": false,
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.messages.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "contextPath": "/ReceivedMessages"
             }
           }

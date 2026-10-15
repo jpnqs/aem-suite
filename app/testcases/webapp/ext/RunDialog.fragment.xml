@@ -8,7 +8,8 @@
     draggable="true">
     <content>
       <VBox class="sapUiSmallMargin" visible="{= !${run>/runId} }">
-        <Text text="Select the brokers to run against. Each selected test case is published once per broker." class="sapUiSmallMarginBottom" />
+        <Text text="Select the brokers to run against. Each selected test case is published once per broker." class="sapUiTinyMarginBottom" />
+        <Link text="How do runs work, and what do the results mean?" press=".onHelp" class="sapUiSmallMarginBottom" />
         <List
           id="brokerList"
           mode="MultiSelect"

@@ -105,6 +105,16 @@
               "contextPath": "/Brokers",
               "variantManagement": "Page",
               "initialLoad": "Enabled",
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.brokers.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "navigation": {
                 "Brokers": {
                   "detail": {
@@ -130,6 +140,16 @@
           "options": {
             "settings": {
               "editableHeaderContent": false,
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.brokers.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "contextPath": "/Brokers"
             }
           }

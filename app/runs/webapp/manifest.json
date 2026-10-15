@@ -115,6 +115,16 @@
               "contextPath": "/RunResults",
               "variantManagement": "Page",
               "initialLoad": "Enabled",
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "navigation": {
                 "RunResults": {
                   "detail": {
@@ -140,6 +150,16 @@
           "options": {
             "settings": {
               "editableHeaderContent": false,
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "contextPath": "/RunResults"
             }
           }
@@ -151,6 +171,16 @@
           "options": {
             "settings": {
               "editableHeaderContent": false,
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "contextPath": "/TestRuns",
               "navigation": {
                 "results": {
@@ -169,6 +199,16 @@
           "options": {
             "settings": {
               "editableHeaderContent": false,
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "contextPath": "/TestRuns/results"
             }
           }

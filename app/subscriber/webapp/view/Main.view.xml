@@ -65,6 +65,11 @@
             type="Transparent"
             icon="sap-icon://list"
             press=".onShowActive" />
+          <Button
+            text="Help"
+            type="Transparent"
+            icon="sap-icon://sys-help"
+            press=".onHelp" />
         </f:actions>
       </f:DynamicPageTitle>
     </f:title>

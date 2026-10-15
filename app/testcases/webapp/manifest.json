@@ -106,6 +106,16 @@
               "contextPath": "/TestCases",
               "variantManagement": "Page",
               "initialLoad": "Enabled",
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.testcases.ext.Help.openForList",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "navigation": {
                 "TestCases": {
                   "detail": {
@@ -199,6 +209,10 @@
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.exportFromObjectPage",
                       "text": "Export",
                       "visible": "{= ${IsActiveEntity} === true }"
+                    },
+                    "help": {
+                      "press": "com.aem.suite.testcases.ext.Help.openForObjectPage",
+                      "text": "Help"
                     },
                     "preview": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.preview",

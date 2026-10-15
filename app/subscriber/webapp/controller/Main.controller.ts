@@ -21,6 +21,8 @@ const FLUSH_MS = 250;
 const HEARTBEAT_MS = 60 * 1000;
 const PREFS_KEY = "aem-suite.subscriber";
 const MAX_TOPIC_HISTORY = 30;
+// section of the user guide (docs/user-guide.md) that explains this app - a test checks that it exists
+const HELP_SECTION = "8-watch-messages-live-live-subscriber";
 
 interface SubscriberPrefs {
   brokerId?: string;
@@ -321,6 +323,15 @@ export default class Main extends Controller {
     const binding = this.odata().bindList("/activeSubscriptions()");
     const contexts = await binding.requestContexts(0, 50);
     return contexts.map((c) => c.getObject() as Record<string, string>);
+  }
+
+  /** Opens the matching section of the user guide in a new tab, so the running subscription is not interrupted. */
+  public onHelp(): void {
+    const ushell = (window as unknown as { sap?: { ushell?: { Container?: unknown } } }).sap?.ushell;
+    const url = ushell?.Container
+      ? `${window.location.pathname}#AEMSuiteHelp-display&/${HELP_SECTION}`
+      : `${window.location.origin}/help/index.html#/${HELP_SECTION}`;
+    window.open(url, "_blank", "noopener");
   }
 
   public async onShowActive(): Promise<void> {

@@ -105,6 +105,16 @@
               "contextPath": "/GlobalVariables",
               "variantManagement": "Page",
               "initialLoad": "Enabled",
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.variables.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "navigation": {
                 "GlobalVariables": {
                   "detail": {
@@ -130,6 +140,16 @@
           "options": {
             "settings": {
               "editableHeaderContent": false,
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.variables.ext.Help.open",
+                      "text": "Help"
+                    }
+                  }
+                }
+              },
               "contextPath": "/GlobalVariables"
             }
           }

@@ -5,9 +5,10 @@ sap.ui.define(
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
     "com/aem/suite/testcases/ext/LiveSocket",
-    "com/aem/suite/testcases/ext/Prefs"
+    "com/aem/suite/testcases/ext/Prefs",
+    "com/aem/suite/testcases/ext/Help"
   ],
-  function (MessageBox, MessageToast, JSONModel, Filter, LiveSocket, Prefs) {
+  function (MessageBox, MessageToast, JSONModel, Filter, LiveSocket, Prefs, Help) {
     "use strict";
 
     /** Navigates to the run in the runs app (FLP intent or standalone app). */
@@ -124,6 +125,9 @@ sap.ui.define(
       }
 
       var handler = {
+        onHelp: function () {
+          Help.openForRun();
+        },
         onBrokerSelection: function () {
           syncCredentials();
         },
