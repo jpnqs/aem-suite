@@ -346,15 +346,47 @@ The suite can be connected to an AI assistant (for example Claude Code or anothe
 - **No runs on direct brokers.** For those you enter a password for every run, and a password typed into an AI chat would be stored in logs. The assistant can run tests on brokers that use a **BTP destination** (*Credentials: BTP Destination*). For direct brokers it tells you to run the tests in the app.
 - At most 100 results (test cases × brokers) per run and 2 runs at a time per user.
 
+**How it works**
+
+The assistant talks to the suite over the *Model Context Protocol* (MCP), an open standard for giving AI tools access to an application. The suite offers one MCP address; your AI client connects to it and shows the assistant three tools:
+
+| Tool | Used for |
+|---|---|
+| `TestAgentService-describe` | learn what exists (test cases, brokers, runs …) and which actions are possible |
+| `TestAgentService-query` | read data: "which tests failed last time?" |
+| `TestAgentService-call` | do something: create / change / move / copy, preview, run |
+
+You do not use these tools yourself. You write what you want in the chat of your AI client; the assistant picks the tools, most clients ask you to confirm each call, and the assistant tells you the result. It acts **with your user and your role** (Tester) – it can do nothing you could not do in the apps.
+
 **Connect**
 
-The address is `<your app>/mcp/agent`; you need the **Tester** role. Locally (`npm run watch`):
+You need the address `<your app>/mcp/agent` and a login. Locally (`npm run watch`) the address is `http://localhost:4004/mcp/agent` and the demo login is `tester` / `tester`; as header that is `Authorization: Basic dGVzdGVyOnRlc3Rlcg==` (the Base64 text of `tester:tester`). For the deployed app the assistant must send a valid login token of your BTP user (`Authorization: Bearer …`); ask your administrator how your organisation hands those out. Then add the address in your client:
+
+*GitHub Copilot (VS Code)* – create the file `.vscode/mcp.json` in your workspace (or run **MCP: Add Server** → *HTTP* from the command palette):
+
+```json
+{
+  "servers": {
+    "aem-suite": {
+      "type": "http",
+      "url": "http://localhost:4004/mcp/agent",
+      "headers": { "Authorization": "Basic dGVzdGVyOnRlc3Rlcg==" }
+    }
+  }
+}
+```
+
+Click **Start** above the entry in the file (or use **MCP: List Servers**), open the Copilot chat, switch to **Agent** mode and check that the `aem-suite` tools show up under the tools icon. Copilot asks before it runs a tool. For organisation accounts your administrator must allow MCP servers in Copilot. Other editors (JetBrains, Visual Studio) take the same address and header in their MCP settings.
+
+*Claude Code*:
 
 ```sh
 claude mcp add --transport http aem-suite http://localhost:4004/mcp/agent --header "Authorization: Basic dGVzdGVyOnRlc3Rlcg=="
 ```
 
-(`dGVzdGVyOnRlc3Rlcg==` is the local demo login `tester:tester`.) For the deployed app the assistant must send a valid login token of your BTP user (`Authorization: Bearer …`); ask your administrator how your organisation hands those out.
+*Other clients* (any MCP client with *streamable HTTP*): server type `http`, the URL above, one header `Authorization`. A client that only knows local (stdio) servers can use a bridge such as `mcp-remote`: `npx mcp-remote http://localhost:4004/mcp/agent --header "Authorization: Basic …"`.
+
+Do not commit a real token or password to git. In VS Code you can have the token asked for instead: an `inputs` entry with `"password": true`, and `${input:token}` in the header.
 
 **Things you can ask**
 
