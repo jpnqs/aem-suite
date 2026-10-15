@@ -1,0 +1,11 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m">
+  <!-- Type column of the test case tree: a small icon instead of the type name (name as tooltip) -->
+  <core:Icon
+    src="{= ${kind} === 'FOLDER' ? 'sap-icon://folder-blank' : 'sap-icon://lab' }"
+    size="1rem"
+    color="{= ${kind} === 'FOLDER' ? 'var(--sapContent_IconColor)' : 'var(--sapContent_NonInteractiveIconColor)' }"
+    tooltip="{= ${kind} === 'FOLDER' ? 'Folder' : 'Test Case' }"
+    alt="{= ${kind} === 'FOLDER' ? 'Folder' : 'Test Case' }" />
+</core:FragmentDefinition>

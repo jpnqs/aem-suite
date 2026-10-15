@@ -24,7 +24,7 @@ annotate service.TestCases with @(
   },
   UI.LineItem          : [
     {Value: name},
-    {Value: kind},
+    // "Type" is a custom icon column (ext/TypeColumn.fragment.xml, see manifest)
     {Value: topic},
     {
       Value      : lastResult.status,

@@ -264,6 +264,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 |---|---|
 | `TestCaseActions.js` | *Run…* (list and object page), Run dialog with broker selection, password fields for DIRECT brokers, live progress via WebSocket, problem list, *Preview* dialog. |
 | `RunDialog.fragment.xml`, `PreviewDialog.fragment.xml` | Dialogs. |
+| `TypeColumn.fragment.xml` | Custom "Type" column of the tree table: a small folder / test case icon (name as tooltip) instead of the type text. Defined under `columns` in the manifest, so `kind` is not part of the `@UI.LineItem`. |
 | `MessageSection.*`, `PayloadSection.*`, `JsonTemplate.js` | Custom sections; JSON handling that tolerates `{{…}}` outside strings. |
 | `ObjectPageExt.controller.js` | Hides test-case-only parts for folders (manifest `visible` expressions are evaluated before data is loaded). |
 | `MyEntriesFilter.controller.js` | Prefills the "Created by" filter once per app start with `currentUser()`. Same file in the runs app ("Started by"). |

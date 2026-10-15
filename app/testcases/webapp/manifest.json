@@ -115,6 +115,21 @@
               },
               "controlConfiguration": {
                 "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "columns": {
+                    "typeIcon": {
+                      "header": "Type",
+                      "template": "com.aem.suite.testcases.ext.TypeColumn",
+                      "width": "5rem",
+                      "horizontalAlign": "Center",
+                      "properties": [
+                        "kind"
+                      ],
+                      "position": {
+                        "placement": "After",
+                        "anchor": "DataField::name"
+                      }
+                    }
+                  },
                   "tableSettings": {
                     "type": "TreeTable",
                     "hierarchyQualifier": "TestTree",
@@ -137,6 +152,11 @@
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.runSelected",
                       "text": "Run…",
                       "requiresSelection": true
+                    },
+                    "copySelected": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.copySelected",
+                      "text": "Copy",
+                      "requiresSelection": true
                     }
                   }
                 }
@@ -152,17 +172,17 @@
             "settings": {
               "editableHeaderContent": false,
               "contextPath": "/TestCases",
-                    },
-                    "copySelected": {
-                      "press": "com.aem.suite.testcases.ext.TestCaseActions.copySelected",
-                      "text": "Copy",
-                      "requiresSelection": true
               "content": {
                 "header": {
                   "actions": {
                     "runThis": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.runFromObjectPage",
                       "text": "Run…",
+                      "visible": "{= ${IsActiveEntity} === true }"
+                    },
+                    "copy": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.copyFromObjectPage",
+                      "text": "Copy",
                       "visible": "{= ${IsActiveEntity} === true }"
                     },
                     "preview": {
@@ -180,11 +200,6 @@
                         "placement": "Before",
                         "anchor": "AdvancedSection"
                       }
-                    "copy": {
-                      "press": "com.aem.suite.testcases.ext.TestCaseActions.copyFromObjectPage",
-                      "text": "Copy",
-                      "visible": "{= ${IsActiveEntity} === true }"
-                    },
                     },
                     "payload": {
                       "template": "com.aem.suite.testcases.ext.PayloadSection",
