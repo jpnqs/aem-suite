@@ -91,11 +91,14 @@ sap.ui.define(
         return dialog.getContent()[0].getItems()[1];
       }
 
-      /** One password row per selected DIRECT broker; typed values are kept while the selection changes. */
+      /**
+       * One credentials row per selected DIRECT broker (password, plus username if the broker has none);
+       * typed values are kept while the selection changes.
+       */
       function syncCredentials() {
         var typed = {};
         state.getProperty("/credentials").forEach(function (c) {
-          typed[c.brokerId] = c.password;
+          typed[c.brokerId] = c;
         });
         var rows = brokerList()
           .getSelectedContexts()
@@ -106,7 +109,16 @@ sap.ui.define(
             return b.credentialMode !== "DESTINATION";
           })
           .map(function (b) {
-            return { brokerId: b.ID, name: b.name, username: b.username, password: typed[b.ID] || "", missing: false };
+            var prev = typed[b.ID] || {};
+            return {
+              brokerId: b.ID,
+              name: b.name,
+              username: b.username || "",
+              needsUsername: !b.username,
+              enteredUsername: prev.enteredUsername || "",
+              password: prev.password || "",
+              missing: false
+            };
           });
         state.setProperty("/credentials", rows);
       }
@@ -154,14 +166,21 @@ sap.ui.define(
           }
           var credentials = state.getProperty("/credentials");
           var missing = credentials.filter(function (c) {
-            return !c.password;
+            return !c.password || (c.needsUsername && !c.enteredUsername.trim());
           });
           if (missing.length) {
             credentials.forEach(function (c) {
               c.missing = true;
             });
             state.refresh(true);
-            MessageToast.show("Enter the password for " + missing.map(function (c) { return c.name; }).join(", "));
+            MessageToast.show(
+              "Enter the missing credentials for " +
+                missing
+                  .map(function (c) {
+                    return c.name;
+                  })
+                  .join(", ")
+            );
             return;
           }
           Prefs.set("lastBrokers", brokerIds);
@@ -172,7 +191,11 @@ sap.ui.define(
           op.setParameter(
             "credentials",
             credentials.map(function (c) {
-              return { brokerId: c.brokerId, password: c.password };
+              return {
+                brokerId: c.brokerId,
+                username: c.needsUsername ? c.enteredUsername.trim() : null,
+                password: c.password
+              };
             })
           );
           op.invoke()

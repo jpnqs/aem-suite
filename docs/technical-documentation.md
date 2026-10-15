@@ -50,7 +50,7 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
 
 **Request flow of a run**
 
-1. UI calls `runTest` / `runTests` with test case or folder IDs, broker IDs and per-broker passwords.
+1. UI calls `runTest` / `runTests` with test case or folder IDs, broker IDs and per-broker credentials (password, plus username for brokers without one).
 2. `createRun` validates the input, expands folders to test cases (tree order), and inserts `TestRuns` plus one `PENDING` `RunResults` row per test case × broker in the request transaction.
 3. After commit (`req.on('succeeded')`) `executeRunInBackground` starts. Brokers are processed **in parallel**, the test cases of one broker **sequentially** over one session.
 4. Each result row is updated in its own transaction and a `runProgress` event goes to WebSocket context = run ID.
@@ -87,7 +87,7 @@ mta.yaml, xs-security.json    deployment
 
 | Entity | Purpose | Notes |
 |---|---|---|
-| `Brokers` | Broker / message VPN | `credentialMode` DIRECT or DESTINATION; DIRECT keeps `url`, `msgVpn`, `username` – **no password field**; `lastConnection*` holds the last connection test. Composition `variables` (broker variables). |
+| `Brokers` | Broker / message VPN | `credentialMode` DIRECT or DESTINATION; DIRECT keeps `url`, `msgVpn`, an optional `username` (if empty it is entered at run time) – **no password field**; `lastConnection*` holds the last connection test. Composition `variables` (broker variables). |
 | `Variables` | Template variables | `broker` empty = global variable, set = broker variable. |
 | `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`. Compositions `userProperties`, `variables`. Association `lastResult` → `TestCaseStats`. |
 | `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
@@ -117,7 +117,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | Element | Description |
 |---|---|
 | `Brokers` (draft) | Broker maintenance. Handlers: URL completion while editing and on save, validation, **automatic connection test on save for DESTINATION brokers** (max. 5 s). |
-| `Brokers.testConnection(password)` | Opens/closes a session, stores the outcome. `password` is required for DIRECT brokers and never stored. |
+| `Brokers.testConnection(username, password)` | Opens/closes a session, stores the outcome. `password` is required for DIRECT brokers and never stored; `username` only if none is maintained on the broker. |
 | `BrokerVariables` | Broker variables (composition of `Brokers`). |
 | `GlobalVariables` (draft) | Projection on `Variables` without broker; unique names. |
 | `Destinations` | Read-only value help (`@cds.persistence.skip`) – destinations from the bound destination service and from env `destinations`, filtered to broker URLs. |
@@ -139,13 +139,13 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `TestCaseStats` | Read-only, with criticality. |
 | `DeliveryModes`, `PropertyTypes` | Code lists. |
 
-`credentials` is `many { brokerId, password }`. `createRun` rejects the call with 400 if a DIRECT broker has no password.
+`credentials` is `many { brokerId, username, password }`. `createRun` rejects the call with 400 if a DIRECT broker has no password, or no username (neither maintained on the broker nor passed in `credentials`).
 
 ### SubscribeService – `/odata/v4/subscribe` (role `Tester`)
 
 | Element | Description |
 |---|---|
-| `start(brokerId, sourceType, topics, queue, password)` | Opens a dedicated session. `sourceType`: `TOPIC` (direct subscriptions, wildcards), `QUEUE_BROWSE` (messages stay), `QUEUE_CONSUME` (client ack, messages removed). Returns `subscriptionId`. |
+| `start(brokerId, sourceType, topics, queue, password, username)` | Opens a dedicated session. `sourceType`: `TOPIC` (direct subscriptions, wildcards), `QUEUE_BROWSE` (messages stay), `QUEUE_CONSUME` (client ack, messages removed). Returns `subscriptionId`. |
 | `stop(subscriptionId)` | Closes the subscription (owner only). |
 | `activeSubscriptions()` | Own subscriptions; also acts as **heartbeat** (keeps them alive). |
 | `ReceivedMessages` | Saved messages (no update). Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
@@ -183,8 +183,8 @@ Single place that opens publishing connections (`connect(conn)`). Tests replace 
 
 ### 7.3 `credentials/resolve.ts` and `credentials/destinations.ts`
 
-- `resolveConnection(broker, jwt, password)` → `{ url, vpnName, userName, password, clientName, connectTimeoutMs }`.
-  - **DIRECT**: URL/VPN/username from the broker, **password from the current request** (`MissingPasswordError` if absent).
+- `resolveConnection(broker, jwt, password, username)` → `{ url, vpnName, userName, password, clientName, connectTimeoutMs }`.
+  - **DIRECT**: URL/VPN from the broker, **password from the current request** (`MissingPasswordError` if absent). The username is the maintained one; only if the broker has none, the one from the request is used (`MissingUsernameError` if neither). `needsUsername(broker)` tells the UIs whether to ask.
   - **DESTINATION**: `getDestination({ destinationName, jwt })`. Expected destination: type HTTP, URL `wss://host:443` (`https://` is mapped to `wss://`), user/password, additional property **`msgVpn`** (required), optional `smfUrl` (e.g. `tcps://host:55443`).
 - `toSmfUrl()` maps `http(s)` → `ws(s)` and rejects other schemes.
 - `listDestinations()` merges the bound destination service (`getAllDestinationsFromDestinationService`) and env `destinations` (local).
@@ -368,6 +368,7 @@ After deployment: assign role collections, create destinations for DESTINATION b
 | Symptom | Cause / fix |
 |---|---|
 | `Password required for broker …` | DIRECT broker without password in the request – enter it in the dialog. |
+| `Username required for broker …` | DIRECT broker without a maintained username and none in the request – enter it in the dialog or maintain it on the broker. |
 | `Connect failed: … ECONNREFUSED` | Wrong host/port or broker down; for Docker check `docker ps` and the port mapping. |
 | `No broker acknowledgement within … ms` | No ACK in time (overloaded broker, spool limits); raise *ACK timeout* or check the broker. |
 | `Rejected by broker: …` | E.g. `reject-msg-to-sender-on-no-subscription-match`, spool quota, ACL – check the VPN configuration. |

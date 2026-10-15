@@ -16,12 +16,13 @@ export default class SubscribeService extends cds.ApplicationService {
     cds.on('shutdown', () => stopAll())
 
     this.on('start', async (req) => {
-      const { brokerId, sourceType, topics, queue, password } = req.data as {
+      const { brokerId, sourceType, topics, queue, password, username } = req.data as {
         brokerId: string
         sourceType: SourceType
         topics?: string[]
         queue?: string
         password?: string
+        username?: string
       }
       const subscriptionId = await startSubscription({
         brokerId,
@@ -30,7 +31,8 @@ export default class SubscribeService extends cds.ApplicationService {
         queue,
         owner: req.user.id,
         jwt: currentJwt(),
-        password: password || undefined
+        password: password || undefined,
+        username: username || undefined
       })
       return { subscriptionId }
     })

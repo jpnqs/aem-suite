@@ -40,7 +40,9 @@ export async function resolveConnection(
   broker: BrokerRecord,
   jwt?: string,
   /** DIRECT mode: the password entered by the user for this run / test / subscription (never stored) */
-  password?: string
+  password?: string,
+  /** DIRECT mode: username entered by the user - only used if the broker has no username maintained */
+  username?: string
 ): Promise<BrokerConnection> {
   const base = {
     brokerId: broker.ID,
@@ -69,13 +71,15 @@ export async function resolveConnection(
 
   if (!broker.url) throw new Error(`Broker "${broker.name}": URL missing`)
   if (!broker.msgVpn) throw new Error(`Broker "${broker.name}": message VPN missing`)
-  if (!broker.username) throw new Error(`Broker "${broker.name}": username missing`)
+  // the maintained username wins; otherwise the one entered for this operation
+  const userName = broker.username || username?.trim()
+  if (!userName) throw new MissingUsernameError(broker.name)
   if (!password) throw new MissingPasswordError(broker.name)
   return {
     ...base,
     url: toSmfUrl(broker.url),
     vpnName: broker.msgVpn,
-    userName: broker.username,
+    userName,
     password
   }
 }
@@ -87,9 +91,21 @@ export class MissingPasswordError extends Error {
   }
 }
 
+export class MissingUsernameError extends Error {
+  readonly status = 400
+  constructor(brokerName: string) {
+    super(`Username required for broker "${brokerName}"`)
+  }
+}
+
 /** True if connecting to this broker needs a password from the user. */
 export function needsPassword(broker: { credentialMode?: string | null }): boolean {
   return broker.credentialMode !== 'DESTINATION'
+}
+
+/** True if the user has to enter a username too: DIRECT broker without a maintained username. */
+export function needsUsername(broker: { credentialMode?: string | null; username?: string | null }): boolean {
+  return broker.credentialMode !== 'DESTINATION' && !broker.username
 }
 
 /** Maps http(s) URLs to ws(s), keeps ws/wss/tcp/tcps. */

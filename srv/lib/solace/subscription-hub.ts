@@ -16,6 +16,8 @@ export interface StartRequest {
   jwt?: string
   /** DIRECT brokers - used to open the session, not kept afterwards */
   password?: string
+  /** DIRECT brokers without a maintained username */
+  username?: string
 }
 
 interface Subscription {
@@ -82,7 +84,7 @@ export async function startSubscription(req: StartRequest): Promise<string> {
   const broker = await loadBroker(req.brokerId)
   let conn
   try {
-    conn = await resolveConnection(broker, req.jwt, req.password)
+    conn = await resolveConnection(broker, req.jwt, req.password, req.username)
   } catch (e) {
     throw httpError(400, (e as Error).message)
   }

@@ -40,7 +40,9 @@ service SubscribeService {
                /** queue name (QUEUE_BROWSE / QUEUE_CONSUME) */
                queue : String,
                /** DIRECT brokers: password, held in memory while the subscription runs, never stored */
-               password : String)       returns SubscriptionRef;
+               password : String,
+               /** DIRECT brokers without a maintained username */
+               username : String)       returns SubscriptionRef;
 
   action stop(subscriptionId : UUID not null);
 

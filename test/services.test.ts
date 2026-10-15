@@ -22,6 +22,8 @@ describe('AEM test suite services', () => {
   const published: { broker: string; spec: PublishSpec }[] = []
   /** broker name -> password the connection was opened with */
   const connectedWith: Record<string, string> = {}
+  /** broker name -> username the connection was opened with */
+  const connectedAs: Record<string, string> = {}
   let goodBroker: { ID: string }
   let badBroker: { ID: string }
   let testCase: { ID: string }
@@ -33,6 +35,7 @@ describe('AEM test suite services', () => {
     axios.defaults.validateStatus = () => true
     setPublisherFactory(async (conn) => {
       connectedWith[conn.brokerName] = conn.password
+      connectedAs[conn.brokerName] = conn.userName
       if (conn.brokerName === 'unreachable') throw new Error('Connect failed: Unauthorized')
       return {
         publish: async (spec) => {
@@ -251,6 +254,60 @@ describe('AEM test suite services', () => {
     )
     expect(res.status).toBe(400)
     expect(res.data.error.message).toBe('Password required for broker(s): dev')
+  })
+
+  it('asks for a username only for direct brokers without a maintained one', async () => {
+    // the username is optional on the broker
+    const noUser = await createActive('admin', 'Brokers', {
+      name: 'no-user',
+      credentialMode: 'DIRECT',
+      url: 'nouser.example',
+      msgVpn: 'v',
+      username: null
+    })
+    // the test case needs {{region}}
+    await INSERT.into('aem.suite.Variables').entries({ broker_ID: noUser.ID, name: 'region', value: 'eu' })
+    try {
+      const run = `/odata/v4/test/TestCases(ID=${testCase.ID},IsActiveEntity=true)/TestService.runTest`
+      const refused = await POST(run, { brokerIds: [noUser.ID], credentials: [{ brokerId: noUser.ID, password: 'pw' }] }, tester)
+      expect(refused.status).toBe(400)
+      expect(refused.data.error.message).toBe('Username required for broker(s): no-user')
+
+      // test connection: username and password both come from the request
+      const url = `/odata/v4/admin/Brokers(ID=${noUser.ID},IsActiveEntity=true)/AdminService.testConnection`
+      const { data: noName } = await POST(url, { password: 'pw' }, admin)
+      expect(noName).toMatchObject({ ok: false, message: 'Username required for broker "no-user"' })
+      const { data: ok } = await POST(url, { username: 'entered', password: 'pw' }, admin)
+      expect(ok.ok).toBe(true)
+      expect(connectedAs['no-user']).toBe('entered')
+
+      const started = await POST(
+        run,
+        { brokerIds: [noUser.ID], credentials: [{ brokerId: noUser.ID, username: ' alice ', password: 'pw' }] },
+        tester
+      )
+      expect(started.status).toBe(200)
+      await waitForRun(started.data.runId)
+      expect(connectedAs['no-user']).toBe('alice')
+      const rows = await SELECT.from('aem.suite.RunResults').where({ run_ID: started.data.runId })
+      expect(rows.map((r: { status: string }) => r.status)).toEqual(['PASSED'])
+      // neither the entered username nor the password is persisted with the broker
+      const stored = await SELECT.one.from('aem.suite.Brokers', noUser.ID)
+      expect(stored.username ?? null).toBeNull()
+
+      // a maintained username wins over an entered one
+      const maintained = await POST(
+        run,
+        { brokerIds: [goodBroker.ID], credentials: [{ brokerId: goodBroker.ID, username: 'ignored', password: 'pw-dev' }] },
+        tester
+      )
+      await waitForRun(maintained.data.runId)
+      expect(connectedAs.dev).toBe('solace-cloud-client')
+    } finally {
+      await DELETE.from('aem.suite.RunResults').where({ broker_ID: noUser.ID })
+      await DELETE.from('aem.suite.Variables').where({ broker_ID: noUser.ID })
+      await DELETE.from('aem.suite.Brokers').where({ ID: noUser.ID })
+    }
   })
 
   it('runs several test cases and marks broker rejections as FAILED', async () => {

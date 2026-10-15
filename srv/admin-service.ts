@@ -39,7 +39,7 @@ export default class AdminService extends cds.ApplicationService {
       } else if (d.credentialMode === 'DIRECT' || req.event === 'CREATE') {
         if (!d.url) req.error(400, 'URL is required', 'in/url')
         if (!d.msgVpn) req.error(400, 'Message VPN is required', 'in/msgVpn')
-        if (!d.username) req.error(400, 'Username is required', 'in/username')
+        // username is optional: if empty, it is asked for together with the password
       }
       if (d.url) {
         try {
@@ -89,8 +89,12 @@ export default class AdminService extends cds.ApplicationService {
 
     // ---------------------------------------------------------------- actions
     this.on('testConnection', Brokers, async (req) => {
-      const { password } = req.data as { password?: string }
-      const check = await checkConnection(keyOf(req), { jwt: currentJwt(), password: password || undefined })
+      const { password, username } = req.data as { password?: string; username?: string }
+      const check = await checkConnection(keyOf(req), {
+        jwt: currentJwt(),
+        password: password || undefined,
+        username: username || undefined
+      })
       if (check.ok) req.info(200, `Connection successful (${check.latencyMs} ms)`)
       else req.warn(200, `Connection failed: ${check.message}`)
       return { ok: check.ok, message: check.message, latencyMs: check.latencyMs }

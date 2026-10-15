@@ -17,15 +17,15 @@ export interface ConnectionCheck {
  */
 export async function checkConnection(
   brokerId: string,
-  opts: { jwt?: string; password?: string; maxTimeoutMs?: number } = {}
+  opts: { jwt?: string; password?: string; username?: string; maxTimeoutMs?: number } = {}
 ): Promise<ConnectionCheck> {
-  const { jwt, password, maxTimeoutMs } = opts
+  const { jwt, password, username, maxTimeoutMs } = opts
   const started = Date.now()
   let ok = false
   let message: string
   try {
     const broker = await loadBroker(brokerId)
-    const conn = await resolveConnection(broker, jwt, password)
+    const conn = await resolveConnection(broker, jwt, password, username)
     if (maxTimeoutMs) conn.connectTimeoutMs = Math.min(conn.connectTimeoutMs ?? maxTimeoutMs, maxTimeoutMs)
     const session = await connect(conn)
     await session.close()

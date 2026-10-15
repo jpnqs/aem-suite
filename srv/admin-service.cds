@@ -24,6 +24,7 @@ service AdminService {
       /**
        * Opens and closes a session against the broker and records the result.
        * DIRECT mode needs the password - it is used for this test only and never stored.
+       * The username is only needed if none is maintained on the broker.
        */
       @Core.OperationAvailable: in.IsActiveEntity
       @Common.SideEffects     : {TargetProperties: [
@@ -32,7 +33,8 @@ service AdminService {
         'in/lastConnectionMessage',
         'in/connectionCriticality'
       ]}
-      action testConnection(password : String @UI.Masked
+      action testConnection(username : String @Common.Label: 'Username (only if not maintained on the broker)',
+                            password : String @UI.Masked
                                               @Common.Label: 'Password (direct mode only, not stored)') returns ConnectionResult;
     };
 

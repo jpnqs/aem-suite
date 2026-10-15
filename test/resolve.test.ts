@@ -1,4 +1,11 @@
-import { MissingPasswordError, needsPassword, resolveConnection, toSmfUrl } from '../srv/lib/credentials/resolve'
+import {
+  MissingPasswordError,
+  MissingUsernameError,
+  needsPassword,
+  needsUsername,
+  resolveConnection,
+  toSmfUrl
+} from '../srv/lib/credentials/resolve'
 
 describe('toSmfUrl', () => {
   it.each([
@@ -26,5 +33,29 @@ describe('resolveConnection (DIRECT)', () => {
   it('needs a password only for direct brokers', () => {
     expect(needsPassword({ credentialMode: 'DIRECT' })).toBe(true)
     expect(needsPassword({ credentialMode: 'DESTINATION' })).toBe(false)
+  })
+
+  describe('username is optional on the broker', () => {
+    const noUser = { ...broker, username: null }
+
+    it('takes the username entered for this connection', async () => {
+      await expect(resolveConnection(noUser, undefined, 'pw', ' alice ')).resolves.toMatchObject({ userName: 'alice', password: 'pw' })
+    })
+
+    it('refuses to connect without any username', async () => {
+      await expect(resolveConnection(noUser, undefined, 'pw')).rejects.toBeInstanceOf(MissingUsernameError)
+      await expect(resolveConnection(noUser, undefined, 'pw', '  ')).rejects.toBeInstanceOf(MissingUsernameError)
+    })
+
+    it('prefers the maintained username over an entered one', async () => {
+      await expect(resolveConnection(broker, undefined, 'pw', 'other')).resolves.toMatchObject({ userName: 'u' })
+    })
+
+    it('asks for a username only for direct brokers without one', () => {
+      expect(needsUsername({ credentialMode: 'DIRECT', username: null })).toBe(true)
+      expect(needsUsername({ credentialMode: 'DIRECT', username: '' })).toBe(true)
+      expect(needsUsername({ credentialMode: 'DIRECT', username: 'u' })).toBe(false)
+      expect(needsUsername({ credentialMode: 'DESTINATION', username: null })).toBe(false)
+    })
   })
 })

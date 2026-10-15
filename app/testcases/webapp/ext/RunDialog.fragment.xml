@@ -3,7 +3,7 @@
   xmlns="sap.m">
   <Dialog
     title="Run {run>/label}"
-    contentWidth="34rem"
+    contentWidth="38rem"
     resizable="true"
     draggable="true">
     <content>
@@ -19,23 +19,32 @@
           items="{path: '/Brokers', parameters: {$select: 'username,credentialMode'}, sorter: {path: 'name'}, templateShareable: false}">
           <StandardListItem
             title="{name}"
-            description="{= ${credentialMode} === 'DESTINATION' ? 'BTP destination' : ${username} + ' @ ' + ${msgVpn} }"
+            description="{= ${credentialMode} === 'DESTINATION' ? 'BTP destination' : (${username} ? ${username} + ' @ ' + ${msgVpn} : 'VPN ' + ${msgVpn}) }"
             info="{lastConnectionStatus}"
             infoState="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />
         </List>
         <VBox visible="{= ${run>/credentials}.length > 0 }" class="sapUiSmallMarginTop">
-          <Title text="Passwords (used for this run only, not stored)" level="H6" />
+          <Title text="Credentials (used for this run only, not stored)" level="H6" />
           <List items="{path: 'run>/credentials', templateShareable: false}" showSeparators="None">
             <CustomListItem>
               <HBox alignItems="Center" class="sapUiTinyMarginTopBottom">
-                <Label text="{run>name} ({run>username})" width="16rem" />
+                <Label text="{= ${run>username} ? ${run>name} + ' (' + ${run>username} + ')' : ${run>name} }" width="12rem" wrapping="true" />
+                <Input
+                  visible="{run>needsUsername}"
+                  value="{run>enteredUsername}"
+                  valueLiveUpdate="true"
+                  valueState="{= ${run>missing} &amp;&amp; !${run>enteredUsername} ? 'Error' : 'None' }"
+                  placeholder="Username"
+                  width="11rem"
+                  class="sapUiTinyMarginEnd"
+                  submit=".onPrimary" />
                 <Input
                   type="Password"
                   value="{run>password}"
                   valueLiveUpdate="true"
                   valueState="{= ${run>missing} &amp;&amp; !${run>password} ? 'Error' : 'None' }"
                   placeholder="Password"
-                  width="14rem"
+                  width="11rem"
                   submit=".onPrimary" />
               </HBox>
             </CustomListItem>

@@ -159,7 +159,7 @@ annotate service.Brokers with @(
                         @Common.QuickInfo: 'Host is enough, e.g. mr-xyz.messaging.solace.cloud - completed to wss://host:443 (port 55443 gives tcps, 55555 gives tcp)';
   msgVpn                @title: 'Message VPN';
   username              @title: 'Username'
-                        @Common.QuickInfo: 'The password is not stored - it is entered when running tests, testing the connection or subscribing';
+                        @Common.QuickInfo: 'Optional. If empty, the username is asked for together with the password when running tests, testing the connection or subscribing. The password is never stored';
   clientNamePrefix      @title: 'Client Name Prefix';
   connectTimeoutMs      @title: 'Connect Timeout (ms)';
   active                @title: 'Active';

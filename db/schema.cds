@@ -63,7 +63,10 @@ entity Brokers : cuid, managed {
   /** DIRECT mode: connection data maintained in the app */
   url                    : String(500);
   msgVpn                 : String(100);
-  /** DIRECT mode: the password is never stored - it is entered for each run / connection test / subscription */
+  /**
+   * DIRECT mode: the password is never stored - it is entered for each run / connection test / subscription.
+   * The username is optional: if empty, it is entered together with the password.
+   */
   username               : String(200) default 'solace-cloud-client';
   clientNamePrefix       : String(60) default 'aem-suite';
   connectTimeoutMs       : Integer default 10000;

@@ -142,9 +142,13 @@ service TestService {
   /** Runs several test cases against several brokers in one run. */
   action runTests(testCaseIds : many UUID not null, brokerIds : many UUID not null, credentials : many BrokerCredential) returns RunRef;
 
-  /** Password of a DIRECT broker for one run - used in memory only, never stored. */
+  /**
+   * Password of a DIRECT broker for one run - used in memory only, never stored.
+   * The username is only needed if none is maintained on the broker.
+   */
   type BrokerCredential {
     brokerId : UUID;
+    username : String;
     password : String;
   }
 

@@ -1,7 +1,7 @@
 import cds from '@sap/cds'
 import { currentJwt, loadBroker } from './lib/credentials/resolve'
 import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord } from './lib/test-case-spec'
-import { BrokerCredential, createRun, executeRunInBackground, toPasswords } from './lib/test-runner'
+import { BrokerCredential, createRun, executeRunInBackground, toCredentials } from './lib/test-runner'
 import { detectContentType, inferPropertyType, STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
 import { compareSiblings, loadTree, TreeNode } from './lib/tree'
 
@@ -210,12 +210,12 @@ export default class TestService extends cds.ApplicationService {
 }
 
 async function startRun(req: cds.Request, testCaseIds: string[], brokerIds: string[], credentials?: BrokerCredential[]) {
-  // passwords stay in memory of this run only - never persisted or logged
-  const passwords = toPasswords(credentials)
-  const runId = await createRun(testCaseIds, brokerIds, passwords)
+  // passwords (and entered usernames) stay in memory of this run only - never persisted or logged
+  const entered = toCredentials(credentials)
+  const runId = await createRun(testCaseIds, brokerIds, entered)
   const jwt = currentJwt()
   // execute after the run rows are committed
-  req.on('succeeded', () => void executeRunInBackground(runId, jwt, passwords))
+  req.on('succeeded', () => void executeRunInBackground(runId, jwt, entered))
   req.info(200, 'Test run started - see "Test Runs" for results')
   return { runId }
 }

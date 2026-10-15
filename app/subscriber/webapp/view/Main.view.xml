@@ -64,8 +64,17 @@
               <core:Item key="{ID}" text="{name}" />
             </Select>
           </VBox>
+          <VBox class="sapUiMediumMarginEnd" visible="{state>/needsUsername}">
+            <Label text="Username (not maintained on the broker)" required="true" />
+            <Input
+              width="14rem"
+              value="{state>/enteredUsername}"
+              placeholder="Username"
+              enabled="{= !${state>/subscriptionId} }"
+              submit=".onStart" />
+          </VBox>
           <VBox class="sapUiMediumMarginEnd" visible="{state>/needsPassword}">
-            <Label text="Password for {state>/username} (not stored)" required="true" />
+            <Label text="{= ${state>/username} ? 'Password for ' + ${state>/username} + ' (not stored)' : 'Password (not stored)' }" required="true" />
             <Input
               type="Password"
               width="14rem"

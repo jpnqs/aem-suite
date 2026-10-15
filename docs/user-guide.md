@@ -40,7 +40,7 @@ Your administrator assigns the roles (**AEM_Suite_Tester** or **AEM_Suite_Admin*
 
 1. An admin adds the brokers once.
 2. You create test cases (optionally in folders).
-3. You select test cases or a folder → **Run…** → choose brokers → enter passwords → done.
+3. You select test cases or a folder → **Run…** → choose brokers → enter passwords (and a username for brokers that have none) → done.
 4. Failures are shown directly in the run dialog; the details are in **Test Runs**.
 5. To see what really arrives on a topic, use the **Live Subscriber**.
 
@@ -56,14 +56,14 @@ Open **Brokers** → **Create**.
 | **Credentials** | **Direct Input**: URL, message VPN and username are entered here; the password is asked for whenever a connection is opened. **BTP Destination**: everything comes from a BTP destination maintained by your BTP admin. |
 | **URL** (direct) | The host is enough, e.g. `mr-xyz.messaging.solace.cloud`. It is completed automatically: no port → `wss://…:443`, port `55443` → `tcps://`, port `55555` → `tcp://`. |
 | **Message VPN** (direct) | e.g. `dev-vpn` |
-| **Username** (direct) | default `solace-cloud-client` |
+| **Username** (direct) | optional, default `solace-cloud-client`. If you clear it, the username is asked for together with the password whenever you run tests, test the connection or subscribe. |
 | **Destination** (destination mode) | choose from the list (shows URL and VPN) |
 | **Active** | inactive brokers are hidden in run and subscribe dialogs |
 | Advanced | client name prefix, connect timeout |
 
 > **Passwords are never saved.** For direct brokers you enter the password when you run tests, test the connection or start a subscription. It is used only for that action.
 
-**Test Connection**: on the broker page, click **Test Connection** (enter the password for direct brokers). The result is shown in the header ("Last Connection Test") and in the broker list. Destination brokers are tested automatically when you save them.
+**Test Connection**: on the broker page, click **Test Connection** (enter the password for direct brokers, and the username if none is maintained on the broker). The result is shown in the header ("Last Connection Test") and in the broker list. Destination brokers are tested automatically when you save them.
 
 **Broker variables**: on the broker page, section *Broker Variables* – values that apply only when sending to this broker (e.g. `region = eu` for the EU broker). See [section 10](#10-variables-and-templates).
 
@@ -160,7 +160,7 @@ You can run:
 The **Run dialog**:
 
 1. **Select brokers** – the brokers of your last run are preselected. Each selected test case is sent once to each selected broker.
-2. **Passwords** – for every selected *direct* broker a password field appears ("used for this run only, not stored"). Destination brokers need nothing.
+2. **Credentials** – for every selected *direct* broker a password field appears ("used for this run only, not stored"). If the broker has no username maintained, a **username** field appears next to it. Destination brokers need nothing.
 3. **Run** – progress is shown live (e.g. `3 / 6`, passed / failed).
 4. When finished: green **Finished** if all passed, red otherwise, with a **Problems** list (test case @ broker + reason).
 5. **Open Results** jumps to the run in *Test Runs*.
@@ -197,7 +197,7 @@ The **Last Result** of each test case is also shown in the test case list and in
 
 ## 8. Watch messages live (Live Subscriber)
 
-1. **Broker** – choose a broker. For direct brokers enter the password (it is not stored).
+1. **Broker** – choose a broker. For direct brokers enter the password (it is not stored), and the username if the broker has none maintained.
 2. **Source**:
    - **Topics** – one or more topic subscriptions, comma-separated, wildcards allowed: `*` = one level, `>` = all remaining levels. Example: `shop/orders/>, shop/*/updated/v1`.
    - **Browse Queue** – shows the messages in a queue **without removing them**.
@@ -290,6 +290,7 @@ If a variable cannot be found, the result is **ERROR** with "Unknown variable(s)
 | Message / situation | What to do |
 |---|---|
 | *Password required for broker …* | Enter the password for every direct broker in the dialog. |
+| *Username required for broker …* | The broker has no username maintained – enter one in the dialog (or maintain it on the broker). |
 | *Connect failed: …* | Wrong URL, VPN, username or password, or the broker is not reachable. Use **Test Connection** on the broker. |
 | *No broker acknowledgement within … ms* | The broker did not confirm in time. Try again, increase *ACK Timeout*, or ask your admin to check the broker. |
 | *Rejected by broker: …* | The broker refused the message (e.g. no subscriber with "reject on no subscription", queue full, missing permissions). |

@@ -66,6 +66,9 @@ export default class Main extends Controller {
       password: "",
       needsPassword: false,
       username: "",
+      // DIRECT brokers without a maintained username: entered together with the password
+      needsUsername: false,
+      enteredUsername: "",
       subscriptionId: null,
       sourceLabel: "",
       status: "Not subscribed",
@@ -108,11 +111,14 @@ export default class Main extends Controller {
     }
   }
 
-  /** Shows the password field for DIRECT brokers. */
+  /** Shows the password field for DIRECT brokers, plus a username field if the broker has none. */
   public onBrokerChange(): void {
     const broker = this.brokers[this.state.getProperty("/brokerId") as string];
-    this.state.setProperty("/needsPassword", !!broker && broker.credentialMode !== "DESTINATION");
+    const direct = !!broker && broker.credentialMode !== "DESTINATION";
+    this.state.setProperty("/needsPassword", direct);
+    this.state.setProperty("/needsUsername", direct && !broker.username);
     this.state.setProperty("/username", broker?.username ?? "");
+    this.state.setProperty("/enteredUsername", "");
     this.state.setProperty("/password", "");
   }
 
@@ -146,6 +152,8 @@ export default class Main extends Controller {
     if (s.sourceType === "TOPIC" && !topics.length) return void MessageToast.show("Enter at least one topic");
     if (s.sourceType !== "TOPIC" && !s.queue?.trim()) return void MessageToast.show("Enter a queue name");
     const needsPassword = this.state.getProperty("/needsPassword") as boolean;
+    const needsUsername = this.state.getProperty("/needsUsername") as boolean;
+    if (needsUsername && !s.enteredUsername?.trim()) return void MessageToast.show("Enter the broker username");
     if (needsPassword && !s.password) return void MessageToast.show("Enter the broker password");
 
     this.state.setProperty("/busy", true);
@@ -156,6 +164,7 @@ export default class Main extends Controller {
       op.setParameter("topics", s.sourceType === "TOPIC" ? topics : []);
       op.setParameter("queue", s.sourceType === "TOPIC" ? null : s.queue.trim());
       op.setParameter("password", needsPassword ? s.password : null);
+      op.setParameter("username", needsUsername ? s.enteredUsername.trim() : null);
       await op.invoke();
       const id = (op.getBoundContext() as Context).getProperty("subscriptionId") as string;
       op.destroy(); // drop the request incl. password from the model

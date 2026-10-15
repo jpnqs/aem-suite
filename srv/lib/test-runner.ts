@@ -1,5 +1,5 @@
 import cds from '@sap/cds'
-import { BrokerRecord, loadBroker, needsPassword, resolveConnection } from './credentials/resolve'
+import { BrokerRecord, loadBroker, needsPassword, needsUsername, resolveConnection } from './credentials/resolve'
 import type { Publisher } from './solace/session'
 import { connect, Connector, setConnector } from './solace/connector'
 import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord } from './test-case-spec'
@@ -40,22 +40,28 @@ function runSummary(testCaseNames: string[], brokerNames: string[]): string {
  * Creates a TestRun with one PENDING result per (test case x broker) within the
  * current transaction. Call executeRun() after the transaction committed.
  */
-/** Password entered by the user for a DIRECT broker - kept in memory for the run only. */
+/**
+ * Password (and username, if the broker has none maintained) entered by the user for a DIRECT broker -
+ * kept in memory for the run only.
+ */
 export interface BrokerCredential {
   brokerId: string
+  username?: string | null
   password?: string | null
 }
 
-/** brokerId -> password; never persisted. */
-export type Passwords = Map<string, string>
+/** brokerId -> credentials entered for this run; never persisted. */
+export type Credentials = Map<string, { username?: string; password?: string }>
 
-export function toPasswords(credentials?: BrokerCredential[] | null): Passwords {
-  const m: Passwords = new Map()
-  for (const c of credentials ?? []) if (c?.brokerId && c.password) m.set(c.brokerId, c.password)
+export function toCredentials(credentials?: BrokerCredential[] | null): Credentials {
+  const m: Credentials = new Map()
+  for (const c of credentials ?? []) {
+    if (c?.brokerId) m.set(c.brokerId, { username: c.username?.trim() || undefined, password: c.password || undefined })
+  }
   return m
 }
 
-export async function createRun(testCaseIds: string[], brokerIds: string[], passwords: Passwords = new Map()): Promise<string> {
+export async function createRun(testCaseIds: string[], brokerIds: string[], credentials: Credentials = new Map()): Promise<string> {
   const selected = [...new Set(testCaseIds ?? [])]
   const brIds = [...new Set(brokerIds ?? [])]
   if (!selected.length) throw httpError(400, 'Select at least one test case or folder')
@@ -67,15 +73,17 @@ export async function createRun(testCaseIds: string[], brokerIds: string[], pass
   const tcIds = tree.expandToTests(selected)
   if (!tcIds.length) throw httpError(400, 'The selected folders contain no test cases')
   const testCases = tcIds.map((id) => ({ ID: id, name: tree.byId.get(id)!.name ?? id }))
-  const brokers = (await SELECT.from('aem.suite.Brokers').columns('ID', 'name', 'active', 'credentialMode').where({
+  const brokers = (await SELECT.from('aem.suite.Brokers').columns('ID', 'name', 'active', 'credentialMode', 'username').where({
     ID: { in: brIds }
-  })) as { ID: string; name: string; active: boolean; credentialMode: string }[]
+  })) as { ID: string; name: string; active: boolean; credentialMode: string; username?: string | null }[]
   if (brokers.length !== brIds.length) throw httpError(404, 'One or more brokers not found')
   // keep the user's selection order (summary, results)
   brokers.sort((a, b) => brIds.indexOf(a.ID) - brIds.indexOf(b.ID))
   const inactive = brokers.filter((b) => b.active === false).map((b) => b.name)
   if (inactive.length) throw httpError(400, `Broker(s) inactive: ${inactive.join(', ')}`)
-  const missing = brokers.filter((b) => needsPassword(b) && !passwords.get(b.ID)).map((b) => b.name)
+  const noUser = brokers.filter((b) => needsUsername(b) && !credentials.get(b.ID)?.username).map((b) => b.name)
+  if (noUser.length) throw httpError(400, `Username required for broker(s): ${noUser.join(', ')}`)
+  const missing = brokers.filter((b) => needsPassword(b) && !credentials.get(b.ID)?.password).map((b) => b.name)
   if (missing.length) throw httpError(400, `Password required for broker(s): ${missing.join(', ')}`)
 
   const runId = cds.utils.uuid()
@@ -108,18 +116,18 @@ export async function createRun(testCaseIds: string[], brokerIds: string[], pass
 }
 
 /** Starts execution in the background (do not await in a request). */
-export function executeRunInBackground(runId: string, jwt?: string, passwords: Passwords = new Map()): Promise<void> {
-  const p = executeRun(runId, jwt, passwords)
+export function executeRunInBackground(runId: string, jwt?: string, credentials: Credentials = new Map()): Promise<void> {
+  const p = executeRun(runId, jwt, credentials)
     .catch((e) => LOG.error(`Run ${runId} crashed`, e))
     .finally(() => {
-      passwords.clear()
+      credentials.clear()
       activeRuns.delete(runId)
     })
   activeRuns.set(runId, p)
   return p
 }
 
-async function executeRun(runId: string, jwt: string | undefined, passwords: Passwords): Promise<void> {
+async function executeRun(runId: string, jwt: string | undefined, credentials: Credentials): Promise<void> {
   const live = await cds.connect.to('LiveService').catch(() => undefined)
   const pending = (await cds.db.tx(() =>
     SELECT.from('aem.suite.RunResults').columns('ID', 'testCase_ID', 'broker_ID', 'brokerName').where({ run_ID: runId })
@@ -166,7 +174,8 @@ async function executeRun(runId: string, jwt: string | undefined, passwords: Pas
       let publisher: Publisher | undefined
       try {
         broker = await cds.db.tx(() => loadBroker(brokerId))
-        const conn = await resolveConnection(broker, jwt, passwords.get(brokerId))
+        const entered = credentials.get(brokerId)
+        const conn = await resolveConnection(broker, jwt, entered?.password, entered?.username)
         publisher = await connect(conn)
       } catch (e) {
         for (const r of mine) await finish(r, 'ERROR', { errorMessage: truncate(errMsg(e)) })
