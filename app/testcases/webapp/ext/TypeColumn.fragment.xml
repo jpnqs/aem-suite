@@ -5,7 +5,7 @@
   <core:Icon
     src="{= ${kind} === 'FOLDER' ? 'sap-icon://folder-blank' : 'sap-icon://lab' }"
     size="1rem"
-    color="{= ${kind} === 'FOLDER' ? 'var(--sapContent_IconColor)' : 'var(--sapContent_NonInteractiveIconColor)' }"
+    color="{= ${kind} === 'FOLDER' ? 'Default' : 'Neutral' }"
     tooltip="{= ${kind} === 'FOLDER' ? 'Folder' : 'Test Case' }"
     alt="{= ${kind} === 'FOLDER' ? 'Folder' : 'Test Case' }" />
 </core:FragmentDefinition>
