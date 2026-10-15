@@ -10,6 +10,7 @@ build-parameters:
       commands:
         - npm ci
         - npx cds build --production
+        - node scripts/build-docs.js
         - node scripts/build-ui.js
 modules:
   - name: aem-suite-srv

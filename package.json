@@ -16,6 +16,7 @@
     "@sap/cds": "^10",
     "@sap/xssec": "^4",
     "express": "^5",
+    "markdown-it": "^15.0.2",
     "solclientjs": "^10.18.3"
   },
   "devDependencies": {
@@ -26,6 +27,7 @@
     "@sap/cds-dk": "^10",
     "@sapui5/types": "1.148.12",
     "@types/jest": "^30",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^22",
     "@ui5/cli": "^4",
     "cds-plugin-ui5": "^0.17.4",
@@ -42,7 +44,8 @@
     "typer": "cds-typer \"*\"",
     "typecheck": "tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p app/subscriber",
     "test": "jest",
-    "build:ui": "node scripts/build-ui.js"
+    "build:ui": "node scripts/build-ui.js",
+    "build:docs": "node scripts/build-docs.js"
   },
   "imports": {
     "#cds-models/*": "./@cds-models/*/index.js"
