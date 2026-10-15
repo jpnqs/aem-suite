@@ -200,7 +200,7 @@ The **Last Result** of each test case is also shown in the test case list and in
 
 1. **Broker** – choose a broker. For direct brokers enter the password (it is not stored), and the username if the broker has none maintained.
 2. **Source**:
-   - **Topics** – one or more topic subscriptions. Type a topic and press **Enter** (or type a comma) to add it to the list; click the **×** on a topic to remove it. Topics you used before are suggested while you type. Wildcards are allowed: `*` = one level, `>` = all remaining levels. Example: `shop/orders/>`, `shop/*/updated/v1`.
+   - **Topics** – one or more topic subscriptions. Type a topic and press **Enter** (or click **Add**) to put it on the list below the field; several topics separated by commas are added one by one. Click the **×** on a row to remove a topic. Topics you used before are suggested while you type. Wildcards are allowed: `*` = one level, `>` = all remaining levels. Example: `shop/orders/>`, `shop/*/updated/v1`.
    - **Browse Queue** – shows the messages in a queue **without removing them**.
    - **Consume Queue** – reads and **removes** the messages from the queue.
 3. **Start**.

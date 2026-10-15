@@ -31,6 +31,20 @@
   color: var(--sapContent_IconColor);
 }
 
+/* status next to the page title: same line, vertically centered */
+.aemStatus {
+  align-self: center;
+}
+
+/* topic subscriptions as a list */
+.aemTopicList {
+  border: 1px solid var(--sapGroup_ContentBorderColor);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+
 /* technical values */
 .aemMono,
 .aemMono .sapMObjectIdentifierTitle,

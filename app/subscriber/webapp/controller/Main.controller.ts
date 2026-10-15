@@ -1,8 +1,6 @@
 import DynamicPage from "sap/f/DynamicPage";
 import Select from "sap/m/Select";
-import MultiInput from "sap/m/MultiInput";
-import Token from "sap/m/Token";
-import { Input$LiveChangeEvent } from "sap/m/Input";
+import Input, { Input$LiveChangeEvent } from "sap/m/Input";
 import Controller from "sap/ui/core/mvc/Controller";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Filter from "sap/ui/model/Filter";
@@ -15,7 +13,7 @@ import MessageToast from "sap/m/MessageToast";
 import Table from "sap/m/Table";
 import ColumnListItem from "sap/m/ColumnListItem";
 import { SearchField$LiveChangeEvent } from "sap/m/SearchField";
-import { ListBase$SelectionChangeEvent } from "sap/m/ListBase";
+import { ListBase$DeleteEvent, ListBase$SelectionChangeEvent } from "sap/m/ListBase";
 import LiveSocket from "../util/LiveSocket";
 
 const MAX_MESSAGES = 500;
@@ -71,6 +69,8 @@ export default class Main extends Controller {
     this.state = new JSONModel({
       brokerId: prefs.brokerId ?? null,
       sourceType: prefs.sourceType ?? "TOPIC",
+      // topic subscriptions: a list of { text }; the input above the list adds to it
+      topics: splitTopics(prefs.topicsText ?? "").map((text) => ({ text })),
       topicHistory: (prefs.topicHistory ?? []).map((text) => ({ text })),
       queue: prefs.queue ?? "",
       // password of DIRECT brokers: only in this page's memory until Start, never stored
@@ -101,50 +101,61 @@ export default class Main extends Controller {
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
     window.addEventListener("beforeunload", this.onUnload);
     void this.preselectBroker();
-
-    // topics are tokens: Enter / blur turns the typed text into a token (no duplicates)
-    const topics = this.topicsInput();
-    topics.addValidator((args: { text: string }) => {
-      const text = args.text.trim();
-      if (!text || this.topicTokens().includes(text)) return null;
-      return new Token({ key: text, text });
-    });
-    this.addTopics(splitTopics(prefs.topicsText ?? ""));
   }
 
-  // ---------------------------------------------------------------- topics (tokens)
+  // ---------------------------------------------------------------- topics (list)
 
   // methods, not getters: the UI5 transpiler evaluates getters when the controller class is defined
-  private topicsInput(): MultiInput {
-    return this.byId("topics") as MultiInput;
+  private topicInput(): Input {
+    return this.byId("topics") as Input;
   }
 
-  private topicTokens(): string[] {
-    return this.topicsInput()
-      .getTokens()
-      .map((t) => t.getKey());
+  private topicList(): string[] {
+    return ((this.state.getProperty("/topics") as { text: string }[]) ?? []).map((t) => t.text);
   }
 
+  /** Appends topics to the list (trimmed, no duplicates). */
   private addTopics(texts: string[]): void {
-    const input = this.topicsInput();
-    for (const text of texts) {
-      if (text && !this.topicTokens().includes(text)) input.addToken(new Token({ key: text, text }));
-    }
+    const topics = this.topicList();
+    for (const text of texts.map((t) => t.trim())) if (text && !topics.includes(text)) topics.push(text);
+    this.state.setProperty(
+      "/topics",
+      topics.map((text) => ({ text }))
+    );
   }
 
-  /** A comma ends a topic: everything before the last comma becomes tokens (also works for pasted lists). */
+  /** Enter, the Add button or a picked suggestion: the typed text (comma separated allowed) joins the list. */
+  public onAddTopic(): void {
+    const input = this.topicInput();
+    const typed = splitTopics(input.getValue());
+    this.addTopics(typed);
+    input.setValue("");
+    if (typed.length) input.focus();
+  }
+
+  /** A comma ends a topic, which also makes pasting "a, b, c" work. */
   public onTopicLiveChange(event: Input$LiveChangeEvent): void {
     const value = event.getParameter("value") ?? "";
     if (!value.includes(",")) return;
     const parts = value.split(",");
     const rest = parts.pop() ?? "";
-    this.addTopics(parts.map((p) => p.trim()));
-    this.topicsInput().setValue(rest.trimStart());
+    this.addTopics(parts);
+    this.topicInput().setValue(rest.trimStart());
   }
 
-  /** Tokens plus the text still being typed (so Start works without pressing Enter first). */
+  public onDeleteTopic(event: ListBase$DeleteEvent): void {
+    const text = (event.getParameter("listItem") as ColumnListItem).getBindingContext("state")!.getProperty("text") as string;
+    this.state.setProperty(
+      "/topics",
+      this.topicList()
+        .filter((t) => t !== text)
+        .map((t) => ({ text: t }))
+    );
+  }
+
+  /** The list plus the text still being typed (so Start works without pressing Add first). */
   private collectTopics(): string[] {
-    return [...new Set([...this.topicTokens(), ...splitTopics(this.topicsInput().getValue())])];
+    return [...new Set([...this.topicList(), ...splitTopics(this.topicInput().getValue())])];
   }
 
   private rememberTopics(topics: string[]): string[] {
@@ -234,7 +245,7 @@ export default class Main extends Controller {
       this.state.setProperty("/password", "");
       await this.socket.enter(id);
       // the text that was still being typed is now a topic, too
-      this.topicsInput().setValue("");
+      this.topicInput().setValue("");
       this.addTopics(topics);
       const history = s.sourceType === "TOPIC" ? this.rememberTopics(topics) : ((this.state.getProperty("/topicHistory") as { text: string }[]) ?? []).map((h) => h.text);
       savePrefs({
