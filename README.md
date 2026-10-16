@@ -10,6 +10,7 @@ Save messages as test cases, send them to several brokers at once, see immediate
 - **Know if the broker really took it.** A result passes only when the broker acknowledges the message (persistent delivery), with the measured ACK latency.
 - **One test, many brokers.** Run a test case or a whole folder against dev, test and prod brokers in parallel, and compare the results per broker.
 - **Reusable messages.** Topics, payloads, correlation IDs and user properties accept `{{variables}}` (global, broker, folder and test case level) plus built-ins such as `{{uuid}}`, `{{now}}` or `{{randomInt(1,10)}}`.
+- **Realistic test data.** faker.js built in: `{{faker.person.fullName}}`, `{{faker.internet.email}}`, `{{faker.location.city}}` and more, in any language.
 - **SAP-like numbers.** Number ranges hand out document numbers such as `SO-4500000001` with `{{numberRange.ORDERS}}`, kept per range and resettable.
 - **Passwords stay with you.** Brokers can use a BTP destination, or direct credentials that are asked for on every run and are never stored.
 - **Works with your AI assistant.** An MCP endpoint lets GitHub Copilot, Claude Code and other clients plan, preview and run tests for you.

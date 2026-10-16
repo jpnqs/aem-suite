@@ -20,6 +20,8 @@ sap.ui.define(
     ["{{randomInt(1,100)}}", "Random integer between min and max (inclusive)"],
     ["{{numberRange.ORDERS}}", "Next number of the number range ORDERS (e.g. SO-4500000001), same value everywhere in the message"],
     ["{{numberRange.ORDERS as orderNo}}", "Takes a number and keeps it as {{orderNo}} - reuse it anywhere in the message; each alias gets its own number"],
+    ["{{faker.person.fullName}}", "Test data from faker.js: faker.<module>.<method> - names, emails, addresses, companies, dates ... (see the user guide)"],
+    ["{{faker.number.int(1,100)}}", "faker.js with arguments; add \"as name\" to keep the value as {{name}}"],
     ["{{broker.name}}", "Name of the broker the message is sent to"],
     ["{{broker.msgVpn}}", "Message VPN of that broker"],
     ["{{broker.id}}", "ID of that broker"]

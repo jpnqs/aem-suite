@@ -331,6 +331,8 @@ Variables may reference other variables (depth 5, cycle detection). Unknown name
 3. `consume` (runs) takes the numbers with a compare-and-set `UPDATE` of `NumberRanges.current` in a transaction of its own that commits at once, retried a few times, so parallel runs never get the same number and a number is not reissued if the message fails later. `peek` (Preview, MCP preview) only computes the next numbers.
 4. An exhausted range (`maximum` or digits exceeded) or an unknown range is a `TemplateError`, so the result is `ERROR` and `current` does not move.
 
+**Faker.** `{{faker.<module>.<method>[(args)]}}` (`fake-data.ts`, [`@faker-js/faker`](https://fakerjs.dev), v9 because it ships CommonJS, which Jest needs) uses the same mechanism as number ranges: `numberSlots` lists the expressions (one slot per distinct expression, one per `as` alias), `withNumbers` calls `generateFake` for them (also in `peek` mode) and the resolver inserts the values. Safety: only the data modules in `MODULES` are reachable (not `helpers`, `seed`, `constructor`, ...), the method must be a function of that module, and the arguments are parsed as numbers, booleans or text - a template cannot run code. `number.int/float`, `finance.amount` take (min,max), `date.between` (from,to). Dates are written as ISO text. The language is `cds.aemSuite.faker.locale`; an unknown locale falls back to English. `test/fake-data.test.ts` pins the refusals.
+
 ### 7.5 `test-case-spec.ts`
 
 Loads test cases with properties and variables, builds the variable scopes (`loadVariableScopes`: global, per broker, per folder + the tree), computes the folder chain of a node (`scopeFor`) and turns a test case into a `PublishSpec` (`buildSpec`): rejects empty topics and wildcards, applies content-type detection and property-type inference as fallbacks.
@@ -430,6 +432,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `cds.aemSuite.agent.allowDirectCredentials` | false | development only: let `runTests` accept passwords of direct brokers (they would pass through the AI conversation) |
 | `cds.aemSuite.mcp.publicUrl` | – | public app URL for the MCP OAuth discovery; default: from the approuter's forwarded headers |
 | `cds.aemSuite.mcp.authorizationServer` | XSUAA `credentials.url` | authorization server advertised to MCP clients |
+| `cds.aemSuite.faker.locale` | `en` | Language of `{{faker...}}` test data (`de`, `fr`, `es`, `en_GB`, ...). |
 | `cds.mcp.prefix` / `cds.mcp.autowire` | true / false | MCP plugin: prefix tool names with the service name; do not register the endpoint in local AI clients automatically |
 | env `destinations` | – | local destinations (JSON array, SAP Cloud SDK format + `msgVpn`/`smfUrl`) |
 | env `NODE_ENV=production` | – | disables the dev no-cache middleware (`srv/server.ts`) |

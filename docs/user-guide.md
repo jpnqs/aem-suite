@@ -31,6 +31,7 @@ save messages as **test cases**, send them to one or several brokers with one cl
     - [Built-ins](#built-ins)
     - [Example](#example)
     - [Number ranges (Admin)](#number-ranges-admin)
+    - [Test data with faker](#test-data-with-faker)
   - [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
   - [12. Tips and troubleshooting](#12-tips-and-troubleshooting)
 
@@ -382,6 +383,32 @@ Need the same generated number several times, or two different numbers from one 
 ```
 
 `orderNo` and `followUpNo` are two different numbers of the range `ORDERS`; `{{orderNo}}` can be used anywhere in the message, also before the line that defines it. Temporary variables live for one message only.
+
+### Test data with faker
+
+For realistic names, addresses or e-mail addresses there is **faker**: `{{faker.<module>.<method>}}`. Every message gets new values.
+
+| Expression | Example result |
+|---|---|
+| `{{faker.person.fullName}}` | `Dagmar Keeling` |
+| `{{faker.person.firstName}}`, `{{faker.person.lastName}}` | first / last name |
+| `{{faker.internet.email}}` | `Letizia.Eggenmueller@example.org` |
+| `{{faker.company.name}}` | a company name |
+| `{{faker.location.city}}`, `{{faker.location.streetAddress}}`, `{{faker.location.zipCode}}`, `{{faker.location.country}}` | address parts |
+| `{{faker.phone.number}}` | a phone number |
+| `{{faker.commerce.productName}}`, `{{faker.commerce.price}}` | product data |
+| `{{faker.finance.iban}}`, `{{faker.finance.currencyCode}}` | finance data |
+| `{{faker.date.past}}`, `{{faker.date.future}}` | a date, written like `2026-03-14T09:21:47.000Z` |
+| `{{faker.string.uuid}}`, `{{faker.string.numeric(8)}}`, `{{faker.string.alpha(5)}}` | random text |
+| `{{faker.number.int(1,100)}}` | a whole number between 1 and 100 |
+| `{{faker.lorem.sentence}}`, `{{faker.lorem.words(3)}}` | filler text |
+
+- The full list is the [faker.js documentation](https://fakerjs.dev/api/) – the expressions are `faker.` + module + method. Available modules: airline, animal, color, commerce, company, database, date, finance, git, hacker, internet, location, lorem, music, number, person, phone, science, string, system, vehicle, word.
+- Arguments are plain: numbers, `true` / `false` or text (`{{faker.person.firstName('female')}}`). `number.int(min,max)`, `number.float(min,max)` and `finance.amount(min,max)` take the two limits.
+- Like numbers, the same expression gives **the same value everywhere in one message** (the e-mail in the topic and in the payload match). Use `as` for a value of its own or to reuse one: `{{faker.person.fullName as buyer}}` ... `{{buyer}}`; a second `{{faker.person.fullName as seller}}` is another person.
+- The **language** of the data (names, cities, ...) is a server setting, `cds.aemSuite.faker.locale` – for example `de`, `fr`, `es`, `en_GB`. Default is English.
+- **Preview** shows example values; a run generates new ones.
+- A wrong expression (`{{faker.person.nope}}`) gives the result **ERROR** with the reason.
 
 ---
 

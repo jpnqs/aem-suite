@@ -17,7 +17,7 @@ c1000000-0000-4000-8000-000000000004;Order cancelled;High priority persistent or
   ""cancelledAt"": ""{{now}}"",
   ""reason"": ""customer request""
 }";application/json;PERSISTENT;;true;9;{{uuid}};5000;TEST;f1000000-0000-4000-8000-000000000001;20;admin;admin
-c1000000-0000-4000-8000-00000000000a;Order with document numbers;Sales order with SAP-like numbers from the number ranges ORDERS, DELIVERIES and INVOICES - the order number is taken once ("as orderNo") and used in topic, payload, correlation ID and user property;{{app}}/orders/{{region}}/created/v1/{{orderNo}};"{
+c1000000-0000-4000-8000-00000000000a;Order with document numbers;Sales order with SAP-like numbers from the number ranges ORDERS, DELIVERIES and INVOICES and customer data from faker - the order number is taken once ("as orderNo") and used in topic, payload, correlation ID and user property;{{app}}/orders/{{region}}/created/v1/{{orderNo}};"{
   ""orderNumber"": ""{{numberRange.ORDERS as orderNo}}"",
   ""reference"": ""{{orderNo}}"",
   ""createdAt"": ""{{now}}"",
@@ -25,6 +25,12 @@ c1000000-0000-4000-8000-00000000000a;Order with document numbers;Sales order wit
   ""items"": [
     { ""order"": ""{{orderNo}}"", ""position"": 10, ""sku"": ""SKU-100"", ""qty"": 5 }
   ],
+  ""customer"": {
+    ""name"": ""{{faker.person.fullName as customerName}}"",
+    ""email"": ""{{faker.internet.email}}"",
+    ""city"": ""{{faker.location.city}}"",
+    ""company"": ""{{faker.company.name}}""
+  },
   ""delivery"": ""{{numberRange.DELIVERIES}}"",
   ""invoice"": ""{{numberRange.INVOICES}}""
 }";application/json;PERSISTENT;;;;{{orderNo}};5000;TEST;f1000000-0000-4000-8000-000000000001;30;admin;admin
