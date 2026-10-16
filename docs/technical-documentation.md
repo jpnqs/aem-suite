@@ -97,6 +97,7 @@ mta.yaml, xs-security.json    deployment
 | `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE, counters. Composition `results`. |
 | `RunResults` | One test case × broker | `status` PENDING/PASSED/FAILED/ERROR, resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
 | `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
+| `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
 | `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
 
 Result semantics:
@@ -152,6 +153,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `start(brokerId, sourceType, topics, queue, password, username)` | Opens a dedicated session. `sourceType`: `TOPIC` (direct subscriptions, wildcards), `QUEUE_BROWSE` (messages stay), `QUEUE_CONSUME` (client ack, messages removed). Returns `subscriptionId`. |
 | `stop(subscriptionId)` | Closes the subscription (owner only). |
 | `activeSubscriptions()` | Own subscriptions; also acts as **heartbeat** (keeps them alive). |
+| `SubscriberPresets` | The user's saved subscriber setups. `@restrict` to `createdBy = $user` (a user sees and changes only their own); a `before` handler checks the name (required, unique per user), source type and the topic list. |
 | `ReceivedMessages` | Saved messages (no update). Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
 | `Brokers` | Active brokers (incl. `credentialMode`, `username`). |
 

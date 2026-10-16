@@ -260,6 +260,8 @@ The **Last Result** of each test case is also shown in the test case list and in
    - **Consume Queue** – reads and **removes** the messages from the queue.
 3. **Start**.
 
+**Saved setups**: so you do not have to enter the same topics again, save what is on the page. Click **Save as…** next to *Saved setup*, give it a name and save. A setup holds the broker, the source, the topics (or the queue) and – if you typed one – the username. It **never holds a password**. Pick a setup from the list to fill the page again; **Save as…** with the same name updates it, the bin button deletes the selected one. Setups are yours: they are kept on the server, so they are there in every browser, and nobody else sees them.
+
 Messages appear at the top of the list. Select one to see payload (formatted), user properties, correlation ID and delivery mode.
 
 | Button | Effect |
