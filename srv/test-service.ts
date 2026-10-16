@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import { buildPreview } from './lib/preview'
-import { BrokerCredential, startRun, toCredentials } from './lib/test-runner'
+import { BrokerCredential, cancelRun, RunOptions, startRun, toCredentials } from './lib/test-runner'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
 import { copyNodes } from './lib/copy-nodes'
 import { exportNodes, importNodes } from './lib/export-import'
@@ -52,19 +52,26 @@ export default class TestService extends cds.ApplicationService {
     })
 
     this.on('runTest', TestCases, async (req) => {
-      const { brokerIds, credentials } = req.data as { brokerIds: string[]; credentials?: BrokerCredential[] }
-      return runFromUi(req, [keyOf(req).ID], brokerIds, credentials)
+      const { brokerIds, credentials, options } = req.data as { brokerIds: string[]; credentials?: BrokerCredential[]; options?: RunOptions }
+      return runFromUi(req, [keyOf(req).ID], brokerIds, credentials, options)
     })
 
     this.on('currentUser', (req) => req.user.id)
 
     this.on('runTests', async (req) => {
-      const { testCaseIds, brokerIds, credentials } = req.data as {
+      const { testCaseIds, brokerIds, credentials, options } = req.data as {
         testCaseIds: string[]
         brokerIds: string[]
         credentials?: BrokerCredential[]
+        options?: RunOptions
       }
-      return runFromUi(req, testCaseIds, brokerIds, credentials)
+      return runFromUi(req, testCaseIds, brokerIds, credentials, options)
+    })
+
+    this.on('cancelRun', async (req) => {
+      const { runId } = req.data as { runId: string }
+      await cancelRun(runId, req.user)
+      req.info(200, 'The run is being stopped - messages not sent yet are skipped')
     })
 
     // preview works on saved test cases and on drafts (lean draft routes draft calls to TestCases.drafts)
@@ -95,8 +102,8 @@ export default class TestService extends cds.ApplicationService {
   }
 }
 
-async function runFromUi(req: cds.Request, testCaseIds: string[], brokerIds: string[], credentials?: BrokerCredential[]) {
-  const runId = await startRun(req, testCaseIds, brokerIds, toCredentials(credentials))
+async function runFromUi(req: cds.Request, testCaseIds: string[], brokerIds: string[], credentials?: BrokerCredential[], options?: RunOptions) {
+  const runId = await startRun(req, testCaseIds, brokerIds, toCredentials(credentials), options)
   req.info(200, 'Test run started - see "Test Runs" for results')
   return { runId }
 }

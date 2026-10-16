@@ -27,6 +27,14 @@ export interface AemSuiteConfig {
     /** development only: accept broker passwords in runTests (they would pass through the AI conversation) */
     allowDirectCredentials: boolean
   }
+  runs: {
+    /** upper limit of the repetitions in the Run dialog */
+    maxRepetitions: number
+    /** upper limit of the pause between two messages */
+    maxDelayMs: number
+    /** messages (test cases x brokers x repetitions) of one run */
+    maxResults: number
+  }
   faker: {
     /** language of {{faker...}} test data: en, de, fr, es, en_GB, ... (the locales of faker.js) */
     locale: string
@@ -44,6 +52,7 @@ export const DEFAULTS: AemSuiteConfig = {
   subscriptions: { maxPerUser: 5, idleTimeoutMs: 5 * 60 * 1000, maxMessagesPerSecond: 100, maxPayloadBytes: 512 * 1024 },
   help: { file: 'docs/user-guide.md' },
   agent: { maxRunResults: 100, maxActiveRuns: 2, allowDirectCredentials: false },
+  runs: { maxRepetitions: 1000, maxDelayMs: 60_000, maxResults: 5000 },
   faker: { locale: 'en' },
   mcp: {}
 }
@@ -58,6 +67,7 @@ export function config(): AemSuiteConfig {
     subscriptions: { ...DEFAULTS.subscriptions, ...own.subscriptions },
     help: { ...DEFAULTS.help, ...own.help },
     agent: { ...DEFAULTS.agent, ...own.agent },
+    runs: { ...DEFAULTS.runs, ...own.runs },
     faker: { ...DEFAULTS.faker, ...own.faker },
     mcp: { ...DEFAULTS.mcp, ...own.mcp }
   }

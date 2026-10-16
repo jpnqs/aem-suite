@@ -45,6 +45,8 @@ type ResultStatus   : String(10) enum {
   PASSED;
   FAILED;
   ERROR;
+  /** not sent: the run was stopped, or an earlier message failed (stop on first failure) */
+  SKIPPED;
 }
 
 type PropertyType   : String(10) enum {
@@ -177,6 +179,12 @@ entity TestRuns : cuid, managed {
   totalCount  : Integer default 0;
   passedCount : Integer default 0;
   failedCount : Integer default 0;
+  /** messages that were not sent (run stopped, stop on first failure) */
+  skippedCount : Integer default 0;
+  /** advanced run settings (Run dialog): how often each message is sent, the pause between messages, ... */
+  repetitions  : Integer default 1;
+  delayMs      : Integer default 0;
+  stopOnFailure : Boolean default false;
   results     : Composition of many RunResults
                   on results.run = $self;
 }
@@ -189,6 +197,10 @@ entity RunResults : cuid {
   broker          : Association to Brokers;
   brokerName      : String(100);
   status          : ResultStatus default 'PENDING';
+  /** which repetition of the test case this is (1 = the first) */
+  iteration       : Integer default 1;
+  /** order of sending within the broker (1 = first) */
+  sequence        : Integer;
   deliveryMode    : DeliveryMode;
   resolvedTopic   : String(500);
   resolvedPayload : LargeString;

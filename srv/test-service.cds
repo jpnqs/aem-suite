@@ -21,7 +21,7 @@ service TestService {
     actions {
       /** Runs this test case against the given brokers. Returns the started run (executes asynchronously). */
       @Core.OperationAvailable: in.IsActiveEntity
-      action runTest(brokerIds : many UUID not null, credentials : many BrokerCredential) returns RunRef;
+      action runTest(brokerIds : many UUID not null, credentials : many BrokerCredential, options : RunOptions) returns RunRef;
 
       /** Resolves topic, payload and properties against a broker's variables without sending anything. */
       action preview(brokerId : UUID) returns Preview;
@@ -195,7 +195,27 @@ service TestService {
   function currentUser() returns String;
 
   /** Runs several test cases against several brokers in one run. */
-  action runTests(testCaseIds : many UUID not null, brokerIds : many UUID not null, credentials : many BrokerCredential) returns RunRef;
+  action runTests(testCaseIds : many UUID not null, brokerIds : many UUID not null, credentials : many BrokerCredential, options : RunOptions) returns RunRef;
+
+  /**
+   * Stops a running run: messages not sent yet are skipped (status SKIPPED). Allowed for the user who started the run
+   * (and administrators).
+   */
+  action cancelRun(runId : UUID not null);
+
+  /**
+   * Advanced run settings. All optional.
+   *   repetitions   how often every test case is sent to every broker (1 - 1000, default 1)
+   *   delayMs       pause between two messages to the same broker (0 - 60000, default 0)
+   *   order         ROUND: the whole selection N times (a b c a b c); EACH: every test case N times in a row (a a b b c c)
+   *   stopOnFailure after the first failed message of a broker, the rest of that broker is skipped
+   */
+  type RunOptions {
+    repetitions   : Integer;
+    delayMs       : Integer;
+    order         : String;
+    stopOnFailure : Boolean;
+  }
 
   /**
    * Password of a DIRECT broker for one run - used in memory only, never stored.

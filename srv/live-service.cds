@@ -41,6 +41,7 @@ service LiveService {
     done     : Integer;
     passed   : Integer;
     failed   : Integer;
+    skipped  : Integer;
     resultId : UUID;
   }
 }
