@@ -1,19 +1,109 @@
 # AEM Test Suite
 
-CAP (Node.js, TypeScript) app on SAP BTP for testing **SAP Integration Suite, Advanced Event Mesh** (Solace) brokers:
+**Test your SAP Advanced Event Mesh (Solace) brokers without writing code.**
+Save messages as test cases, send them to several brokers at once, see immediately which broker accepted them, and watch topics and queues live. Built on SAP CAP and SAP Fiori, ready for SAP BTP (Cloud Foundry).
 
-- **Brokers**: connection data either from a **BTP destination** or entered in the UI. For direct brokers, **the password is never stored**: it's entered when a run, a connection test or a subscription is started, and kept in memory only for that operation.
-- **Test cases**: topic, JSON payload, delivery mode, TTL, priority, correlation ID and user properties. Topic, payload, correlation ID and property values support `{{variables}}`.
-- **Runs**: run one or many test cases against several brokers in parallel. A result **passes when the broker acknowledges** the message (PERSISTENT), or when the send succeeds (DIRECT). The run history is kept per broker.
-- **Live subscriber**: subscribe to topics (wildcards allowed), browse or consume queues, watch messages live over a WebSocket, and save them or turn them into a test case.
-- **Help in the app**: the tile **AEM Suite – Help** shows the [user guide](docs/user-guide.md) with navigation, search and links to every heading. It is rendered from the Markdown file on the server (edit the file, nothing else), and every app has a *Help* button that opens the matching section in a new tab.
-- **AI assistant (MCP)**: an AI assistant can plan, preview and run tests and read the results through the **Model Context Protocol** (`/mcp/agent`). No deleting, and no broker passwords through the AI: runs are limited to brokers with a BTP destination. See [Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp) and the technical documentation.
+![Home](docs/images/home.png)
+
+## Why use it
+
+- **Know if the broker really took it.** A result passes only when the broker acknowledges the message (persistent delivery), with the measured ACK latency.
+- **One test, many brokers.** Run a test case or a whole folder against dev, test and prod brokers in parallel, and compare the results per broker.
+- **Reusable messages.** Topics, payloads, correlation IDs and user properties accept `{{variables}}` (global, broker, folder and test case level) plus built-ins such as `{{uuid}}`, `{{now}}` or `{{randomInt(1,10)}}`.
+- **Passwords stay with you.** Brokers can use a BTP destination, or direct credentials that are asked for on every run and are never stored.
+- **Works with your AI assistant.** An MCP endpoint lets GitHub Copilot, Claude Code and other clients plan, preview and run tests for you.
+- **Help is built in.** Every app has a Help button that opens the matching section of the user guide, rendered from Markdown.
+
+## Features
+
+### Organize tests in folders
+
+A tree of folders and test cases with drag and drop, copy, cut and paste, and a compact type icon. Folders carry their own variables, run everything below them, and can be exported to a JSON file and imported again (handy for backups and for keeping tests in Git).
+
+![Test cases as a tree of folders](docs/images/test-cases.png)
+
+### Design the message
+
+Topic, JSON payload with validation and formatting, delivery mode, TTL, priority, DMQ eligibility, correlation ID and SMF user properties. Everything beyond the topic is optional and has sensible defaults.
+
+![A test case](docs/images/test-case.png)
+
+### See exactly what will be sent
+
+**Preview** resolves all variables for a chosen broker and shows the final topic, payload, correlation ID and user properties. Nothing is sent.
+
+![Preview of the resolved message](docs/images/preview.png)
+
+### Run against several brokers
+
+Pick one or more brokers and run. Progress arrives live, and the results are kept per test case and broker. For direct brokers the dialog asks for the password (and for the username if the broker has none); it is used for this run only.
+
+![Run dialog](docs/images/run-dialog.png)
+
+### Variables on every level
+
+`{{name}}` is resolved from the test case, then the broker, then the folders (inner first), then the global variables, then the built-ins. Folder variables are maintained right on the folder page.
+
+![Variables of a folder](docs/images/folder-variables.png)
+
+### Watch messages live
+
+Subscribe to topics (wildcards allowed), browse a queue without taking messages, or consume it. Messages stream in over a WebSocket; save them, or turn one into a test case.
+
+![Live subscriber](docs/images/live-subscriber.png)
+
+### Manage brokers
+
+Maintain broker connections (BTP destination or direct), test the connection, and filter by credentials, status and activity. Broker URLs are completed for you: the host is enough.
+
+![Brokers](docs/images/brokers.png)
+
+### Documentation inside the app
+
+The user guide is rendered from Markdown with navigation, search and links to every heading.
+
+![In-app help](docs/images/help.png)
+
+## Quick start
+
+Requires **Node.js 22.12 or newer**.
+
+```sh
+npm install
+npm run watch
+```
+
+Open http://localhost:4004/launchpad.html and sign in as `admin` / `admin` (Admin and Tester) or `tester` / `tester`. The demo data comes with a ready-made set of folders, test cases and brokers.
+
+To test against a real broker locally, start the Solace container from [local/README.md](local/README.md). No broker is needed to explore the apps.
+
+## Use it with an AI assistant
+
+The suite offers an MCP endpoint (`/mcp/agent`). Connect GitHub Copilot, Claude Code or any MCP client, and ask for things like *"Create a folder Inventory with a test case for acme/inventory/updated/v1/{{sku}} and show me how it looks for broker aem-dev"* or *"Run all tests in Orders on aem-dev and tell me what failed."* The assistant can plan, preview and run tests, but cannot delete anything and never receives broker passwords. Setup for Copilot and others: [Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp).
 
 ## Documentation
 
-- [User guide](docs/user-guide.md): how to use the apps (brokers, folders and test cases, runs, live subscriber, variables).
-- [Technical documentation](docs/technical-documentation.md): architecture, data model, APIs, runtime behaviour, security, configuration, deployment, extension points.
-- [Local broker](local/README.md): Solace PubSub+ in Docker for local testing.
+| Document | For whom | Content |
+|---|---|---|
+| [User guide](docs/user-guide.md) | testers, admins | how to use every app, variables, runs, live subscriber, AI assistant, troubleshooting |
+| [Technical documentation](docs/technical-documentation.md) | developers, operators | architecture, data model, APIs, security, configuration, deployment, extension points |
+| [Local broker](local/README.md) | developers | Solace PubSub+ in Docker with demo users and queues |
+
+## Technology
+
+SAP CAP (Node.js, TypeScript) with OData V4, SAP HANA Cloud, SAP Fiori elements and freestyle SAPUI5 apps, the Solace JavaScript API, XSUAA, the Destination service, the HTML5 Application Repository (also usable from SAP Build Work Zone), and the CAP MCP plugin. Tests: Jest (unit and service integration) and Playwright (browser).
+
+## Screenshots
+
+The images in `docs/images` are generated from the running apps on the demo data. To refresh them after a UI change:
+
+```sh
+npm run docs:screenshots
+```
+
+---
+
+# Reference
 
 ## Architecture
 
