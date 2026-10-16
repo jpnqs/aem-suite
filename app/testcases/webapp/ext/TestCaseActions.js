@@ -41,6 +41,14 @@ sap.ui.define(
         problems: [],
         runId: null,
         starting: false,
+        // advanced settings (remembered for the next run)
+        repetitions: Prefs.get("runRepetitions", 1),
+        delayMs: Prefs.get("runDelayMs", 0),
+        order: Prefs.get("runOrder", "ROUND"),
+        stopOnFailure: Prefs.get("runStopOnFailure", false),
+        estimate: "",
+        stopping: false,
+        skipped: 0,
         total: 0,
         done: 0,
         passed: 0,
@@ -58,6 +66,7 @@ sap.ui.define(
           state.setProperty("/done", data.done);
           state.setProperty("/passed", data.passed);
           state.setProperty("/failed", data.failed);
+          state.setProperty("/skipped", data.skipped || 0);
           if (data.status !== "RUNNING") {
             finish(data.runId);
           }
@@ -90,6 +99,7 @@ sap.ui.define(
               state.setProperty("/done", r.totalCount);
               state.setProperty("/passed", r.passedCount);
               state.setProperty("/failed", r.failedCount);
+              state.setProperty("/skipped", r.skippedCount || 0);
               state.setProperty("/aborted", r.status === "FAILED");
               finish(runId);
             }
@@ -108,7 +118,7 @@ sap.ui.define(
           return;
         }
         model
-          .bindList("/RunResults", null, [], [new Filter("run_ID", "EQ", runId), new Filter("status", "NE", "PASSED")], {
+          .bindList("/RunResults", null, [], [new Filter("run_ID", "EQ", runId), new Filter("status", "NE", "PASSED"), new Filter("status", "NE", "SKIPPED")], {
             $select: "testCaseName,brokerName,status,errorMessage"
           })
           .requestContexts(0, MAX_PROBLEMS)
@@ -167,12 +177,49 @@ sap.ui.define(
         state.setProperty("/credentials", rows);
       }
 
+      /** "5 test cases x 2 brokers x 10 = at least 100 messages; the pauses alone take about 2 min" */
+      function updateEstimate() {
+        var brokers = brokerList() ? brokerList().getSelectedContexts().length : 0;
+        var reps = Math.max(1, Number(state.getProperty("/repetitions")) || 1);
+        var delay = Math.max(0, Number(state.getProperty("/delayMs")) || 0);
+        var perBroker = testCaseIds.length * reps;
+        var text = "";
+        if (brokers && (reps > 1 || delay > 0)) {
+          text = perBroker * brokers + " or more messages (" + testCaseIds.length + " × " + brokers + " broker(s) × " + reps + "; folders send everything below them)";
+          if (delay > 0 && perBroker > 1) {
+            text += "; the pauses alone take about " + formatDuration((perBroker - 1) * delay);
+          }
+        }
+        state.setProperty("/estimate", text);
+      }
+
+      function formatDuration(ms) {
+        var s = Math.round(ms / 1000);
+        if (s < 60) {
+          return Math.max(s, 1) + " s";
+        }
+        var m = Math.floor(s / 60);
+        return m < 60 ? m + " min " + (s % 60) + " s" : Math.floor(m / 60) + " h " + (m % 60) + " min";
+      }
+
       var handler = {
         onHelp: function () {
           Help.openForRun();
         },
         onBrokerSelection: function () {
           syncCredentials();
+          updateEstimate();
+        },
+        onOptionsChange: function () {
+          updateEstimate();
+        },
+        /** Stops the run: messages not sent yet are skipped. */
+        onStop: function () {
+          state.setProperty("/stopping", true);
+          Actions.invokeAction(model, "/cancelRun(...)", { runId: state.getProperty("/runId") }).catch(function (e) {
+            state.setProperty("/stopping", false);
+            MessageBox.error(errorText(e));
+          });
         },
         /** Preselects the brokers of the last run, or the only broker there is. */
         onBrokersLoaded: function (event) {
@@ -194,6 +241,7 @@ sap.ui.define(
             list.setSelectedItem(items[0], true);
           }
           syncCredentials();
+          updateEstimate();
         },
         onPrimary: function () {
           var runId = state.getProperty("/runId");
@@ -231,6 +279,16 @@ sap.ui.define(
             return;
           }
           Prefs.set("lastBrokers", brokerIds);
+          var options = {
+            repetitions: Math.max(1, Math.round(Number(state.getProperty("/repetitions")) || 1)),
+            delayMs: Math.max(0, Math.round(Number(state.getProperty("/delayMs")) || 0)),
+            order: state.getProperty("/order"),
+            stopOnFailure: !!state.getProperty("/stopOnFailure")
+          };
+          Prefs.set("runRepetitions", options.repetitions);
+          Prefs.set("runDelayMs", options.delayMs);
+          Prefs.set("runOrder", options.order);
+          Prefs.set("runStopOnFailure", options.stopOnFailure);
           state.setProperty("/starting", true);
           Actions.invokeAction(model, "/runTests(...)", {
             testCaseIds: testCaseIds,
@@ -241,13 +299,14 @@ sap.ui.define(
                 username: c.needsUsername ? c.enteredUsername.trim() : null,
                 password: c.password
               };
-            })
+            }),
+            options: options
           })
             .then(function (result) {
               // passwords are not kept in the UI after the run was started
               state.setProperty("/credentials", []);
               var id = result.runId;
-              state.setProperty("/total", testCaseIds.length * brokerIds.length);
+              state.setProperty("/total", testCaseIds.length * brokerIds.length * options.repetitions);
               state.setProperty("/runId", id);
               pollTimer = setInterval(function () {
                 poll(id);

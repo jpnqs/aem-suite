@@ -29,3 +29,28 @@ test('the run dialog runs a test case and shows the outcome', async ({ page }) =
   await dialog.getByRole('button', { name: 'Open Results' }).click()
   await expect(page).toHaveURL(/#AEMSuiteTestRuns-display&\/TestRuns\(/)
 })
+
+test('the advanced settings repeat the message and show what is about to happen', async ({ page }) => {
+  await page.goto(`/launchpad.html#${apps.testCases.intent}&/TestCases(ID=c1000000-0000-4000-8000-000000000002,IsActiveEntity=true)`)
+  await expect(page).toHaveTitle(/^Ping/)
+  await page.getByRole('button', { name: 'Run…' }).click()
+  const dialog = page.getByRole('dialog', { name: /^Run Ping/ })
+  await dialog.getByText('local-docker', { exact: true }).click()
+  await dialog.getByPlaceholder('Password').fill('aemsuite')
+
+  await dialog.getByText('Advanced settings').click()
+  const [repetitions, pause] = await dialog.getByRole('spinbutton').all()
+  await repetitions.fill('3')
+  await repetitions.press('Tab')
+  await pause.fill('200')
+  await pause.press('Tab')
+  await expect(dialog.getByText(/3 or more messages/)).toBeVisible()
+  await expect(dialog.getByText(/pauses alone take about 1 s/)).toBeVisible()
+  // the order only matters with repetitions
+  await expect(dialog.getByText('Whole selection')).toBeVisible()
+
+  await dialog.getByRole('button', { name: 'Run', exact: true }).click()
+  // without a local broker every message ends as ERROR - but all three were created and the run ends
+  await expect(dialog.getByText('Finished', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('3 / 3').first()).toBeVisible()
+})

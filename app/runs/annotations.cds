@@ -30,6 +30,7 @@ annotate service.TestRuns with @(
     {Value: totalCount},
     {Value: passedCount},
     {Value: failedCount},
+    {Value: skippedCount},
     {Value: finishedAt}
   ],
   UI.HeaderFacets      : [{
@@ -45,6 +46,10 @@ annotate service.TestRuns with @(
     {Value: totalCount},
     {Value: passedCount},
     {Value: failedCount},
+    {Value: skippedCount},
+    {Value: repetitions},
+    {Value: delayMs},
+    {Value: stopOnFailure},
     {Value: startedAt},
     {Value: finishedAt}
   ]},
@@ -66,6 +71,10 @@ annotate service.TestRuns with @(
   totalCount        @title: 'Total';
   passedCount       @title: 'Passed';
   failedCount       @title: 'Failed / Error';
+  skippedCount      @title: 'Not Sent'  @Common.QuickInfo: 'Messages that were not sent: the run was stopped, or stop on first failure';
+  repetitions       @title: 'Repetitions';
+  delayMs           @title: 'Pause (ms)'  @Common.QuickInfo: 'Pause between two messages to the same broker';
+  stopOnFailure     @title: 'Stop at First Failure';
   statusCriticality @UI.Hidden;
 };
 
@@ -84,7 +93,7 @@ annotate service.RunResults with @(
         Descending: true
       },
       {Property: brokerName},
-      {Property: testCaseName}
+      {Property: sequence}
     ],
     Visualizations: ['@UI.LineItem']
   },
@@ -111,6 +120,7 @@ annotate service.RunResults with @(
       Value: brokerName,
       Url  : brokerLink
     },
+    {Value: iteration},
     {
       Value      : status,
       Criticality: statusCriticality
@@ -125,7 +135,7 @@ annotate service.RunResults with @(
   UI.PresentationVariant #Run: {
     SortOrder     : [
       {Property: brokerName},
-      {Property: testCaseName}
+      {Property: sequence}
     ],
     Visualizations: ['@UI.LineItem#Run']
   },
@@ -140,6 +150,7 @@ annotate service.RunResults with @(
       Value: brokerName,
       Url  : brokerLink
     },
+    {Value: iteration},
     {
       Value      : status,
       Criticality: statusCriticality
@@ -149,7 +160,7 @@ annotate service.RunResults with @(
     {Value: resolvedTopic},
     {Value: errorMessage}
   ],
-  UI.HeaderFacets      : [{
+  UI.HeaderFacets     : [{
     $Type : 'UI.ReferenceFacet',
     Target: '@UI.FieldGroup#Status',
     Label : 'Status'
@@ -203,6 +214,8 @@ annotate service.RunResults with @(
   brokerName        @title: 'Broker';
   testCaseName      @title: 'Test Case';
   status            @title: 'Status';
+  iteration         @title: 'Repetition'  @Common.QuickInfo: 'Which repetition of the test case this is (1 = the first)';
+  sequence          @UI.Hidden;
   ackLatencyMs      @title: 'ACK Latency (ms)';
   deliveryMode      @title: 'Delivery Mode';
   resolvedTopic     @title: 'Topic'  @UI.MultiLineText;

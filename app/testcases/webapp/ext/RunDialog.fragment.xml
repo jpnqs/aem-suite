@@ -51,6 +51,38 @@
             </CustomListItem>
           </List>
         </VBox>
+        <Panel
+          headerText="Advanced settings"
+          expandable="true"
+          expanded="false"
+          class="sapUiNoContentPadding sapUiSmallMarginTop">
+          <content>
+            <VBox class="sapUiSmallMargin">
+              <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                <Label text="Repetitions" width="14rem" tooltip="How often every test case is sent to every selected broker" />
+                <StepInput value="{run>/repetitions}" min="1" max="1000" width="9rem" change=".onOptionsChange" />
+              </HBox>
+              <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                <Label text="Pause between messages" width="14rem" tooltip="Wait between two messages to the same broker (not before the first)" />
+                <StepInput value="{run>/delayMs}" min="0" max="60000" step="100" largerStep="1000" displayValuePrecision="0" description="ms" fieldWidth="60%" width="11rem" change=".onOptionsChange" />
+              </HBox>
+              <HBox alignItems="Center" class="sapUiTinyMarginBottom" visible="{= ${run>/repetitions} > 1 }">
+                <Label text="Order" width="14rem" tooltip="Whole selection: a b c, a b c, ...   Each test case: a a a, b b b, ..." />
+                <SegmentedButton selectedKey="{run>/order}" width="20rem">
+                  <items>
+                    <SegmentedButtonItem key="ROUND" text="Whole selection" />
+                    <SegmentedButtonItem key="EACH" text="Each test case" />
+                  </items>
+                </SegmentedButton>
+              </HBox>
+              <CheckBox
+                text="Stop at the first failure"
+                selected="{run>/stopOnFailure}"
+                tooltip="After a message failed, the rest of that broker is skipped. Other brokers go on." />
+              <Text text="{run>/estimate}" class="sapUiTinyMarginTop" />
+            </VBox>
+          </content>
+        </Panel>
       </VBox>
       <VBox class="sapUiSmallMargin" visible="{= !!${run>/runId} }">
         <MessageStrip
@@ -60,8 +92,8 @@
           showIcon="true"
           class="sapUiSmallMarginBottom" />
         <ObjectStatus
-          text="{= ${run>/finished} ? (${run>/aborted} ? 'Aborted - see the problems below' : 'Finished') : 'Running…' }"
-          state="{= ${run>/finished} ? (${run>/failed} > 0 ? 'Error' : 'Success') : 'Information' }"
+          text="{= ${run>/finished} ? (${run>/aborted} ? 'Aborted - see the problems below' : (${run>/skipped} > 0 ? 'Finished - ' + ${run>/skipped} + ' not sent' : 'Finished')) : (${run>/stopping} ? 'Stopping…' : 'Running…') }"
+          state="{= ${run>/finished} ? (${run>/failed} > 0 ? 'Error' : (${run>/skipped} > 0 ? 'Warning' : 'Success')) : 'Information' }"
           icon="{= ${run>/finished} ? (${run>/failed} > 0 ? 'sap-icon://error' : 'sap-icon://sys-enter-2') : 'sap-icon://pending' }"
           class="sapMObjectStatusLarge sapUiSmallMarginBottom" />
         <ProgressIndicator
@@ -71,8 +103,18 @@
           showValue="true" />
         <HBox class="sapUiSmallMarginTop">
           <ObjectNumber number="{run>/passed}" unit="passed" state="Success" class="sapUiMediumMarginEnd" />
-          <ObjectNumber number="{run>/failed}" unit="failed / error" state="{= ${run>/failed} > 0 ? 'Error' : 'None' }" />
+          <ObjectNumber number="{run>/failed}" unit="failed / error" state="{= ${run>/failed} > 0 ? 'Error' : 'None' }" class="sapUiMediumMarginEnd" />
+          <ObjectNumber number="{run>/skipped}" unit="not sent" state="Warning" visible="{= ${run>/skipped} > 0 }" />
         </HBox>
+        <Button
+          text="Stop run"
+          icon="sap-icon://stop"
+          type="Reject"
+          class="sapUiSmallMarginTop"
+          visible="{= !${run>/finished} }"
+          enabled="{= !${run>/stopping} }"
+          tooltip="Stops the run: messages not sent yet are skipped"
+          press=".onStop" />
         <List
           visible="{= ${run>/problems}.length > 0 }"
           items="{path: 'run>/problems', templateShareable: false}"
