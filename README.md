@@ -194,10 +194,11 @@ Open http://localhost:4004/launchpad.html (redirects to `/comaemsuitelaunchpad/i
 - Brokers `local-docker (publisher)` (user `aem-publisher`/`publisher`, may only publish below `aem/`) and `local-docker (subscriber)` (user `aem-subscriber`/`subscriber`, may not publish) – the same broker, to compare ACLs.
 - Broker `local-docker (ask for user)`: the same broker without a username, to try the username prompt.
 - Broker `aem-dev (destination)`: an inactive example for DESTINATION mode.
-- Number ranges `ORDERS` (`SO-4500000001`), `DELIVERIES` (`0080000001`) and `INVOICES` (`INV-00001/26`, ends at 99999).
+- Number ranges `ORDERS` (`SO-4500000001`), `DELIVERIES` (`0080000001`), `INVOICES` (`INV-00001/26`, ends at 99999), `CUSTOMERS` (`CU-00001000`) and `EMPLOYEES` (`E100001`).
 - Global variables `app` (`aem`, so all topics fall under the `aem/>` ACLs), `region` and `source`, plus broker overrides `region=local`.
 - Test cases, one folder per target:
   - **Orders** → queue `q.aem.orders`: "Order created" (user properties, local variable), "Order cancelled" (priority, DMQ eligible), "Order with document numbers" (number ranges `ORDERS`, `DELIVERIES`, `INVOICES`, with a temporary variable for the order number).
+  - **Customers** (person payloads with test data from faker): "Customer created", "Customer address changed", "Employee hired" - customer and personnel numbers from the number ranges `CUSTOMERS` and `EMPLOYEES`.
   - **Events** → queue `q.aem.events`: "Inventory updated" (TTL, random values), "Shipment dispatched".
   - **Notifications** → `q.aem.events` via `aem/notifications/*`: "Email notification" is queued, while "Notification too deep" passes but is not queued (`*` matches one level only).
   - **ACL checks**: "Publish below `aem/`" and "Publish outside `aem/`" – run them against all `local-docker` brokers; the descriptions list the expected PASSED/FAILED per broker.

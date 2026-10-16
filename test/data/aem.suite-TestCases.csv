@@ -3,10 +3,16 @@ f1000000-0000-4000-8000-000000000001;Orders;Lands in queue q.aem.orders (subscri
 f1000000-0000-4000-8000-000000000002;Events;Lands in queue q.aem.events (subscription aem/events/>);;;;;;;;;;FOLDER;;20;admin;admin
 f1000000-0000-4000-8000-000000000003;Notifications;Lands in queue q.aem.events (subscription aem/notifications/* - exactly one level);;;;;;;;;;FOLDER;;30;admin;admin
 f1000000-0000-4000-8000-000000000004;ACL checks;Run against all local-docker brokers to compare the users - see the test descriptions for the expected result per broker;;;;;;;;;;FOLDER;;40;admin;admin
-c1000000-0000-4000-8000-000000000001;Order created;Persistent order event with user properties and a local variable - lands in q.aem.orders;{{app}}/orders/{{region}}/created/v1/{{uuid}};"{
+f1000000-0000-4000-8000-000000000005;Customers;Person payloads: customer and employee numbers from number ranges, names, addresses and contact data from faker - lands in q.aem.events (subscription aem/customers/> and aem/hr/>);;;;;;;;;;FOLDER;;25;admin;admin
+c1000000-0000-4000-8000-000000000001;Order created;Persistent order event with user properties, a local variable and customer data from faker - lands in q.aem.orders;{{app}}/orders/{{region}}/created/v1/{{uuid}};"{
   ""orderId"": ""{{uuid}}"",
   ""createdAt"": ""{{now}}"",
   ""region"": ""{{region}}"",
+  ""customer"": {
+    ""name"": ""{{faker.person.fullName}}"",
+    ""email"": ""{{faker.internet.email}}"",
+    ""city"": ""{{faker.location.city}}""
+  },
   ""items"": [
     { ""sku"": ""SKU-100"", ""qty"": {{qty}} }
   ],
@@ -15,7 +21,9 @@ c1000000-0000-4000-8000-000000000001;Order created;Persistent order event with u
 c1000000-0000-4000-8000-000000000004;Order cancelled;High priority persistent order event - lands in q.aem.orders;{{app}}/orders/{{region}}/cancelled/v1/{{uuid}};"{
   ""orderId"": ""{{uuid}}"",
   ""cancelledAt"": ""{{now}}"",
-  ""reason"": ""customer request""
+  ""reason"": ""customer request"",
+  ""cancelledBy"": ""{{faker.person.fullName}}"",
+  ""comment"": ""{{faker.lorem.sentence}}""
 }";application/json;PERSISTENT;;true;9;{{uuid}};5000;TEST;f1000000-0000-4000-8000-000000000001;20;admin;admin
 c1000000-0000-4000-8000-00000000000a;Order with document numbers;Sales order with SAP-like numbers from the number ranges ORDERS, DELIVERIES and INVOICES and customer data from faker - the order number is taken once ("as orderNo") and used in topic, payload, correlation ID and user property;{{app}}/orders/{{region}}/created/v1/{{orderNo}};"{
   ""orderNumber"": ""{{numberRange.ORDERS as orderNo}}"",
@@ -34,6 +42,61 @@ c1000000-0000-4000-8000-00000000000a;Order with document numbers;Sales order wit
   ""delivery"": ""{{numberRange.DELIVERIES}}"",
   ""invoice"": ""{{numberRange.INVOICES}}""
 }";application/json;PERSISTENT;;;;{{orderNo}};5000;TEST;f1000000-0000-4000-8000-000000000001;30;admin;admin
+c1000000-0000-4000-8000-00000000000b;Customer created;New customer (a person) with a customer number from the range CUSTOMERS and name, contact data and address from faker. The number and the names are kept in temporary variables ("as") and reused;{{app}}/customers/{{region}}/created/v1/{{customerNo}};"{
+  ""customerNumber"": ""{{numberRange.CUSTOMERS as customerNo}}"",
+  ""createdAt"": ""{{now}}"",
+  ""person"": {
+    ""firstName"": ""{{faker.person.firstName as first}}"",
+    ""lastName"": ""{{faker.person.lastName as last}}"",
+    ""fullName"": ""{{first}} {{last}}"",
+    ""sex"": ""{{faker.person.sex}}"",
+    ""birthDate"": ""{{faker.date.birthdate}}"",
+    ""email"": ""{{faker.internet.email}}"",
+    ""phone"": ""{{faker.phone.number}}""
+  },
+  ""address"": {
+    ""street"": ""{{faker.location.streetAddress}}"",
+    ""zipCode"": ""{{faker.location.zipCode}}"",
+    ""city"": ""{{faker.location.city}}"",
+    ""country"": ""{{faker.location.country}}""
+  },
+  ""company"": ""{{faker.company.name}}"",
+  ""marketingConsent"": true
+}";application/json;PERSISTENT;;;;{{customerNo}};5000;TEST;f1000000-0000-4000-8000-000000000005;10;admin;admin
+c1000000-0000-4000-8000-00000000000c;Customer address changed;Address change of a customer: the old and the new address are different persons' data from faker (an alias gives the old city a value of its own);{{app}}/customers/{{region}}/address-changed/v1/{{faker.string.numeric(8)}};"{
+  ""customerNumber"": ""CU-{{faker.string.numeric(8)}}"",
+  ""changedAt"": ""{{now}}"",
+  ""name"": ""{{faker.person.fullName}}"",
+  ""oldAddress"": {
+    ""street"": ""{{faker.location.streetAddress as oldStreet}}"",
+    ""city"": ""{{faker.location.city as oldCity}}""
+  },
+  ""newAddress"": {
+    ""street"": ""{{faker.location.streetAddress}}"",
+    ""zipCode"": ""{{faker.location.zipCode}}"",
+    ""city"": ""{{faker.location.city}}"",
+    ""country"": ""{{faker.location.country}}""
+  }
+}";application/json;PERSISTENT;;;;{{faker.string.uuid}};5000;TEST;f1000000-0000-4000-8000-000000000005;20;admin;admin
+c1000000-0000-4000-8000-00000000000d;Employee hired;New employee with a personnel number from the range EMPLOYEES and job, department, salary and bank data from faker;{{app}}/hr/employees/{{region}}/hired/v1/{{employeeNo}};"{
+  ""employeeNumber"": ""{{numberRange.EMPLOYEES as employeeNo}}"",
+  ""hiredAt"": ""{{now}}"",
+  ""person"": {
+    ""firstName"": ""{{faker.person.firstName}}"",
+    ""lastName"": ""{{faker.person.lastName}}"",
+    ""email"": ""{{faker.internet.email}}"",
+    ""phone"": ""{{faker.phone.number}}""
+  },
+  ""job"": {
+    ""title"": ""{{faker.person.jobTitle}}"",
+    ""department"": ""{{faker.commerce.department}}"",
+    ""startDate"": ""{{faker.date.future}}"",
+    ""salary"": {{faker.finance.amount(40000,90000)}},
+    ""currency"": ""{{faker.finance.currencyCode}}""
+  },
+  ""manager"": ""{{faker.person.fullName}}"",
+  ""iban"": ""{{faker.finance.iban}}""
+}";application/json;PERSISTENT;;;;{{employeeNo}};5000;TEST;f1000000-0000-4000-8000-000000000005;30;admin;admin
 c1000000-0000-4000-8000-000000000003;Inventory updated;Persistent message with random values and TTL - lands in q.aem.events;{{app}}/events/inventory/{{region}}/updated/v1;"{
   ""sku"": ""SKU-{{randomInt(100,999)}}"",
   ""stock"": {{randomInt(0,500)}},
