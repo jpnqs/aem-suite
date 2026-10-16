@@ -1,19 +1,28 @@
 import cds from '@sap/cds'
 import { currentJwt } from './lib/credentials/resolve'
-import {
-  listSubscriptions,
-  SourceType,
-  startSubscription,
-  stopAll,
-  stopSubscription,
-  touch
-} from './lib/solace/subscription-hub'
+import { detectContentType } from './lib/defaults'
+import { truncate } from './lib/errors'
+import { createNode } from './lib/nodes'
+import type { NodeData } from './lib/node-validation'
+import { inferPropertyType } from './lib/property-types'
+import { keyOf } from './lib/request'
+import { listSubscriptions, SourceType, startSubscription, stopSubscription, touch } from './lib/solace/subscription-hub'
+
+interface ReceivedMessage {
+  topic: string
+  payload?: string | null
+  contentType?: string | null
+  userProperties?: string | null
+  correlationId?: string | null
+  deliveryMode?: string | null
+  source?: string | null
+  brokerName?: string | null
+  receivedAt?: string | null
+}
 
 export default class SubscribeService extends cds.ApplicationService {
   async init() {
     const { ReceivedMessages } = this.entities
-
-    cds.on('shutdown', () => stopAll())
 
     this.on('start', async (req) => {
       const { brokerId, sourceType, topics, queue, password, username } = req.data as {
@@ -58,45 +67,47 @@ export default class SubscribeService extends cds.ApplicationService {
       d.receivedAt ??= new Date().toISOString()
     })
 
+    // same rules and placement as a test case created in the UI or by an agent
     this.on('createTestCase', ReceivedMessages, async (req) => {
-      const p = req.params[0] as unknown
-      const id = typeof p === 'string' ? p : (p as { ID: string }).ID
-      const m = (await SELECT.one.from('aem.suite.ReceivedMessages', id)) as Record<string, string | null> | null
+      const m = (await SELECT.one.from('aem.suite.ReceivedMessages', keyOf(req).ID)) as ReceivedMessage | null
       if (!m) return req.error(404, 'Message not found')
-
-      let payload = m.payload ?? ''
-      try {
-        payload = JSON.stringify(JSON.parse(payload), null, 2)
-      } catch {
-        /* keep raw */
-      }
-      let props: Record<string, unknown> = {}
-      try {
-        props = m.userProperties ? JSON.parse(m.userProperties) : {}
-      } catch {
-        /* ignore */
-      }
-
-      const ID = cds.utils.uuid()
-      await INSERT.into('aem.suite.TestCases').entries({
-        ID,
-        name: `From ${m.topic}`.slice(0, 200),
-        description: `Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`,
-        topic: m.topic,
-        payload,
-        contentType: m.contentType || 'application/json',
-        deliveryMode: m.deliveryMode === 'DIRECT' ? 'DIRECT' : 'PERSISTENT',
-        correlationId: m.correlationId,
-        userProperties: Object.entries(props).map(([name, value]) => ({
-          name,
-          type: typeof value === 'boolean' ? 'BOOL' : Number.isInteger(value) ? 'INT' : 'STRING',
-          value: String(value)
-        }))
-      })
+      const { ID } = await createNode(testCaseFrom(m))
       req.info(200, 'Test case created')
       return { ID }
     })
 
     return super.init()
+  }
+}
+
+function testCaseFrom(m: ReceivedMessage): NodeData {
+  let payload = m.payload ?? ''
+  try {
+    payload = JSON.stringify(JSON.parse(payload), null, 2)
+  } catch {
+    /* keep raw */
+  }
+  let props: Record<string, unknown> = {}
+  try {
+    props = m.userProperties ? JSON.parse(m.userProperties) : {}
+  } catch {
+    /* ignore */
+  }
+  return {
+    ID: cds.utils.uuid(),
+    kind: 'TEST',
+    parent_ID: null,
+    name: truncate(`From ${m.topic}`, 200),
+    description: truncate(`Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`, 1000),
+    topic: m.topic,
+    payload,
+    contentType: m.contentType || detectContentType(payload),
+    deliveryMode: m.deliveryMode === 'DIRECT' ? 'DIRECT' : 'PERSISTENT',
+    correlationId: m.correlationId,
+    userProperties: Object.entries(props).map(([name, value]) => ({
+      name,
+      type: typeof value === 'boolean' ? 'BOOL' : inferPropertyType(String(value)),
+      value: String(value)
+    }))
   }
 }

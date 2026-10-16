@@ -2,6 +2,8 @@ import cds from '@sap/cds'
 import fs from 'node:fs'
 import path from 'node:path'
 import MarkdownIt from 'markdown-it'
+import { config } from './config'
+import { httpError } from './errors'
 
 /**
  * In-app help: the user guide (docs/user-guide.md) rendered to HTML sections for the Help app.
@@ -36,10 +38,7 @@ const SKIPPED = ['contents']
  * Location of the guide: docs/user-guide.md in the project (copied next to the server on deployment, see
  * scripts/build-docs.js). `cds.aemSuite.help.file` overrides it (relative to the project root).
  */
-export const guideFile = (): string => {
-  const configured = (cds.env as unknown as { aemSuite?: { help?: { file?: string } } }).aemSuite?.help?.file
-  return path.resolve(cds.root, configured ?? path.join('docs', 'user-guide.md'))
-}
+export const guideFile = (): string => path.resolve(cds.root, config().help.file)
 
 let cached: { mtimeMs: number; guide: Guide } | undefined
 
@@ -50,7 +49,7 @@ export function loadGuide(): Guide {
   try {
     stat = fs.statSync(file)
   } catch {
-    throw Object.assign(new Error('The user guide is not available on this system.'), { status: 404, code: 404 })
+    throw httpError(404, 'The user guide is not available on this system.')
   }
   if (!cached || cached.mtimeMs !== stat.mtimeMs) cached = { mtimeMs: stat.mtimeMs, guide: renderGuide(fs.readFileSync(file, 'utf8')) }
   return cached.guide

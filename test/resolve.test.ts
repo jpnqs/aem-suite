@@ -3,9 +3,9 @@ import {
   MissingUsernameError,
   needsPassword,
   needsUsername,
-  resolveConnection,
-  toSmfUrl
+  resolveConnection
 } from '../srv/lib/credentials/resolve'
+import { toSmfUrl } from '../srv/lib/broker-url'
 
 describe('toSmfUrl', () => {
   it.each([
@@ -20,7 +20,7 @@ describe('toSmfUrl', () => {
 })
 
 describe('resolveConnection (DIRECT)', () => {
-  const broker = { ID: '1', name: 'dev', credentialMode: 'DIRECT', url: 'wss://h:443', msgVpn: 'v', username: 'u' }
+  const broker = { ID: '1', name: 'dev', credentialMode: 'DIRECT' as const, url: 'wss://h:443', msgVpn: 'v', username: 'u' }
 
   it('uses the password passed in for this connection', async () => {
     await expect(resolveConnection(broker, undefined, 'pw')).resolves.toMatchObject({ userName: 'u', password: 'pw', vpnName: 'v' })

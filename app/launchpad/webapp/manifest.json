@@ -1,0 +1,12 @@
+{
+  "_version": "1.65.0",
+  "sap.app": {
+    "id": "com.aem.suite.launchpad",
+    "type": "application",
+    "applicationVersion": {
+      "version": "1.0.0"
+    },
+    "title": "AEM Test Suite",
+    "description": "Sandbox launchpad with all AEM Test Suite apps (standalone approuter). Work Zone uses its own site instead."
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "welcomeFile": "/launchpad.html",
+  "welcomeFile": "/comaemsuitelaunchpad/index.html",
   "authenticationMethod": "route",
   "websockets": {
     "enabled": true
@@ -9,13 +9,6 @@
   },
   "routes": [
     {
-      "source": "^/odata/(.*)$",
-      "target": "/odata/$1",
-      "destination": "srv-api",
-      "authenticationType": "xsuaa",
-      "csrfProtection": true
-    },
-    {
       "source": "^/mcp/(.*)$",
       "target": "/mcp/$1",
       "destination": "srv-api",
@@ -23,18 +16,23 @@
       "csrfProtection": false
     },
     {
-      "source": "^/ws/(.*)$",
-      "target": "/ws/$1",
+      "source": "^/\\.well-known/(oauth-.*)$",
+      "target": "/.well-known/$1",
       "destination": "srv-api",
-      "authenticationType": "xsuaa",
+      "authenticationType": "none",
       "csrfProtection": false
     },
     {
-      "source": "^/(.*)$",
+      "source": "^/appconfig/(.*)$",
+      "target": "/comaemsuitelaunchpad/appconfig/$1",
+      "service": "html5-apps-repo-rt",
+      "authenticationType": "xsuaa"
+    },
+    {
+      "source": "^(.*)$",
       "target": "$1",
-      "localDir": "resources",
-      "authenticationType": "xsuaa",
-      "cacheControl": "no-cache, no-store, must-revalidate"
+      "service": "html5-apps-repo-rt",
+      "authenticationType": "xsuaa"
     }
   ]
 }

@@ -27,6 +27,8 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension", "sap/ui/model/json/JSONMod
                 control.setVisible(!isFolder);
               }
             });
+          }).catch(function () {
+            // the page could not be read - Fiori elements shows the message; keep the test case layout
           });
         }
       }

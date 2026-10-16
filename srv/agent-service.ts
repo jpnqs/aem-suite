@@ -1,34 +1,23 @@
 import cds from '@sap/cds'
+import { config } from './lib/config'
 import { copyNodes } from './lib/copy-nodes'
 import { exportNodes, importNodes } from './lib/export-import'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
-import { nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './lib/node-validation'
+import { assertValid, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './lib/node-validation'
+import { createNode, NodeRow, selectNodeDeep, TABLE } from './lib/nodes'
+import type { PropertyType } from './lib/property-types'
 import { buildPreview } from './lib/preview'
-import { currentJwt } from './lib/credentials/resolve'
-import { TestCaseRecord } from './lib/test-case-spec'
-import { BrokerCredential, createRun, executeRunInBackground, toCredentials } from './lib/test-runner'
+import { BrokerCredential, runOutcome, startRun, toCredentials } from './lib/test-runner'
 import { loadTree } from './lib/tree'
 
 const LOG = cds.log('agent')
-const TABLE = 'aem.suite.TestCases'
 const MAX_WAIT_SECONDS = 30
 const MAX_FAILURES = 25
-
-/** Limits for agents - the MCP adapter itself has no rate limiting or audit (see docs). */
-const limits = () =>
-  ({
-    /** test cases x brokers of one run */
-    maxRunResults: 100,
-    /** runs of one user that may be RUNNING at the same time */
-    maxActiveRuns: 2,
-    /** development only: accept broker passwords in runTests (they would pass through the AI conversation) */
-    allowDirectCredentials: false,
-    ...(cds.env as unknown as { aemSuite?: { agent?: Record<string, unknown> } }).aemSuite?.agent
-  }) as { maxRunResults: number; maxActiveRuns: number; allowDirectCredentials: boolean }
+const POLL_INTERVAL_MS = 500
 
 interface PropertyInput {
   name: string
-  type?: string | null
+  type?: PropertyType | null
   value?: string | null
 }
 interface VariableInput {
@@ -74,7 +63,7 @@ export default class TestAgentService extends cds.ApplicationService {
         parent_ID: parentId ?? null,
         variables: toVariables(variables)
       }
-      return createNode(req, d as unknown as NodeData)
+      return createNode(d as NodeData)
     })
 
     this.on('createTestCase', async (req) => {
@@ -91,7 +80,7 @@ export default class TestAgentService extends cds.ApplicationService {
       d.correlationId ??= STARTER_CORRELATION_ID
       d.userProperties = toProperties(input.userProperties)
       d.variables = toVariables(input.variables)
-      return createNode(req, d as unknown as NodeData)
+      return createNode(d as unknown as NodeData)
     })
 
     this.on('updateTestCase', async (req) => {
@@ -107,9 +96,9 @@ export default class TestAgentService extends cds.ApplicationService {
 
       // check the result as a whole, with the same rules as for new test cases
       const merged = { ...current, ...changes, userProperties: userProperties ?? current.userProperties, variables: variables ?? current.variables }
-      problemsOf(req, (reject) => {
-        validateEnums(merged as unknown as NodeData, reject)
-        validateNode(merged as unknown as NodeData, 'UPDATE', reject)
+      await assertValid((reject) => {
+        validateEnums(merged, reject)
+        validateNode(merged, 'UPDATE', reject)
       })
       return saveChanges(input.id, changes, userProperties, variables)
     })
@@ -125,7 +114,7 @@ export default class TestAgentService extends cds.ApplicationService {
       if (input.description != null) changes.description = input.description
       const variables = input.variables ? toVariables(input.variables) : undefined
       const merged = { ...current, ...changes, variables: variables ?? current.variables }
-      problemsOf(req, (reject) => validateNode(merged as unknown as NodeData, 'UPDATE', reject))
+      await assertValid((reject) => validateNode(merged, 'UPDATE', reject))
       return saveChanges(input.id, changes, undefined, variables)
     })
 
@@ -133,7 +122,7 @@ export default class TestAgentService extends cds.ApplicationService {
       const { id, parentId } = req.data as { id: string; parentId?: string | null }
       const current = await loadNode(id)
       if (!current) return req.reject(404, 'Test case or folder not found')
-      await problemsOfAsync(req, (reject) => validateParent({ parent_ID: parentId ?? null } as NodeData, id, reject))
+      await assertValid((reject) => validateParent({ parent_ID: parentId ?? null }, id, reject))
       await UPDATE(TABLE, id).with({ parent_ID: parentId ?? null, sortOrder: await nextSortOrder(parentId) })
       return { ID: id, name: current.name, kind: current.kind }
     })
@@ -157,7 +146,7 @@ export default class TestAgentService extends cds.ApplicationService {
       const tc = await loadNode(testCaseId)
       if (!tc) return req.reject(404, 'Test case not found')
       if (tc.kind !== 'TEST') return req.reject(400, 'Folders have no message - preview a test case')
-      return buildPreview(tc as unknown as TestCaseRecord, brokerId)
+      return buildPreview(tc, brokerId)
     })
 
     // ---------------------------------------------------------------- execute
@@ -167,7 +156,7 @@ export default class TestAgentService extends cds.ApplicationService {
         brokerIds: string[]
         credentials?: BrokerCredential[]
       }
-      const max = limits()
+      const max = config().agent
 
       // secrets stay out of AI conversations: only brokers whose credentials come from a BTP destination
       const brokers = (await SELECT.from('aem.suite.Brokers')
@@ -193,10 +182,7 @@ export default class TestAgentService extends cds.ApplicationService {
         return req.reject(429, `You already have ${active.length} runs in progress (limit ${max.maxActiveRuns}). Wait for one to finish (getRunSummary).`)
 
       const entered = max.allowDirectCredentials ? toCredentials(credentials) : toCredentials([])
-      const runId = await createRun(testCaseIds, brokerIds, entered)
-      const jwt = currentJwt()
-      // execute after the run rows are committed
-      req.on('succeeded', () => void executeRunInBackground(runId, jwt, entered))
+      const runId = await startRun(req, testCaseIds, brokerIds, entered)
       return { runId, total }
     })
 
@@ -211,7 +197,7 @@ export default class TestAgentService extends cds.ApplicationService {
         run = (await cds.db.tx(() => SELECT.one.from('aem.suite.TestRuns', runId))) as Run | undefined
         if (!run) return req.reject(404, 'Run not found')
         if (run.status !== 'RUNNING' || Date.now() >= deadline) break
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
       }
       const failures = (await cds.db.tx(() =>
         SELECT.from('aem.suite.RunResults')
@@ -223,7 +209,7 @@ export default class TestAgentService extends cds.ApplicationService {
       return {
         runId,
         status: run.status,
-        outcome: !finished ? 'RUNNING' : run.failedCount > 0 ? 'FAILED' : 'PASSED',
+        outcome: runOutcome(run),
         finished,
         total: run.totalCount,
         passed: run.passedCount,
@@ -240,32 +226,6 @@ export default class TestAgentService extends cds.ApplicationService {
 }
 
 // ------------------------------------------------------------------ helpers
-
-type Rejector = (status: number, message: string, target?: string) => void
-
-/** Runs the checks and rejects the request with all findings in one message (nothing is written yet). */
-function problemsOf(req: cds.Request, check: (reject: Rejector) => void): void {
-  const problems: string[] = []
-  check((_status, message, target) => problems.push(target ? `${target.replace(/^in\//, '')}: ${message}` : message))
-  if (problems.length) req.reject(400, problems.join('; '))
-}
-
-async function problemsOfAsync(req: cds.Request, check: (reject: Rejector) => Promise<unknown>): Promise<void> {
-  const problems: string[] = []
-  await check((_status, message, target) => problems.push(target ? `${target.replace(/^in\//, '')}: ${message}` : message))
-  if (problems.length) req.reject(400, problems.join('; '))
-}
-
-async function createNode(req: cds.Request, d: NodeData): Promise<{ ID: string; name: string; kind: string }> {
-  await problemsOfAsync(req, async (reject) => {
-    validateEnums(d, reject)
-    validateNode(d, 'CREATE', reject)
-    await validateParent(d, undefined, reject)
-  })
-  d.sortOrder = await nextSortOrder(d.parent_ID)
-  await INSERT.into(TABLE).entries(d)
-  return { ID: d.ID, name: d.name, kind: d.kind as string }
-}
 
 async function saveChanges(
   id: string,
@@ -287,13 +247,7 @@ async function saveChanges(
   return row
 }
 
-async function loadNode(id: string): Promise<(Record<string, any> & { kind: string; name: string }) | undefined> {
-  return (await SELECT.one.from(TABLE, (t: any) => {
-    t`.*`
-    t.userProperties((p: any) => p`.*`)
-    t.variables((v: any) => v`.*`)
-  }).where({ ID: id })) as (Record<string, any> & { kind: string; name: string }) | undefined
-}
+const loadNode = (id: string): Promise<NodeRow | undefined> => selectNodeDeep(id)
 
 const toProperties = (list?: PropertyInput[] | null): PropertyInput[] =>
   (list ?? []).map((p) => ({ name: p.name, type: p.type ?? undefined, value: p.value ?? '' }))

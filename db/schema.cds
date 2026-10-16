@@ -25,8 +25,8 @@ type CredentialMode : String(12) enum {
 }
 
 type DeliveryMode   : String(12) enum {
-  DIRECT;
   PERSISTENT;
+  DIRECT;
 }
 
 type RunStatus      : String(10) enum {
@@ -53,6 +53,25 @@ type PropertyType   : String(10) enum {
   BOOL;
 }
 
+type ConnectionStatus : String(10) enum {
+  OK;
+  ERROR;
+}
+
+/** where a live view message came from (SubscribeService.SourceType) */
+type SourceType     : String(15) enum {
+  TOPIC;
+  QUEUE_BROWSE;
+  QUEUE_CONSUME;
+}
+
+/** delivery mode of a received message - NON_PERSISTENT exists on receive only */
+type ReceivedDeliveryMode : String(20) enum {
+  DIRECT;
+  NON_PERSISTENT;
+  PERSISTENT;
+}
+
 /** A Solace / Advanced Event Mesh broker (message VPN) to test against. */
 entity Brokers : cuid, managed {
   name                   : String(100) @mandatory;
@@ -71,7 +90,7 @@ entity Brokers : cuid, managed {
   clientNamePrefix       : String(60) default 'aem-suite';
   connectTimeoutMs       : Integer default 10000;
   active                 : Boolean default true;
-  lastConnectionStatus   : String(10);
+  lastConnectionStatus   : ConnectionStatus;
   lastConnectionAt       : Timestamp;
   lastConnectionMessage  : String(1000);
   variables              : Composition of many Variables
@@ -185,13 +204,13 @@ entity ReceivedMessages : cuid, managed {
   brokerName     : String(100);
   /** subscription expression or queue name the message was received on */
   source         : String(500);
-  sourceType     : String(10); // TOPIC | QUEUE
+  sourceType     : SourceType;
   topic          : String(500);
   payload        : LargeString;
   contentType    : String(100);
   /** JSON object of user properties */
   userProperties : LargeString;
   correlationId  : String(200);
-  deliveryMode   : String(20);
+  deliveryMode   : ReceivedDeliveryMode;
   receivedAt     : Timestamp;
 }

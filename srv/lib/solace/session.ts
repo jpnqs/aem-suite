@@ -1,5 +1,7 @@
 import solace from 'solclientjs'
 import { randomUUID } from 'node:crypto'
+import { DEFAULT_ACK_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS } from '../defaults'
+import { parseBool, parseInt64, PropertyType } from '../property-types'
 
 let initialized = false
 
@@ -28,7 +30,7 @@ export type DeliveryMode = 'DIRECT' | 'PERSISTENT'
 
 export interface UserProperty {
   name: string
-  type?: 'STRING' | 'INT' | 'BOOL' | string | null
+  type?: PropertyType | null
   value?: string | null
 }
 
@@ -72,8 +74,6 @@ interface PendingAck {
   sentAt: number
 }
 
-const DEFAULT_ACK_TIMEOUT = 5000
-
 /**
  * Promise-based wrapper around a solclientjs session.
  * One instance = one SMF connection to one message VPN.
@@ -90,7 +90,7 @@ export class SolaceSession implements Publisher {
   /** Connects and resolves once the session is UP. */
   static connect(config: ConnectionConfig): Promise<SolaceSession> {
     const s = sol()
-    const timeout = config.connectTimeoutMs ?? 10000
+    const timeout = config.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS
     const session = s.SolclientFactory.createSession({
       url: config.url,
       vpnName: config.vpnName,
@@ -176,7 +176,7 @@ export class SolaceSession implements Publisher {
 
     const key = randomUUID()
     msg.setCorrelationKey(key)
-    const ackTimeout = spec.ackTimeoutMs || DEFAULT_ACK_TIMEOUT
+    const ackTimeout = spec.ackTimeoutMs || DEFAULT_ACK_TIMEOUT_MS
     return new Promise<PublishResult>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(key)
@@ -356,14 +356,17 @@ export function buildMessage(spec: PublishSpec): solace.Message {
     for (const p of spec.userProperties) {
       switch (p.type) {
         case 'INT': {
-          const n = Number(p.value)
-          if (!Number.isInteger(n)) throw new Error(`User property "${p.name}" is not an integer: ${p.value}`)
+          const n = parseInt64(p.value)
+          if (n === undefined) throw new Error(`User property "${p.name}" is not an integer in the safe range: ${p.value}`)
           map.addField(p.name, s.SDTFieldType.INT64, n)
           break
         }
-        case 'BOOL':
-          map.addField(p.name, s.SDTFieldType.BOOL, ['true', '1', 'yes'].includes(String(p.value).trim().toLowerCase()))
+        case 'BOOL': {
+          const b = parseBool(p.value)
+          if (b === undefined) throw new Error(`User property "${p.name}" is not true or false: ${p.value}`)
+          map.addField(p.name, s.SDTFieldType.BOOL, b)
           break
+        }
         default:
           map.addField(p.name, s.SDTFieldType.STRING, p.value ?? '')
       }

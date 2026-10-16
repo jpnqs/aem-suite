@@ -1,5 +1,9 @@
 {
   "_version": "1.65.0",
+  "sap.cloud": {
+    "public": true,
+    "service": "aemsuite"
+  },
   "sap.app": {
     "id": "com.aem.suite.runs",
     "type": "application",
@@ -17,7 +21,7 @@
     "description": "{{appDescription}}",
     "dataSources": {
       "mainService": {
-        "uri": "/odata/v4/test/",
+        "uri": "odata/v4/test/",
         "type": "OData",
         "settings": {
           "odataVersion": "4.0"
@@ -48,6 +52,9 @@
   },
   "sap.ui5": {
     "flexEnabled": false,
+    "config": {
+      "myEntriesFilter": "runStartedBy"
+    },
     "dependencies": {
       "minUI5Version": "1.148.0",
       "libs": {
@@ -119,7 +126,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -154,7 +161,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -175,7 +182,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -203,7 +210,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.runs.ext.Help.open",
+                      "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -219,7 +226,7 @@
       "extensions": {
         "sap.ui.controllerExtensions": {
           "sap.fe.templates.ListReport.ListReportController#com.aem.suite.runs::RunResultsList": {
-            "controllerName": "com.aem.suite.runs.ext.MyEntriesFilter"
+            "controllerName": "com.aem.suite.runs.shared.MyEntriesFilter"
           }
         }
       }

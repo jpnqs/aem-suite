@@ -1,7 +1,8 @@
 import cds from '@sap/cds'
-import { compareSiblings, loadTree, TreeNode } from './tree'
+import { httpError } from './errors'
+import { selectNodesDeep, TABLE } from './nodes'
+import { loadTree, renumberSiblings, TreeNode } from './tree'
 
-const TABLE = 'aem.suite.TestCases'
 const MANAGED = ['createdAt', 'createdBy', 'modifiedAt', 'modifiedBy']
 /** keys of the child rows (user properties, variables) that must be new for the copy */
 const CHILD_KEYS = ['ID', 'testCase_ID']
@@ -45,11 +46,7 @@ async function copySubtree(rootId: string, children: Map<string | null, TreeNode
     order.push(id)
     queue.push(...(children.get(id) ?? []).map((c) => c.ID))
   }
-  const rows = (await SELECT.from(TABLE, (t: any) => {
-    t`.*`
-    t.userProperties((p: any) => p`.*`)
-    t.variables((v: any) => v`.*`)
-  }).where({ ID: { in: order } })) as Row[]
+  const rows = (await selectNodesDeep({ ID: { in: order } })) as Row[]
   const byId = new Map(rows.map((r) => [r.ID, r]))
 
   const newIds = new Map(order.map((id) => [id, cds.utils.uuid()]))
@@ -76,22 +73,6 @@ async function copySubtree(rootId: string, children: Map<string | null, TreeNode
   return { ID: newIds.get(rootId)!, name: copyName }
 }
 
-/** Gives the siblings a clean 10, 20, 30... order; reordering is no content change, so modified* stays. */
-async function renumberSiblings(parentId: string | null): Promise<void> {
-  type Sibling = TreeNode & { modifiedAt: string; modifiedBy: string }
-  const siblings = (await SELECT.from(TABLE)
-    .columns('ID', 'parent_ID', 'kind', 'name', 'sortOrder', 'modifiedAt', 'modifiedBy')
-    .where({ parent_ID: parentId ?? null })) as Sibling[]
-  siblings.sort(compareSiblings)
-  for (const [i, s] of siblings.entries()) {
-    await UPDATE(TABLE, s.ID).with({ sortOrder: (i + 1) * 10, modifiedAt: s.modifiedAt, modifiedBy: s.modifiedBy })
-  }
-}
-
 function omit<T extends Record<string, unknown>>(row: T, keys: string[]): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row).filter(([k]) => !keys.includes(k)))
-}
-
-function httpError(status: number, message: string): Error {
-  return Object.assign(new Error(message), { status, code: status })
 }

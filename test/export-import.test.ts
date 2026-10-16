@@ -1,8 +1,8 @@
 import cds from '@sap/cds'
-import path from 'node:path'
+import { resetDatabase, startServer, users } from './helpers'
 
-const { POST, axios } = cds.test(path.join(__dirname, '..'))
-const tester = { auth: { username: 'tester', password: 'tester' } }
+const { POST } = startServer()
+const { tester } = users
 
 const exportNodes = (ids?: string[]) => POST('/odata/v4/test/exportNodes', ids ? { ids } : {}, tester)
 const importNodes = (content: unknown, extra: object = {}) =>
@@ -14,8 +14,7 @@ describe('export / import of test cases and folders', () => {
   const ids: Record<string, string> = {}
 
   beforeAll(async () => {
-    axios.defaults.validateStatus = () => true
-    for (const e of ['TestCaseStats', 'TestCaseProperties', 'TestCaseVariables', 'TestCases']) await DELETE.from(`aem.suite.${e}`)
+    await resetDatabase()
     const id = (k: string) => (ids[k] = cds.utils.uuid())
     await INSERT.into('aem.suite.TestCases').entries([
       { ID: id('orders'), kind: 'FOLDER', name: 'Orders', description: 'All order events', sortOrder: 10, variables: [{ name: 'domain', value: 'orders' }] },

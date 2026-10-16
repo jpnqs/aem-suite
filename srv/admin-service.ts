@@ -1,8 +1,11 @@
 import cds from '@sap/cds'
 import { checkConnection } from './lib/broker-check'
+import { normalizeBrokerUrl, toSmfUrl } from './lib/broker-url'
+import { config } from './lib/config'
 import { listDestinations } from './lib/credentials/destinations'
-import { currentJwt, needsPassword, toSmfUrl } from './lib/credentials/resolve'
-import { normalizeBrokerUrl } from './lib/defaults'
+import { currentJwt, needsPassword } from './lib/credentials/resolve'
+import { VAR_NAME, VAR_NAME_RULE } from './lib/node-validation'
+import { keyOf } from './lib/request'
 
 /** Connection check on save is capped so saving never blocks long. */
 const AUTO_CHECK_TIMEOUT_MS = 5000
@@ -57,15 +60,15 @@ export default class AdminService extends cds.ApplicationService {
     this.after(['CREATE', 'UPDATE'], Brokers, async (res, req) => {
       const result = (Array.isArray(res) ? res[0] : res) as BrokerData | undefined
       const data = { ...(req.data as BrokerData), ...result }
-      const autoCheck = (cds.env as unknown as { aemSuite?: { autoTestConnection?: boolean } }).aemSuite?.autoTestConnection
-      if (autoCheck === false || data.active === false || needsPassword(data)) return
+      if (!config().autoTestConnection || data.active === false || needsPassword(data)) return
 
-      const id = (data.ID ?? keyOf(req)) as string
+      const id = data.ID ?? keyOf(req).ID
       const check = await checkConnection(id, { jwt: currentJwt(), maxTimeoutMs: AUTO_CHECK_TIMEOUT_MS })
       if (result && typeof result === 'object') {
         result.lastConnectionStatus = check.lastConnectionStatus
         result.lastConnectionAt = check.lastConnectionAt
         result.lastConnectionMessage = check.lastConnectionMessage
+        // same as Brokers.connectionCriticality in srv/admin-service.cds (the response is built before this update)
         result.connectionCriticality = check.ok ? 3 : 1
       }
       if (check.ok) req.info(200, `Connection test successful (${check.latencyMs} ms)`)
@@ -77,12 +80,10 @@ export default class AdminService extends cds.ApplicationService {
       const d = req.data as { ID?: string; name?: string; broker_ID?: string | null }
       d.broker_ID = null
       if (d.name !== undefined) {
-        if (!/^[A-Za-z_][\w.-]*$/.test(d.name ?? '')) {
-          return req.error(400, 'Variable names must start with a letter or _ and contain only letters, digits, _ . -', 'in/name')
-        }
+        if (!VAR_NAME.test(d.name ?? '')) return req.error(400, VAR_NAME_RULE, 'in/name')
         const dup = await SELECT.one
           .from('aem.suite.Variables')
-          .where({ name: d.name, broker_ID: null, ID: { '!=': d.ID ?? (req.params?.[0] as { ID?: string })?.ID ?? '' } })
+          .where({ name: d.name, broker_ID: null, ID: { '!=': d.ID ?? keyOf(req).ID ?? '' } })
         if (dup) req.error(409, `Global variable "${d.name}" already exists`, 'in/name')
       }
     })
@@ -90,7 +91,7 @@ export default class AdminService extends cds.ApplicationService {
     // ---------------------------------------------------------------- actions
     this.on('testConnection', Brokers, async (req) => {
       const { password, username } = req.data as { password?: string; username?: string }
-      const check = await checkConnection(keyOf(req), {
+      const check = await checkConnection(keyOf(req).ID, {
         jwt: currentJwt(),
         password: password || undefined,
         username: username || undefined
@@ -117,9 +118,4 @@ export default class AdminService extends cds.ApplicationService {
 
     return super.init()
   }
-}
-
-function keyOf(req: cds.Request): string {
-  const p = req.params?.[0] as unknown
-  return typeof p === 'string' ? p : ((p as { ID: string } | undefined)?.ID as string)
 }

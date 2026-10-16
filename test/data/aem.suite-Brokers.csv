@@ -1,4 +1,6 @@
 ID;name;description;credentialMode;destinationName;url;msgVpn;username;clientNamePrefix;connectTimeoutMs;active
-b1000000-0000-4000-8000-000000000001;local-docker;Local Solace PubSub+ in Docker (container solace-broker, SMF port 55555);DIRECT;;tcp://localhost:55555;default;default;aem-suite;5000;true
-b1000000-0000-4000-8000-000000000003;local-docker (ask for user);"Same local Docker broker, but without a username - username and password are asked for when running (try user ""default"")";DIRECT;;tcp://localhost:55555;default;;aem-suite;5000;true
+b1000000-0000-4000-8000-000000000001;local-docker;Local Solace PubSub+ in Docker - VPN aem-local from local/terragrunt - user aem-suite may publish everywhere (password aemsuite);DIRECT;;tcp://localhost:55555;aem-local;aem-suite;aem-suite;5000;true
+b1000000-0000-4000-8000-000000000004;local-docker (publisher);Same broker as user aem-publisher - may only publish below aem/ (password publisher);DIRECT;;tcp://localhost:55555;aem-local;aem-publisher;aem-suite;5000;true
+b1000000-0000-4000-8000-000000000005;local-docker (subscriber);Same broker as user aem-subscriber - may not publish at all, so every test fails with Publish ACL Denied (password subscriber);DIRECT;;tcp://localhost:55555;aem-local;aem-subscriber;aem-suite;5000;true
+b1000000-0000-4000-8000-000000000003;local-docker (ask for user);"Same broker without a username - username and password are asked for when running (aem-suite/aemsuite, aem-publisher/publisher or aem-subscriber/subscriber)";DIRECT;;tcp://localhost:55555;aem-local;;aem-suite;5000;true
 b1000000-0000-4000-8000-000000000002;aem-dev (destination);"Example for DESTINATION mode - provide destination ""aem-dev"" and activate";DESTINATION;aem-dev;;;;aem-suite;10000;false

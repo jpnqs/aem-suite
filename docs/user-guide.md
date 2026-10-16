@@ -7,27 +7,41 @@ save messages as **test cases**, send them to one or several brokers with one cl
 
 ## Contents
 
-1. [Getting started](#1-getting-started)
-2. [Set up brokers (Admin)](#2-set-up-brokers-admin)
-3. [Global variables (Admin)](#3-global-variables-admin)
-4. [Organize test cases in folders](#4-organize-test-cases-in-folders)
-5. [Create and edit a test case](#5-create-and-edit-a-test-case)
-6. [Run tests](#6-run-tests)
-7. [Check results](#7-check-results)
-8. [Watch messages live (Live Subscriber)](#8-watch-messages-live-live-subscriber)
-9. [Saved messages](#9-saved-messages)
-10. [Variables and templates](#10-variables-and-templates)
-11. [Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
-12. [Tips and troubleshooting](#12-tips-and-troubleshooting)
+- [AEM Test Suite – User Guide](#aem-test-suite--user-guide)
+  - [Contents](#contents)
+  - [1. Getting started](#1-getting-started)
+  - [2. Set up brokers (Admin)](#2-set-up-brokers-admin)
+  - [3. Global variables (Admin)](#3-global-variables-admin)
+  - [4. Organize test cases in folders](#4-organize-test-cases-in-folders)
+    - [Export and import](#export-and-import)
+  - [5. Create and edit a test case](#5-create-and-edit-a-test-case)
+    - [Message](#message)
+    - [Payload](#payload)
+    - [Advanced (click *Show more*)](#advanced-click-show-more)
+    - [User Properties](#user-properties)
+    - [Variables](#variables)
+    - [Preview](#preview)
+  - [6. Run tests](#6-run-tests)
+    - [What do the results mean?](#what-do-the-results-mean)
+  - [7. Check results](#7-check-results)
+  - [8. Watch messages live (Live Subscriber)](#8-watch-messages-live-live-subscriber)
+  - [9. Saved messages](#9-saved-messages)
+  - [10. Variables and templates](#10-variables-and-templates)
+    - [Where values come from (first match wins)](#where-values-come-from-first-match-wins)
+    - [Built-ins](#built-ins)
+    - [Example](#example)
+  - [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
+  - [12. Tips and troubleshooting](#12-tips-and-troubleshooting)
 
 ---
 
 ## 1. Getting started
 
-Open the launchpad. Depending on your role you see these tiles:
+Open the launchpad – the suite's own start page, or your SAP Build Work Zone site if your administrator added the apps there. Depending on your role you see these tiles:
 
 | Tile | What for | Role |
 |---|---|---|
+| **Home** | start page: the state of the suite at a glance, your apps and the latest runs | everyone |
 | **Test Cases** | create, organize and run test cases | Tester |
 | **Test Runs** | results of all runs | Tester |
 | **Live Subscriber** | watch topics and queues live | Tester |
@@ -360,33 +374,27 @@ You do not use these tools yourself. You write what you want in the chat of your
 
 **Connect**
 
-You need the address `<your app>/mcp/agent` and a login. Locally (`npm run watch`) the address is `http://localhost:4004/mcp/agent` and the demo login is `tester` / `tester`; as header that is `Authorization: Basic dGVzdGVyOnRlc3Rlcg==` (the Base64 text of `tester:tester`). For the deployed app the assistant must send a valid login token of your BTP user (`Authorization: Bearer …`); ask your administrator how your organisation hands those out. Then add the address in your client:
+The address is `<your app>/mcp/agent` (the same host as the launchpad); you need the **Tester** role. The assistant logs you in with your normal BTP login – you never copy a token by hand.
 
-*GitHub Copilot (VS Code)* – create the file `.vscode/mcp.json` in your workspace (or run **MCP: Add Server** → *HTTP* from the command palette):
+1. Get the **client ID** and **client secret** of the app from your administrator. They identify the app, not you, and are the same for everyone.
+2. Add the server, for example in Claude Code:
 
-```json
-{
-  "servers": {
-    "aem-suite": {
-      "type": "http",
-      "url": "http://localhost:4004/mcp/agent",
-      "headers": { "Authorization": "Basic dGVzdGVyOnRlc3Rlcg==" }
-    }
-  }
-}
-```
+   ```sh
+   claude mcp add --transport http --client-id <client ID> --client-secret --callback-port 8765 aem-suite https://<your app>/mcp/agent
+   ```
 
-Click **Start** above the entry in the file (or use **MCP: List Servers**), open the Copilot chat, switch to **Agent** mode and check that the `aem-suite` tools show up under the tools icon. Copilot asks before it runs a tool. For organisation accounts your administrator must allow MCP servers in Copilot. Other editors (JetBrains, Visual Studio) take the same address and header in their MCP settings.
+   The command asks for the client secret.
+3. Start the assistant and log in: in Claude Code run `/mcp`, choose `aem-suite` and **Authenticate**. A browser window opens with the BTP login; after you sign in, the assistant is connected. The login is renewed automatically; when it has expired, authenticate again the same way.
 
-*Claude Code*:
+Other assistants work the same way if they support MCP with OAuth: enter the address, client ID, client secret and the callback address `http://localhost:8765/callback`.
+
+The assistant acts as **you**: it sees and may do exactly what your roles allow, and everything it creates is stored under your user.
+
+*Local development* (`npm run watch`) has no BTP login; use the demo login `tester:tester` instead:
 
 ```sh
 claude mcp add --transport http aem-suite http://localhost:4004/mcp/agent --header "Authorization: Basic dGVzdGVyOnRlc3Rlcg=="
 ```
-
-*Other clients* (any MCP client with *streamable HTTP*): server type `http`, the URL above, one header `Authorization`. A client that only knows local (stdio) servers can use a bridge such as `mcp-remote`: `npx mcp-remote http://localhost:4004/mcp/agent --header "Authorization: Basic …"`.
-
-Do not commit a real token or password to git. In VS Code you can have the token asked for instead: an `inputs` entry with `"password": true`, and `${input:token}` in the header.
 
 **Things you can ask**
 

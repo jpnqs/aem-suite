@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   solace:
     image: solace/solace-pubsub-standard:latest
@@ -10,7 +8,8 @@ services:
       - "55555:55555" # Native Solace messaging protocol (SMF)
       - "1883:1883" # MQTT
       - "5672:5672" # AMQP
-      - "9000:9000" # WebSocket
+      - "8008:8008" # Web Transport (SMF over WebSocket)
+      - "9000:9000" # REST messaging
     shm_size: '1gb' # Required shared memory size for Solace data plane
     ulimits:
       memlock: -1

@@ -53,8 +53,14 @@
         </VBox>
       </VBox>
       <VBox class="sapUiSmallMargin" visible="{= !!${run>/runId} }">
+        <MessageStrip
+          visible="{= ${run>/connectionLost} &amp;&amp; !${run>/finished} }"
+          text="Live progress connection lost - reconnecting. The result is checked every few seconds meanwhile."
+          type="Warning"
+          showIcon="true"
+          class="sapUiSmallMarginBottom" />
         <ObjectStatus
-          text="{= ${run>/finished} ? 'Finished' : 'Running…' }"
+          text="{= ${run>/finished} ? (${run>/aborted} ? 'Aborted - see the problems below' : 'Finished') : 'Running…' }"
           state="{= ${run>/finished} ? (${run>/failed} > 0 ? 'Error' : 'Success') : 'Information' }"
           icon="{= ${run>/finished} ? (${run>/failed} > 0 ? 'sap-icon://error' : 'sap-icon://sys-enter-2') : 'sap-icon://pending' }"
           class="sapMObjectStatusLarge sapUiSmallMarginBottom" />

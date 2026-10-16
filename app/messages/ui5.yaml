@@ -4,4 +4,13 @@ metadata:
 type: application
 customConfiguration:
   cds-plugin-ui5:
-    mountPath: /messages
+    mountPath: /comaemsuitemessages
+builder:
+  customTasks:
+    - name: ui5-task-zipper
+      afterTask: generateCachebusterInfo
+      configuration:
+        archiveName: comaemsuitemessages
+        relativePaths: true
+        additionalFiles:
+          - xs-app.json

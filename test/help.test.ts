@@ -1,19 +1,14 @@
-import cds from '@sap/cds'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { renderGuide, slug } from '../srv/lib/help-content'
+import { startServer, users, withAemSuiteConfig } from './helpers'
 
-const { GET, axios } = cds.test(path.join(__dirname, '..'))
+const { GET } = startServer()
 const root = path.join(__dirname, '..')
-const tester = { auth: { username: 'tester', password: 'tester' } }
-const noRole = { auth: { username: 'admin', password: 'admin' } }
+const { tester, noRole } = users
 
 describe('help (user guide rendered from Markdown)', () => {
-  beforeAll(() => {
-    axios.defaults.validateStatus = () => true
-  })
-
   describe('rendering', () => {
     const guide = renderGuide(fs.readFileSync(path.join(root, 'docs/user-guide.md'), 'utf8'))
     const byId = new Map(guide.sections.map((s) => [s.id, s]))
@@ -73,25 +68,19 @@ describe('help (user guide rendered from Markdown)', () => {
     })
 
     it('links from the apps point to existing sections', () => {
-      // every Help button names its section in `var SECTION = "..."` (or HELP_SECTION in the subscriber)
-      const files: string[] = []
-      const walk = (dir: string) => {
-        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-          const p = path.join(dir, e.name)
-          if (e.isDirectory()) {
-            if (!['node_modules', 'dist', 'resources'].includes(e.name)) walk(p)
-          } else if (/(^Help\.js$)|(^Main\.controller\.ts$)/.test(e.name)) files.push(p)
-        }
-      }
-      walk(path.join(root, 'app'))
+      // the Help buttons of all apps use the sections listed in app/_shared/Help.js
+      const help = fs.readFileSync(path.join(root, 'app', '_shared', 'Help.js'), 'utf8')
+      const table = /var SECTIONS = \{([^}]*)\}/.exec(help)![1]
+      const referenced = [...table.matchAll(/(\w+): "([a-z0-9-]+)"/g)].map((m) => ({ key: m[1], id: m[2] }))
       const allIds = new Set<string>()
       for (const s of guide.sections) {
         allIds.add(s.id)
         for (const h of JSON.parse(s.headings)) allIds.add(h.id)
       }
-      const referenced = files.flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/(?:SECTION|HELP_[A-Z_]+)\w*\s*[=:]\s*"([a-z0-9-]+)"/g)].map((m) => `${path.basename(path.dirname(f))}: ${m[1]}`))
-      expect(referenced.length).toBeGreaterThanOrEqual(6)
-      expect(referenced.filter((r) => !allIds.has(r.split(': ')[1]))).toEqual([])
+      expect(referenced.map((r) => r.key)).toEqual(
+        expect.arrayContaining(['brokers', 'variables', 'folders', 'testcases', 'run', 'runs', 'subscriber', 'messages'])
+      )
+      expect(referenced.filter((r) => !allIds.has(r.id))).toEqual([])
     })
   })
 
@@ -116,8 +105,8 @@ describe('help (user guide rendered from Markdown)', () => {
     it('follows changes of the file, and says so if there is none', async () => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aem-help-'))
       const file = path.join(dir, 'guide.md')
-      ;(cds.env as any).aemSuite = { help: { file } }
       try {
+        await withAemSuiteConfig({ help: { file } }, async () => {
         fs.writeFileSync(file, '# Guide\n\nHello\n\n## First\n\nOne\n')
         const first = await GET('/odata/v4/help/Sections?$orderby=number', tester)
         expect(first.data.value.map((s: { title: string }) => s.title)).toEqual(['Overview', 'First'])
@@ -132,8 +121,8 @@ describe('help (user guide rendered from Markdown)', () => {
         const gone = await GET('/odata/v4/help/Sections', tester)
         expect(gone.status).toBe(404)
         expect(gone.data.error.message).toMatch(/user guide is not available/)
+        })
       } finally {
-        delete (cds.env as any).aemSuite
         fs.rmSync(dir, { recursive: true, force: true })
       }
     })

@@ -1,5 +1,9 @@
 {
   "_version": "1.65.0",
+  "sap.cloud": {
+    "public": true,
+    "service": "aemsuite"
+  },
   "sap.app": {
     "id": "com.aem.suite.brokers",
     "type": "application",
@@ -17,7 +21,7 @@
     "description": "{{appDescription}}",
     "dataSources": {
       "mainService": {
-        "uri": "/odata/v4/admin/",
+        "uri": "odata/v4/admin/",
         "type": "OData",
         "settings": {
           "odataVersion": "4.0"
@@ -109,7 +113,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.brokers.ext.Help.open",
+                      "press": "com.aem.suite.brokers.shared.Help.open",
                       "text": "Help"
                     }
                   }
@@ -144,7 +148,7 @@
                 "header": {
                   "actions": {
                     "help": {
-                      "press": "com.aem.suite.brokers.ext.Help.open",
+                      "press": "com.aem.suite.brokers.shared.Help.open",
                       "text": "Help"
                     }
                   }

@@ -1,9 +1,8 @@
 import cds from '@sap/cds'
-import path from 'node:path'
-import { setPublisherFactory } from '../srv/lib/test-runner'
+import { fakeBroker, resetDatabase, startServer, users, withAemSuiteConfig } from './helpers'
 
-const { POST, GET, axios } = cds.test(path.join(__dirname, '..'))
-const tester = { auth: { username: 'tester', password: 'tester' } }
+const { POST, GET } = startServer()
+const { tester } = users
 const MCP_HEADERS = { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' }
 
 /** One MCP JSON-RPC request to the agent endpoint (the server answers as an event stream). */
@@ -43,39 +42,34 @@ async function query(cql: string): Promise<any[]> {
 }
 
 describe('AI agent service (MCP)', () => {
-  const published: { broker: string; topic: string }[] = []
-  const connectedAs: Record<string, string> = {}
-  let dest: { ID: string }
-  let direct: { ID: string }
+  const { published, connectedAs } = fakeBroker(2)
+  const dest = { ID: cds.utils.uuid() }
+  const direct = { ID: cds.utils.uuid() }
+  /** the fixture: folder "Orders" (variable domain) with the test cases "Order created" and "ping/a" */
   let folder: { ID: string }
-  let test: { ID: string }
+  let testCase: { ID: string }
 
   beforeAll(async () => {
-    for (const e of ['RunResults', 'TestRuns', 'TestCaseStats', 'TestCaseProperties', 'TestCaseVariables', 'TestCases', 'Variables', 'Brokers'])
-      await DELETE.from(`aem.suite.${e}`)
-    axios.defaults.validateStatus = () => true
-    setPublisherFactory(async (conn) => {
-      connectedAs[conn.brokerName] = conn.userName
-      return {
-        publish: async (spec) => {
-          published.push({ broker: conn.brokerName, topic: spec.topic })
-          if (spec.topic.includes('reject')) throw new Error('Rejected by broker: no subscribers')
-          return { latencyMs: 2 }
-        },
-        close: async () => undefined
-      }
-    })
+    await resetDatabase()
     process.env.destinations = JSON.stringify([{ name: 'aem-dest', url: 'https://dest.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }])
-    dest = { ID: cds.utils.uuid() }
-    direct = { ID: cds.utils.uuid() }
     await INSERT.into('aem.suite.Brokers').entries([
       { ID: dest.ID, name: 'dest', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: true },
       { ID: direct.ID, name: 'direct', credentialMode: 'DIRECT', url: 'wss://d:443', msgVpn: 'v', username: 'u', active: true }
     ])
+    folder = (await call('createFolder', { name: 'Orders', variables: [{ name: 'domain', value: 'orders' }] })).result
+    testCase = (
+      await call('createTestCase', {
+        name: 'Order created',
+        topic: '{{domain}}/created/{{uuid}}',
+        payload: '{"orderId":"{{uuid}}","qty":{{randomInt(1,5)}}}',
+        parentId: folder.ID,
+        variables: [{ name: 'region', value: 'eu' }]
+      })
+    ).result
+    await call('createTestCase', { topic: 'ping/a', parentId: folder.ID })
   })
 
   afterAll(() => {
-    setPublisherFactory()
     delete process.env.destinations
   })
 
@@ -97,8 +91,8 @@ describe('AI agent service (MCP)', () => {
         'TestAgentService-describe',
         'TestAgentService-query'
       ])
-      const describe = await rpc('tools/call', { name: 'TestAgentService-describe', arguments: {} })
-      const { entities, actions } = describe.body.result.structuredContent
+      const described = await rpc('tools/call', { name: 'TestAgentService-describe', arguments: {} })
+      const { entities, actions } = described.body.result.structuredContent
       expect(Object.keys(entities).sort()).toEqual(
         ['Brokers', 'RunResults', 'TestNodeLastResults', 'TestNodeProperties', 'TestNodeVariables', 'TestNodes', 'TestRuns'].sort()
       )
@@ -131,15 +125,14 @@ describe('AI agent service (MCP)', () => {
 
   describe('plan: create and change', () => {
     it('creates a folder with variables and a test case inside it', async () => {
-      const f = await call('createFolder', { name: 'Orders', variables: [{ name: 'domain', value: 'orders' }] })
-      expect(f).toMatchObject({ ok: true, result: { name: 'Orders', kind: 'FOLDER' } })
-      folder = f.result
+      const f = await call('createFolder', { name: 'Invoices', variables: [{ name: 'domain', value: 'invoices' }] })
+      expect(f).toMatchObject({ ok: true, result: { name: 'Invoices', kind: 'FOLDER' } })
 
       const t = await call('createTestCase', {
-        name: 'Order created',
+        name: 'Invoice created',
         topic: '{{domain}}/created/{{uuid}}',
-        payload: '{"orderId":"{{uuid}}","qty":{{randomInt(1,5)}}}',
-        parentId: folder.ID,
+        payload: '{"invoiceId":"{{uuid}}","qty":{{randomInt(1,5)}}}',
+        parentId: f.result.ID,
         userProperties: [
           { name: 'qty', value: '5' },
           { name: 'source', value: 'agent' }
@@ -147,13 +140,12 @@ describe('AI agent service (MCP)', () => {
         variables: [{ name: 'region', value: 'eu' }]
       })
       expect(t.ok).toBe(true)
-      test = t.result
 
-      const rows = await query(`SELECT name, kind, parent_ID, deliveryMode, correlationId, contentType, userProperties { name, type, value } from TestNodes where ID = '${test.ID}'`)
+      const rows = await query(`SELECT name, kind, parent_ID, deliveryMode, correlationId, contentType, userProperties { name, type, value } from TestNodes where ID = '${t.result.ID}'`)
       expect(rows[0]).toMatchObject({
-        name: 'Order created',
+        name: 'Invoice created',
         kind: 'TEST',
-        parent_ID: folder.ID,
+        parent_ID: f.result.ID,
         deliveryMode: 'PERSISTENT',
         correlationId: '{{uuid}}',
         contentType: 'application/json'
@@ -163,11 +155,13 @@ describe('AI agent service (MCP)', () => {
     })
 
     it('puts new nodes at the end and uses the topic as name', async () => {
-      const a = await call('createTestCase', { topic: 'ping/a', parentId: folder.ID })
-      const rows = await query(`SELECT name, sortOrder from TestNodes where parent_ID = '${folder.ID}' order by sortOrder`)
-      expect(rows.map((r) => r.name)).toEqual(['Order created', 'ping/a'])
-      expect(rows[1].sortOrder).toBeGreaterThan(rows[0].sortOrder)
+      const f = (await call('createFolder', { name: 'Sorted' })).result
+      await call('createTestCase', { name: 'first', topic: 'ping/first', parentId: f.ID })
+      const a = await call('createTestCase', { topic: 'ping/b', parentId: f.ID })
       expect(a.ok).toBe(true)
+      const rows = await query(`SELECT name, sortOrder from TestNodes where parent_ID = '${f.ID}' order by sortOrder`)
+      expect(rows.map((r) => r.name)).toEqual(['first', 'ping/b'])
+      expect(rows[1].sortOrder).toBeGreaterThan(rows[0].sortOrder)
     })
 
     it('applies the same validation as the UI and reports all problems at once', async () => {
@@ -186,7 +180,7 @@ describe('AI agent service (MCP)', () => {
       expect(bad.error).toMatch(/Duplicate user property "n"/)
 
       expect((await call('createTestCase', { topic: 'x', parentId: cds.utils.uuid() })).error).toMatch(/Parent folder not found/)
-      expect((await call('createTestCase', { topic: 'x', parentId: test.ID })).error).toMatch(/only be placed in folders/)
+      expect((await call('createTestCase', { topic: 'x', parentId: testCase.ID })).error).toMatch(/only be placed in folders/)
       expect(await call('createFolder', { name: '  ' })).toMatchObject({ ok: false, error: expect.stringMatching(/Folder name is required/) })
       expect((await call('createTestCase', { topic: ' ' })).error).toMatch(/Topic is required/)
       expect((await call('createTestCase', {})).error).toMatch(/Topic is required/)
@@ -196,40 +190,49 @@ describe('AI agent service (MCP)', () => {
     })
 
     it('changes only the given fields and replaces properties / variables when given', async () => {
-      const r = await call('updateTestCase', { id: test.ID, priority: 7, userProperties: [{ name: 'only', value: 'one' }] })
+      const own = (
+        await call('createTestCase', {
+          name: 'To change',
+          topic: 'change/{{uuid}}',
+          userProperties: [{ name: 'first', value: '1' }],
+          variables: [{ name: 'region', value: 'eu' }]
+        })
+      ).result
+      const r = await call('updateTestCase', { id: own.ID, priority: 7, userProperties: [{ name: 'only', value: 'one' }] })
       expect(r).toMatchObject({ ok: true })
-      const row = (await query(`SELECT name, topic, priority, userProperties { name }, variables { name, value } from TestNodes where ID = '${test.ID}'`))[0]
-      expect(row).toMatchObject({ name: 'Order created', topic: '{{domain}}/created/{{uuid}}', priority: 7 })
+      const row = (await query(`SELECT name, topic, priority, userProperties { name }, variables { name, value } from TestNodes where ID = '${own.ID}'`))[0]
+      expect(row).toMatchObject({ name: 'To change', topic: 'change/{{uuid}}', priority: 7 })
       expect(row.userProperties).toEqual([{ name: 'only' }])
       expect(row.variables).toEqual([{ name: 'region', value: 'eu' }]) // not given -> unchanged
 
-      const bad = await call('updateTestCase', { id: test.ID, payload: '{oops' })
+      const bad = await call('updateTestCase', { id: own.ID, payload: '{oops' })
       expect(bad.error).toMatch(/Payload is not valid JSON/)
       expect((await call('updateTestCase', { id: folder.ID, priority: 1 })).error).toMatch(/use updateFolder/)
-      expect((await call('updateFolder', { id: test.ID, name: 'x' })).error).toMatch(/use updateTestCase/)
+      expect((await call('updateFolder', { id: testCase.ID, name: 'x' })).error).toMatch(/use updateTestCase/)
       expect((await call('updateTestCase', { id: cds.utils.uuid(), priority: 1 })).error).toMatch(/not found/)
     })
 
     it('renames a folder and replaces its variables', async () => {
-      expect(await call('updateFolder', { id: folder.ID, name: 'Orders v2', variables: [{ name: 'domain', value: 'orders2' }] })).toMatchObject({ ok: true })
-      const row = (await query(`SELECT name, variables { name, value } from TestNodes where ID = '${folder.ID}'`))[0]
-      expect(row).toMatchObject({ name: 'Orders v2', variables: [{ name: 'domain', value: 'orders2' }] })
+      const own = (await call('createFolder', { name: 'Rename me', variables: [{ name: 'domain', value: 'old' }] })).result
+      expect(await call('updateFolder', { id: own.ID, name: 'Renamed', variables: [{ name: 'domain', value: 'new' }] })).toMatchObject({ ok: true })
+      const row = (await query(`SELECT name, variables { name, value } from TestNodes where ID = '${own.ID}'`))[0]
+      expect(row).toMatchObject({ name: 'Renamed', variables: [{ name: 'domain', value: 'new' }] })
     })
 
     it('moves nodes, but not into a test case or into themselves', async () => {
       const other = (await call('createFolder', { name: 'Other' })).result
-      expect(await call('moveNode', { id: test.ID, parentId: other.ID })).toMatchObject({ ok: true })
-      expect((await query(`SELECT parent_ID from TestNodes where ID = '${test.ID}'`))[0].parent_ID).toBe(other.ID)
-      expect((await call('moveNode', { id: test.ID, parentId: test.ID })).error).toMatch(/only be placed in folders/)
+      const own = (await call('createTestCase', { topic: 'move/me' })).result
+      expect(await call('moveNode', { id: own.ID, parentId: other.ID })).toMatchObject({ ok: true })
+      expect((await query(`SELECT parent_ID from TestNodes where ID = '${own.ID}'`))[0].parent_ID).toBe(other.ID)
+      expect((await call('moveNode', { id: own.ID, parentId: own.ID })).error).toMatch(/only be placed in folders/)
       expect((await call('moveNode', { id: other.ID, parentId: other.ID })).error).toMatch(/cannot be moved into itself/)
-      expect((await call('moveNode', { id: test.ID })).ok).toBe(true) // top level
-      expect((await query(`SELECT parent_ID from TestNodes where ID = '${test.ID}'`))[0].parent_ID).toBeNull()
-      await call('moveNode', { id: test.ID, parentId: folder.ID })
+      expect((await call('moveNode', { id: own.ID })).ok).toBe(true) // top level
+      expect((await query(`SELECT parent_ID from TestNodes where ID = '${own.ID}'`))[0].parent_ID).toBeNull()
     })
 
     it('copies a folder with everything below it', async () => {
       const copies = await call('copyNodes', { ids: [folder.ID] })
-      expect(copies).toMatchObject({ ok: true, result: [{ name: 'Orders v2 (Copy)', kind: 'FOLDER' }] })
+      expect(copies).toMatchObject({ ok: true, result: [{ name: 'Orders (Copy)', kind: 'FOLDER' }] })
       const below = await query(`SELECT name from TestNodes where parent_ID = '${copies.result[0].ID}'`)
       expect(below.map((r) => r.name).sort()).toEqual(['Order created', 'ping/a'])
     })
@@ -238,10 +241,10 @@ describe('AI agent service (MCP)', () => {
   describe('export and import', () => {
     it('exports a folder as the file the UI would download', async () => {
       const e = await call('exportNodes', { ids: [folder.ID] })
-      expect(e).toMatchObject({ ok: true, result: { folders: 1, testCases: 2, filename: 'orders-v2.json' } })
+      expect(e).toMatchObject({ ok: true, result: { folders: 1, testCases: 2, filename: 'orders.json' } })
       const file = JSON.parse(e.result.content)
       expect(file).toMatchObject({ format: 'aem-suite.test-cases', version: 1 })
-      expect(file.nodes[0]).toMatchObject({ kind: 'FOLDER', name: 'Orders v2', variables: [{ name: 'domain', value: 'orders2' }] })
+      expect(file.nodes[0]).toMatchObject({ kind: 'FOLDER', name: 'Orders', variables: [{ name: 'domain', value: 'orders' }] })
     })
 
     it('imports a whole generated suite in one call - checked first with a dry run', async () => {
@@ -289,9 +292,9 @@ describe('AI agent service (MCP)', () => {
 
   describe('check before sending', () => {
     it('previews the message with folder variables resolved', async () => {
-      const p = await call('previewTestCase', { testCaseId: test.ID, brokerId: dest.ID })
+      const p = await call('previewTestCase', { testCaseId: testCase.ID, brokerId: dest.ID })
       expect(p).toMatchObject({ ok: true, result: { valid: true } })
-      expect(p.result.topic).toMatch(/^orders2\/created\/[0-9a-f-]{36}$/)
+      expect(p.result.topic).toMatch(/^orders\/created\/[0-9a-f-]{36}$/)
       expect(JSON.parse(p.result.payload)).toMatchObject({ qty: expect.any(Number) })
     })
 
@@ -306,9 +309,10 @@ describe('AI agent service (MCP)', () => {
 
   describe('execute and check', () => {
     it('runs tests on a destination broker and summarizes the result', async () => {
-      const bad = (await call('createTestCase', { topic: 'reject/me', parentId: folder.ID, name: 'rejected' })).result
+      const bad = (await call('createTestCase', { topic: 'reject/me', name: 'rejected' })).result
       expect(bad.ID).toBeTruthy()
-      const run = await call('runTests', { testCaseIds: [folder.ID], brokerIds: [dest.ID] })
+      published.length = 0
+      const run = await call('runTests', { testCaseIds: [folder.ID, bad.ID], brokerIds: [dest.ID] })
       expect(run.ok).toBe(true)
       expect(run.result.total).toBe(3) // Order created, ping/a, rejected
 
@@ -328,15 +332,19 @@ describe('AI agent service (MCP)', () => {
     it('reports a running run as such when it does not wait', async () => {
       const id = cds.utils.uuid()
       await INSERT.into('aem.suite.TestRuns').entries({ ID: id, summary: 'x', status: 'RUNNING', totalCount: 1, createdBy: 'someone' })
-      const s = await call('getRunSummary', { runId: id })
-      expect(s.result).toMatchObject({ finished: false, outcome: 'RUNNING' })
-      await DELETE.from('aem.suite.TestRuns').where({ ID: id })
+      try {
+        const s = await call('getRunSummary', { runId: id })
+        expect(s.result).toMatchObject({ finished: false, outcome: 'RUNNING' })
+      } finally {
+        await DELETE.from('aem.suite.TestRuns').where({ ID: id })
+      }
       expect((await call('getRunSummary', { runId: cds.utils.uuid() })).error).toMatch(/Run not found/)
     })
 
     it('does not let an agent handle broker credentials', async () => {
+      delete connectedAs.direct
       const r = await call('runTests', {
-        testCaseIds: [test.ID],
+        testCaseIds: [testCase.ID],
         brokerIds: [direct.ID],
         credentials: [{ brokerId: direct.ID, password: 'secret' }]
       })
@@ -346,40 +354,35 @@ describe('AI agent service (MCP)', () => {
       expect(connectedAs.direct).toBeUndefined()
     })
 
-    it('can be configured (development) to accept credentials', async () => {
-      ;(cds.env as any).aemSuite = { agent: { allowDirectCredentials: true } }
-      try {
-        const missing = await call('runTests', { testCaseIds: [test.ID], brokerIds: [direct.ID] })
+    it('can be configured (development) to accept credentials', () =>
+      withAemSuiteConfig({ agent: { allowDirectCredentials: true } }, async () => {
+        const missing = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [direct.ID] })
         expect(missing.error).toMatch(/Password required for broker/)
         const run = await call('runTests', {
-          testCaseIds: [test.ID],
+          testCaseIds: [testCase.ID],
           brokerIds: [direct.ID],
           credentials: [{ brokerId: direct.ID, password: 'pw' }]
         })
         expect(run.ok).toBe(true)
         await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
         expect(connectedAs.direct).toBe('u')
-      } finally {
-        delete (cds.env as any).aemSuite
-      }
-    })
+      }))
 
-    it('limits the size of a run and the number of parallel runs', async () => {
-      ;(cds.env as any).aemSuite = { agent: { maxRunResults: 2, maxActiveRuns: 1 } }
-      try {
+    it('limits the size of a run and the number of parallel runs', () =>
+      withAemSuiteConfig({ agent: { maxRunResults: 1, maxActiveRuns: 1 } }, async () => {
         const big = await call('runTests', { testCaseIds: [folder.ID], brokerIds: [dest.ID] })
-        expect(big.error).toMatch(/at most 2 results .* would have 3/)
+        expect(big.error).toMatch(/at most 1 results .* would have 2/)
 
         const id = cds.utils.uuid()
         await INSERT.into('aem.suite.TestRuns').entries({ ID: id, summary: 'x', status: 'RUNNING', totalCount: 1, createdBy: 'tester' })
-        const busy = await call('runTests', { testCaseIds: [test.ID], brokerIds: [dest.ID] })
-        expect(busy.error).toMatch(/already have 1 runs in progress/)
-        await DELETE.from('aem.suite.TestRuns').where({ ID: id })
+        try {
+          const busy = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [dest.ID] })
+          expect(busy.error).toMatch(/already have 1 runs in progress/)
+        } finally {
+          await DELETE.from('aem.suite.TestRuns').where({ ID: id })
+        }
 
         expect((await call('runTests', { testCaseIds: [cds.utils.uuid()], brokerIds: [dest.ID] })).error).toMatch(/not found/)
-      } finally {
-        delete (cds.env as any).aemSuite
-      }
-    })
+      }))
   })
 })

@@ -24,8 +24,9 @@ sap.ui.define(
   ];
   var helpPopover;
 
-  function getHelpPopover() {
-    if (helpPopover) {
+  /** One popover per view: it is a dependent of the view and is destroyed with it (e.g. when the app is closed in the launchpad). */
+  function getHelpPopover(source) {
+    if (helpPopover && !helpPopover.isDestroyed()) {
       return helpPopover;
     }
     var list = new List({
@@ -56,6 +57,13 @@ sap.ui.define(
         list
       ]
     });
+    var view = source;
+    while (view && !view.isA("sap.ui.core.mvc.View")) {
+      view = view.getParent();
+    }
+    if (view) {
+      view.addDependent(helpPopover);
+    }
     return helpPopover;
   }
 
@@ -65,10 +73,14 @@ sap.ui.define(
     while (vbox && !vbox.isA("sap.m.VBox")) {
       vbox = vbox.getParent();
     }
-    var toolbar = vbox.getItems()[0];
+    var find = function (type) {
+      return vbox.findAggregatedObjects(true, function (c) {
+        return c.isA(type);
+      })[0];
+    };
     return {
-      editor: vbox.getItems()[1],
-      status: toolbar.getContent()[0]
+      editor: find("sap.ui.codeeditor.CodeEditor"),
+      status: find("sap.m.ObjectStatus")
     };
   }
 
@@ -98,7 +110,7 @@ sap.ui.define(
     },
 
     onHelp: function (event) {
-      getHelpPopover().openBy(event.getSource());
+      getHelpPopover(event.getSource()).openBy(event.getSource());
     },
 
     onFormat: function (event) {

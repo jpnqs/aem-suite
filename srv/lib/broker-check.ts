@@ -1,4 +1,5 @@
 import { loadBroker, resolveConnection } from './credentials/resolve'
+import { errMsg, truncate } from './errors'
 import { connect } from './solace/connector'
 
 export interface ConnectionCheck {
@@ -32,12 +33,12 @@ export async function checkConnection(
     ok = true
     message = `Connected to ${conn.url} (VPN ${conn.vpnName}) as ${conn.userName}`
   } catch (e) {
-    message = (e as Error).message
+    message = errMsg(e)
   }
   const status = {
     lastConnectionStatus: ok ? ('OK' as const) : ('ERROR' as const),
     lastConnectionAt: new Date().toISOString(),
-    lastConnectionMessage: message.slice(0, 1000)
+    lastConnectionMessage: truncate(message, 1000)
   }
   await UPDATE('aem.suite.Brokers', brokerId).with(status)
   return { ok, message, latencyMs: Date.now() - started, ...status }

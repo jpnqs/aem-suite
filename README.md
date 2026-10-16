@@ -19,7 +19,7 @@ CAP (Node.js, TypeScript) app on SAP BTP for testing **SAP Integration Suite, Ad
 
 ```
 Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe}  OData V4
-                                           ├─ /mcp/agent                        MCP for AI assistants (JWT checked by the backend)
+                                           ├─ /mcp/agent                        MCP for AI assistants (OAuth login via XSUAA)
                                            └─ /ws/live                          WebSocket (run progress, live messages)
 CAP srv (TypeScript)
   srv/lib/solace/session.ts            solclientjs session wrapper: connect, publish + ACK, subscribe, queue flows
@@ -38,8 +38,9 @@ HANA Cloud · Destination service · XSUAA
 | `messages` | Fiori elements, saved messages | Tester |
 | `brokers`, `variables` | Fiori elements | Admin |
 | `help` | Freestyle UI5 | Everyone: the user guide, rendered from `docs/user-guide.md` |
+| `home` | Freestyle UI5 | Everyone: start page with figures, the apps of your roles and the latest runs |
 
-`app/launchpad.html` is a sandbox launchpad that shows all apps as tiles. The approuter uses it as its welcome page.
+`app/launchpad` is a sandbox launchpad that shows all apps as tiles; the standalone approuter uses it as its welcome page. All apps are deployed to the **HTML5 Application Repository** (`comaemsuite<app>`, e.g. `comaemsuitebrokers`), so they are listed under *HTML5 Applications* in the BTP cockpit and can be added to **SAP Build Work Zone** – see [Build and deployment](docs/technical-documentation.md#12-build-and-deployment-cloud-foundry).
 
 ## Defaults and automatic settings
 
@@ -87,19 +88,21 @@ npm install
 npm run watch          # cds watch with TypeScript, SQLite in memory
 ```
 
-Open http://localhost:4004/launchpad.html and log in as `admin`/`admin` (Admin + Tester) or `tester`/`tester`.
+Open http://localhost:4004/launchpad.html (redirects to `/comaemsuitelaunchpad/index.html`) and log in as `admin`/`admin` (Admin + Tester) or `tester`/`tester`.
 
 **Local demo setup** (`test/data/`, loaded by `cds watch` only, never deployed):
 
-- Broker `local-docker`: `tcp://localhost:55555`, VPN `default`, user `default`. Enter any password when running (the default VPN of the Docker broker doesn't check it). Start a local broker with:
-  ```sh
-  docker run -d --name solace-broker --shm-size=1g -p 8080:8080 -p 55555:55555 -p 8008:8008 \
-    -e username_admin_globalaccesslevel=admin -e username_admin_password=admin solace/solace-pubsub-standard
-  ```
-- Broker `local-docker (ask for user)`: the same Docker broker without a username, to try the username prompt (enter user `default`).
+- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md) (`docker compose up -d`, then `local/terragrunt/tg.ps1 apply`).
+- Brokers `local-docker (publisher)` (user `aem-publisher`/`publisher`, may only publish below `aem/`) and `local-docker (subscriber)` (user `aem-subscriber`/`subscriber`, may not publish) – the same broker, to compare ACLs.
+- Broker `local-docker (ask for user)`: the same broker without a username, to try the username prompt.
 - Broker `aem-dev (destination)`: an inactive example for DESTINATION mode.
-- Global variables `app`, `region` and `source`, plus a broker override `region=local`.
-- Test cases "Order created" (persistent, user properties, local variable), "Ping" (direct) and "Inventory updated" (persistent, TTL, random values).
+- Global variables `app` (`aem`, so all topics fall under the `aem/>` ACLs), `region` and `source`, plus broker overrides `region=local`.
+- Test cases, one folder per target:
+  - **Orders** → queue `q.aem.orders`: "Order created" (user properties, local variable), "Order cancelled" (priority, DMQ eligible).
+  - **Events** → queue `q.aem.events`: "Inventory updated" (TTL, random values), "Shipment dispatched".
+  - **Notifications** → `q.aem.events` via `aem/notifications/*`: "Email notification" is queued, while "Notification too deep" passes but is not queued (`*` matches one level only).
+  - **ACL checks**: "Publish below `aem/`" and "Publish outside `aem/`" – run them against all `local-docker` brokers; the descriptions list the expected PASSED/FAILED per broker.
+  - "Ping" (direct, not queued).
 
 The data lives in memory and is reset on every restart. `cds watch` does not restart when `test/data` changes, so restart it manually.
 
@@ -113,8 +116,13 @@ You can also bind a real destination service with `cds bind`.
 
 ```sh
 npm test               # jest: unit + service integration tests (broker connection stubbed)
-npm run typecheck      # backend + subscriber app
+npm run e2e            # Playwright: the UI apps in a browser (starts its own dev server on port 4005)
+npm run e2e:ui         # interactive Playwright runner
+npm run e2e:headed     # watch the browser while the tests run
+npm run typecheck      # backend + subscriber app + e2e tests
 ```
+
+On Windows the e2e tests use the installed Edge. Elsewhere install Chromium once (`npx playwright install chromium`); `PW_CHANNEL=chrome` / `msedge` picks another installed browser. A failed test leaves a trace: `npm run e2e:trace -- test-results/<test>/trace.zip`.
 
 ## BTP destination layout
 
@@ -138,7 +146,9 @@ cf deploy mta_archives/aem-suite_1.0.0.mtar
 
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.
 
-The MTA build runs `cds build --production` (which compiles the TypeScript), `node scripts/build-docs.js` (copies the user guide next to the server for the Help app) and `node scripts/build-ui.js`. That script runs `ui5 build` for every app and copies the results into `app/router/resources`, where the standalone approuter serves them.
+The MTA build runs `cds build --production` (which compiles the TypeScript), `node scripts/build-docs.js` (copies the user guide next to the server for the Help app). Every UI app is an `html5` module: `ui5 build` writes a zip (`ui5-task-zipper`), and `aem-suite-app-deployer` uploads all zips to the HTML5 Application Repository. `node scripts/build-ui.js` runs the same builds locally.
+
+**SAP Build Work Zone**: the apps carry `sap.cloud.service: aemsuite` and the MTA creates the matching instance-level destinations, so after deployment they appear in Work Zone (*Channel Manager* → *HTML5 Apps* → refresh, then add them in the *Content Manager* to a group, a role and a site). Details in the [technical documentation](docs/technical-documentation.md#12-build-and-deployment-cloud-foundry).
 
 ### Operational notes
 
