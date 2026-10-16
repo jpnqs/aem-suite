@@ -11,7 +11,7 @@ service TestService {
   entity TestCases as
     projection on db.TestCases {
       *,
-      case kind when 'FOLDER' then 'Folder' else 'Test Case' end as kindText : String(20),
+      case when kind = 'FOLDER' then 'Folder' else 'Test Case' end as kindText : String(20),
       // computed by CAP for hierarchy requests of the tree table
       null as LimitedDescendantCount : Int16,
       null as DistanceFromRoot       : Int16,

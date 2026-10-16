@@ -156,8 +156,6 @@ modules:
               Authentication: OAuth2UserTokenExchange
               ServiceInstanceName: aem-suite-auth
               ServiceKeyName: aem-suite-auth-key
-              Type: HTTP
-              ProxyType: Internet
               HTML5.Timeout: 120000
 
   - name: aem-suite-launchpad
