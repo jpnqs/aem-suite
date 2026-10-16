@@ -220,11 +220,29 @@ The **Run dialog**:
 
 1. **Select brokers** – the brokers of your last run are preselected. Each selected test case is sent once to each selected broker.
 2. **Credentials** – for every selected *direct* broker a password field appears ("used for this run only, not stored"). If the broker has no username maintained, a **username** field appears next to it. Destination brokers need nothing.
-3. **Run** – progress is shown live (e.g. `3 / 6`, passed / failed).
-4. When finished: green **Finished** if all passed, red otherwise, with a **Problems** list (test case @ broker + reason).
-5. **Open Results** jumps to the run in *Test Runs*.
+3. **Advanced settings** (optional, click to open) – see below.
+4. **Run** – progress is shown live (e.g. `3 / 6`, passed / failed).
+5. When finished: green **Finished** if all passed, red otherwise, with a **Problems** list (test case @ broker + reason).
+6. **Open Results** jumps to the run in *Test Runs*.
 
-You can close the dialog at any time – the run continues on the server.
+You can close the dialog at any time – the run continues on the server. **Stop run** (while it runs) ends it early.
+
+### Advanced settings
+
+For repeating a message, simulating traffic or watching a flow over time:
+
+| Setting | Meaning |
+|---|---|
+| **Repetitions** | How often **every** test case is sent to **every** broker (1 – 1000, default 1). Variables, `{{uuid}}`, number ranges and faker values are resolved anew for every message, so each one is different. |
+| **Pause between messages** | Wait (0 – 60 000 ms) between two messages to the same broker – not before the first one. Brokers run in parallel, so the pause does not add up across brokers. |
+| **Order** (with more than one repetition) | **Whole selection**: a, b, c, a, b, c … (like mixed traffic). **Each test case**: a, a, a, b, b, b … |
+| **Stop at the first failure** | After a message failed, the rest of **that broker** is not sent (status **SKIPPED**). Other brokers go on. |
+
+The dialog shows what you are about to start, for example *"30 or more messages … the pauses alone take about 2 min"* (a folder sends everything below it). Your settings are remembered for the next run.
+
+**Stop run** ends a run early (the user who started it, or an administrator): messages not sent yet get the status **SKIPPED**. A message that is already on its way is finished.
+
+A run is limited (`cds.aemSuite.runs`): at most 1000 repetitions and 5000 messages (test cases × brokers × repetitions) per run.
 
 ### What do the results mean?
 
@@ -233,6 +251,7 @@ You can close the dialog at any time – the run continues on the server.
 | **PASSED** | Persistent: the broker acknowledged the message. Direct: the message was sent. |
 | **FAILED** | The broker rejected the message, or no acknowledgement arrived in time. |
 | **ERROR** | The message could not be sent at all – e.g. unknown variable, invalid JSON, wrong password, broker not reachable. |
+| **SKIPPED** | Not sent: the run was stopped, or an earlier message to this broker failed and *Stop at the first failure* was on. Skipped messages are not counted as failed. |
 
 PASSED means the broker accepted the message. It does not check whether a consumer received or processed it – use the Live Subscriber or saved messages for that.
 
@@ -242,6 +261,7 @@ PASSED means the broker accepted the message. It does not check whether a consum
 
 **Test Runs** lists one row per test case × broker, newest run first:
 
+- With repetitions, each row has its **Repetition** number (1 = the first message of that test case); rows are in the order they were sent.
 - **Test Case** and **Broker** are separate columns and separate filters. Click a name to open that test case or broker configuration (the *Brokers* app needs the Admin role).
 - **Status**: PASSED / FAILED / ERROR, with **ACK latency**, delivery mode, the resolved topic and the error message
 - **Run Started** (click to open the whole run with its totals) and **Started By**

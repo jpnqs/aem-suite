@@ -78,7 +78,14 @@ test('run dialog', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: /^Run Ping/ })
   await expect(dialog).toBeVisible()
   await dialog.getByText('local-docker', { exact: true }).click()
-  await page.waitForTimeout(500)
+  // the advanced settings open, with a repeated run
+  await dialog.getByText('Advanced settings').click()
+  const [repetitions, pause] = await dialog.getByRole('spinbutton').all()
+  await repetitions.fill('10')
+  await repetitions.press('Tab')
+  await pause.fill('500')
+  await pause.press('Tab')
+  await page.waitForTimeout(800)
   await page.screenshot({ path: out('run-dialog') })
 })
 

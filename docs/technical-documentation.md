@@ -341,6 +341,9 @@ Loads test cases with properties and variables, builds the variable scopes (`loa
 
 `createRun` → validation (brokers exist and are active, passwords for DIRECT brokers, at least one test case after folder expansion), `summary`, pending rows. `executeRunInBackground` → see section 3. `waitForRun(runId)` exists for tests.
 
+
+**Advanced settings** (`RunOptions` of `runTests` / `runTest`, saved on the `TestRuns` row): `repetitions` (1 - `runs.maxRepetitions`), `delayMs` (0 - `runs.maxDelayMs`), `order` (`ROUND`: the selection N times; `EACH`: every test case N times in a row) and `stopOnFailure`. `createRun` checks them (`normalizeOptions`) and the total (test cases x brokers x repetitions <= `runs.maxResults`), and creates one PENDING `RunResults` row per message with `iteration` and `sequence` (the order within a broker). `runBroker` sends a broker's rows in `sequence` order, waits `delayMs` between two messages (`pause`, interrupted when the run is stopped) and - after a failed message with `stopOnFailure`, or when the run was stopped - marks the rest `SKIPPED` (`RunProgress.skip`: counted as done, in `TestRuns.skippedCount`, not as failed; skipped results do not touch `TestCaseStats`). `cancelRun` (service action `cancelRun(runId)`) puts the run into an in-memory set that the loops check, so it only works on the instance that executes the run; allowed for the user who started the run and for administrators.
+
 ### 7.7 `tree.ts`
 
 In-memory tree over `TestCases` (`ID`, `parent_ID`, `kind`, `name`, `sortOrder`): `ancestors`, `isWithin` (cycle check), `expandToTests` (folders → test cases in tree order), `compareSiblings` (folders first, then `sortOrder`, then name).
@@ -432,6 +435,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `cds.aemSuite.agent.allowDirectCredentials` | false | development only: let `runTests` accept passwords of direct brokers (they would pass through the AI conversation) |
 | `cds.aemSuite.mcp.publicUrl` | – | public app URL for the MCP OAuth discovery; default: from the approuter's forwarded headers |
 | `cds.aemSuite.mcp.authorizationServer` | XSUAA `credentials.url` | authorization server advertised to MCP clients |
+| `cds.aemSuite.runs.maxRepetitions` / `maxDelayMs` / `maxResults` | 1000 / 60000 / 5000 | limits of the advanced run settings: repetitions, pause between messages (ms), messages per run |
 | `cds.aemSuite.faker.locale` | `en` | Language of `{{faker...}}` test data (`de`, `fr`, `es`, `en_GB`, ...). |
 | `cds.mcp.prefix` / `cds.mcp.autowire` | true / false | MCP plugin: prefix tool names with the service name; do not register the endpoint in local AI clients automatically |
 | env `destinations` | – | local destinations (JSON array, SAP Cloud SDK format + `msgVpn`/`smfUrl`) |

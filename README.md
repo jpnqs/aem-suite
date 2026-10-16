@@ -42,6 +42,8 @@ Pick one or more brokers and run. Progress arrives live, and the results are kep
 
 ![Run dialog](docs/images/run-dialog.png)
 
+The **advanced settings** of the Run dialog repeat messages (up to 1000 times), pause between them, send the whole selection or each test case in a row, stop at the first failure, and **Stop run** ends a long run early.
+
 ### Variables on every level
 
 `{{name}}` is resolved from the test case, then the broker, then the folders (inner first), then the global variables, then the built-ins. Folder variables are maintained right on the folder page.
