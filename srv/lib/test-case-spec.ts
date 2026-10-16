@@ -1,6 +1,7 @@
 import type { BrokerRecord } from './credentials/resolve'
 import type { PublishSpec, DeliveryMode } from './solace/session'
-import { TemplateResolver, TemplateScope, jsonError, TemplateError } from './template/resolve'
+import { TemplateResolver, TemplateScope, jsonError, TemplateError, numberSlots } from './template/resolve'
+import { allocateNumbers } from './number-ranges'
 import { DEFAULT_ACK_TIMEOUT_MS, detectContentType } from './defaults'
 import { NodeRow, selectNodesDeep } from './nodes'
 import { inferPropertyType, PropertyType } from './property-types'
@@ -96,6 +97,17 @@ export function scopeFor(
     testCase: Object.fromEntries((tc.variables ?? []).map((v) => [v.name, v.value ?? ''])),
     brokerInfo: broker ? { id: broker.ID, name: broker.name, msgVpn: broker.msgVpn ?? '' } : undefined
   }
+}
+
+/**
+ * The scope plus the numbers of the number ranges this test case uses ({{numberRange.X}}). 'consume' issues them
+ * (a run), 'peek' only shows what the next ones would be (Preview). Throws TemplateError for an unknown or
+ * exhausted range.
+ */
+export async function withNumbers(tc: TestCaseRecord, scope: TemplateScope, mode: 'consume' | 'peek'): Promise<TemplateScope> {
+  const templates = [tc.topic, tc.payload, tc.correlationId, ...(tc.userProperties ?? []).map((p) => p.value)]
+  const slots = numberSlots(templates, scope)
+  return slots.length ? { ...scope, numbers: await allocateNumbers(slots, mode) } : scope
 }
 
 /**

@@ -6,6 +6,7 @@ import { listDestinations } from './lib/credentials/destinations'
 import { currentJwt, needsPassword } from './lib/credentials/resolve'
 import { VAR_NAME, VAR_NAME_RULE } from './lib/node-validation'
 import { keyOf } from './lib/request'
+import { currentForNext, formatNumber, MAX_LENGTH, nextExample, RANGE_NAME } from './lib/number-ranges'
 
 /** Connection check on save is capped so saving never blocks long. */
 const AUTO_CHECK_TIMEOUT_MS = 5000
@@ -24,7 +25,41 @@ interface BrokerData {
 
 export default class AdminService extends cds.ApplicationService {
   async init() {
-    const { Brokers, GlobalVariables, Destinations } = this.entities
+    const { Brokers, GlobalVariables, Destinations, NumberRanges } = this.entities
+
+    // ---------------------------------------------------------------- number ranges
+    this.before(['CREATE', 'UPDATE'], NumberRanges, validateNumberRange)
+
+    // the formatted numbers need these columns, also when the client asks for the numbers only (side effects)
+    this.before('READ', [NumberRanges, NumberRanges.drafts!], (req) => {
+      const columns = (req.query as { SELECT?: { columns?: { ref?: string[] }[] } }).SELECT?.columns
+      const asked = columns?.map((c) => c.ref?.[0])
+      if (!columns || !asked?.some((n) => n === 'nextNumber' || n === 'lastNumber')) return
+      for (const n of ['name', 'prefix', 'suffix', 'length', 'start', 'step', 'current']) if (!asked.includes(n)) columns.push({ ref: [n] })
+    })
+
+    // last and next number as the range formats them (also while editing)
+    this.after('READ', [NumberRanges, NumberRanges.drafts!], (rows) => {
+      for (const r of (Array.isArray(rows) ? rows : [rows]) as NumberRangeRow[]) {
+        if (!r || r.name === undefined) continue
+        // nothing issued yet (also after setting the next number to the start of the range)
+        const issued = r.current !== null && r.current !== undefined && BigInt(r.current) >= BigInt(r.start ?? 1)
+        r.lastNumber = issued ? formatNumber(r, BigInt(r.current!)) : ''
+        r.nextNumber = nextExample(r)
+      }
+    })
+
+    this.on('reset', NumberRanges, async (req) => {
+      const { ID } = keyOf(req) as { ID: string }
+      const { nextNumber } = req.data as { nextNumber?: number | string | null }
+      const range = (await SELECT.one.from('aem.suite.NumberRanges').where({ ID })) as NumberRangeRow | undefined
+      if (!range) return req.reject(404, 'Number range not found')
+      if (nextNumber !== undefined && nextNumber !== null && BigInt(nextNumber) < 0n) return req.reject(400, 'The next number must not be negative')
+      // empty: back to the start of the range
+      const current = nextNumber === undefined || nextNumber === null ? null : currentForNext(range, nextNumber)
+      await UPDATE('aem.suite.NumberRanges').set({ current }).where({ ID })
+      req.info(200, 'Number range reset')
+    })
 
     // complete URLs while editing, so the user sees the result right away
     this.before(['NEW', 'UPDATE'], Brokers.drafts!, (req) => {
@@ -118,4 +153,42 @@ export default class AdminService extends cds.ApplicationService {
 
     return super.init()
   }
+}
+
+interface NumberRangeRow {
+  ID?: string
+  name?: string
+  prefix?: string | null
+  suffix?: string | null
+  length?: number | null
+  start?: number | string | null
+  step?: number | null
+  maximum?: number | string | null
+  current?: number | string | null
+  lastNumber?: string
+  nextNumber?: string
+  lastUsedAt?: string | null
+}
+
+/** Name (unique, as used in the template), sizes and limits of a number range. */
+async function validateNumberRange(req: cds.Request): Promise<void> {
+  const d = req.data as NumberRangeRow
+  // the counter is moved by runs only (and by "Reset"): a draft that was open meanwhile must not set it back
+  if (req.event === 'UPDATE') {
+    delete d.current
+    delete d.lastUsedAt
+  }
+  if (req.event === 'CREATE' || d.name !== undefined) {
+    const name = (d.name ?? '').trim()
+    if (!RANGE_NAME.test(name)) return req.reject(400, 'The name must start with a letter and may contain letters, digits, _ and - (it is used as {{numberRange.<name>}})', 'in/name')
+    d.name = name
+    const same = (await SELECT.from('aem.suite.NumberRanges').columns('ID', 'name')) as { ID: string; name: string }[]
+    if (same.some((r) => r.name.toLowerCase() === name.toLowerCase() && r.ID !== d.ID)) return req.reject(400, `A number range named "${name}" exists already`, 'in/name')
+  }
+  if (d.length != null && (d.length < 0 || d.length > MAX_LENGTH)) return req.reject(400, `The length must be between 0 and ${MAX_LENGTH} digits (0 = no leading zeros)`, 'in/length')
+  if (d.step != null && d.step < 1) return req.reject(400, 'The step must be at least 1', 'in/step')
+  if (d.start != null && BigInt(d.start) < 0n) return req.reject(400, 'The start must not be negative', 'in/start')
+  if (d.maximum != null && d.start != null && BigInt(d.maximum) < BigInt(d.start)) return req.reject(400, 'The maximum must not be below the start', 'in/maximum')
+  if (d.prefix && d.prefix.includes('{{')) return req.reject(400, 'Prefix and suffix are plain text, no variables', 'in/prefix')
+  if (d.suffix && d.suffix.includes('{{')) return req.reject(400, 'Prefix and suffix are plain text, no variables', 'in/suffix')
 }

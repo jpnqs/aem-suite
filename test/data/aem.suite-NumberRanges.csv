@@ -1,0 +1,4 @@
+ID;name;description;prefix;suffix;length;start;step;maximum
+d1000000-0000-4000-8000-000000000001;ORDERS;Sales order numbers like SO-4500000001;SO-;;10;4500000001;1;
+d1000000-0000-4000-8000-000000000002;DELIVERIES;Delivery numbers like 0080000001;;;10;80000001;1;
+d1000000-0000-4000-8000-000000000003;INVOICES;Invoice numbers with a year suffix, 99999 numbers;INV-;/26;5;1;1;99999

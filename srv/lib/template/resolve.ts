@@ -13,6 +13,11 @@ import { randomInt, randomUUID } from 'node:crypto'
  *
  *   uuid, newUuid, now (ISO), timestamp (epoch ms), date (YYYY-MM-DD),
  *   randomInt(min,max), broker.id, broker.name, broker.msgVpn
+ *
+ * Number ranges: {{numberRange.NAME}} is the next number of the range, the same everywhere in one message.
+ * {{numberRange.NAME as orderNo}} takes a number of its own and keeps it in the temporary variable {{orderNo}}
+ * (usable anywhere in the message, also before the definition); two aliases of the same range get two numbers.
+ * The numbers are handed out beforehand (see number-ranges.ts), the resolver only inserts them.
  */
 export interface TemplateScope {
   testCase?: Record<string, string>
@@ -21,7 +26,17 @@ export interface TemplateScope {
   broker?: Record<string, string>
   global?: Record<string, string>
   brokerInfo?: { id?: string; name?: string; msgVpn?: string }
+  /** numbers handed out for this message: "numberRange.NAME" and "as:<alias>" -> formatted number */
+  numbers?: Record<string, string>
 }
+
+/** A number this message needs: key as in TemplateScope.numbers, range = name of the number range. */
+export interface NumberSlot {
+  key: string
+  range: string
+}
+
+const RANGE_PREFIX = 'numberRange.'
 
 export class TemplateError extends Error {
   constructor(
@@ -32,16 +47,18 @@ export class TemplateError extends Error {
   }
 }
 
-const EXPR = /\{\{\s*([A-Za-z_][\w.-]*)\s*(?:\(([^)]*)\))?\s*\}\}/g
+const EXPR = /\{\{\s*([A-Za-z_][\w.-]*)\s*(?:\(([^)]*)\))?(?:\s+as\s+([A-Za-z_]\w*))?\s*\}\}/g
 const MAX_DEPTH = 5
 
 export class TemplateResolver {
   private readonly fixed: Record<string, string>
   private readonly vars: Record<string, string>
+  private readonly numbers: Record<string, string>
 
   constructor(scope: TemplateScope = {}, now = new Date()) {
     // precedence: global < folders (outer -> inner) < broker < test case
     this.vars = Object.assign({}, scope.global, ...(scope.folders ?? []), scope.broker, scope.testCase)
+    this.numbers = scope.numbers ?? {}
     this.fixed = {
       uuid: randomUUID(),
       now: now.toISOString(),
@@ -74,14 +91,17 @@ export class TemplateResolver {
   }
 
   private resolveInner(template: string, missing: Set<string>, depth: number): string {
-    return template.replace(EXPR, (match, name: string, args: string | undefined) => {
-      const value = this.lookup(name, args, missing, depth)
+    return template.replace(EXPR, (match, name: string, args: string | undefined, alias: string | undefined) => {
+      const value = alias ? this.numberValue(`as:${alias}`, `${name} as ${alias}`, name, missing) : this.lookup(name, args, missing, depth)
       return value ?? match
     })
   }
 
   private lookup(name: string, args: string | undefined, missing: Set<string>, depth: number): string | undefined {
     if (args !== undefined) return this.callFunction(name, args, missing)
+    if (name.startsWith(RANGE_PREFIX)) return this.numberValue(name, name, name, missing)
+    // a temporary variable ({{numberRange.X as alias}}) wins over a variable of the same name
+    if (`as:${name}` in this.numbers) return this.numbers[`as:${name}`]
 
     if (Object.prototype.hasOwnProperty.call(this.vars, name)) {
       const raw = this.vars[name] ?? ''
@@ -93,6 +113,14 @@ export class TemplateResolver {
     if (name in this.fixed) return this.fixed[name]
     missing.add(name)
     return undefined
+  }
+
+  private numberValue(key: string, shown: string, name: string, missing: Set<string>): string | undefined {
+    if (!name.startsWith(RANGE_PREFIX) || name.length === RANGE_PREFIX.length || !(key in this.numbers)) {
+      missing.add(shown)
+      return undefined
+    }
+    return this.numbers[key]
   }
 
   private callFunction(name: string, args: string, missing: Set<string>): string | undefined {
@@ -114,6 +142,7 @@ export class TemplateResolver {
 
 function isBuiltin(name: string, isCall: boolean): boolean {
   if (isCall) return name === 'randomInt'
+  if (name.startsWith(RANGE_PREFIX)) return true
   return ['uuid', 'newUuid', 'now', 'timestamp', 'date', 'broker.id', 'broker.name', 'broker.msgVpn'].includes(name)
 }
 
@@ -127,4 +156,36 @@ export function jsonError(payload: string, contentType?: string | null): string 
   } catch (e) {
     return `Payload is not valid JSON after resolving variables: ${(e as Error).message}`
   }
+}
+
+/**
+ * The numbers a message needs from number ranges: in the templates and in the variables they use (a variable
+ * may contain {{numberRange.X}} itself). Each plain range name and each "as alias" is one slot.
+ */
+export function numberSlots(templates: (string | null | undefined)[], scope: TemplateScope = {}): NumberSlot[] {
+  const vars: Record<string, string> = Object.assign({}, scope.global, ...(scope.folders ?? []), scope.broker, scope.testCase)
+  const slots = new Map<string, NumberSlot>()
+  const aliases = new Set<string>()
+  const direct = templates.filter((t): t is string => !!t)
+  // aliases first: a variable of the same name is hidden by the alias and not followed
+  for (const text of direct)
+    for (const m of text.matchAll(EXPR)) if (m[3] && m[1].startsWith(RANGE_PREFIX)) aliases.add(m[3])
+
+  const seen = new Set<string>()
+  const scan = (text: string, depth: number): void => {
+    for (const m of text.matchAll(EXPR)) {
+      const [, name, args, alias] = m
+      if (name.startsWith(RANGE_PREFIX)) {
+        const range = name.slice(RANGE_PREFIX.length)
+        if (!range) continue
+        const key = alias ? `as:${alias}` : name
+        slots.set(key, { key, range })
+      } else if (args === undefined && depth < MAX_DEPTH && !aliases.has(name) && !seen.has(name) && Object.prototype.hasOwnProperty.call(vars, name)) {
+        seen.add(name)
+        scan(vars[name] ?? '', depth + 1)
+      }
+    }
+  }
+  for (const text of direct) scan(text, 0)
+  return [...slots.values()]
 }

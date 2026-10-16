@@ -1,5 +1,5 @@
 import { loadBroker } from './credentials/resolve'
-import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord } from './test-case-spec'
+import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord, withNumbers } from './test-case-spec'
 
 export interface Preview {
   valid: boolean
@@ -18,7 +18,8 @@ export async function buildPreview(tc: TestCaseRecord, brokerId?: string | null)
   try {
     const broker = brokerId ? await loadBroker(brokerId) : undefined
     const vars = await loadVariableScopes(broker ? [broker.ID] : [])
-    const spec = buildSpec(tc, scopeFor(tc, broker, vars))
+    // peek: the preview shows the next numbers of number ranges without using them up
+    const spec = buildSpec(tc, await withNumbers(tc, scopeFor(tc, broker, vars), 'peek'))
     return {
       topic: spec.topic,
       payload: prettyJson(spec.payload),

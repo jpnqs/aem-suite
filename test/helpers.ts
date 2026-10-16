@@ -73,6 +73,7 @@ const TABLES = [
   'Variables',
   'ReceivedMessages',
   'SubscriberPresets',
+  'NumberRanges',
   'Brokers'
 ]
 

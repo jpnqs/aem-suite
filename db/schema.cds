@@ -230,3 +230,25 @@ entity SubscriberPresets : cuid, managed {
   /** only if the user wants it remembered; DIRECT brokers without a maintained username */
   username   : String(100);
 }
+
+/**
+ * Number ranges: issue real-looking identifiers (like SAP number ranges). Used in templates as
+ * {{numberRange.<name>}}; every message that uses a range gets the next number. `current` is the last number issued.
+ */
+entity NumberRanges : cuid, managed {
+  /** used in the template: {{numberRange.<name>}} */
+  name        : String(50) @mandatory;
+  description : String(200);
+  prefix      : String(20);
+  suffix      : String(20);
+  /** digits of the number, filled with leading zeros (0 = no padding) */
+  length      : Integer default 6;
+  /** first number of the range */
+  start       : Integer64 default 1;
+  step        : Integer default 1;
+  /** last allowed number; empty = unlimited (until the number no longer fits into the length) */
+  maximum     : Integer64;
+  /** last number issued; empty = nothing issued yet */
+  current     : Integer64;
+  lastUsedAt  : Timestamp;
+}

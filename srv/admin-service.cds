@@ -57,6 +57,27 @@ service AdminService {
   @odata.draft.enabled
   entity GlobalVariables as projection on db.Variables where broker.ID is null;
 
+  /** Number ranges for template numbers: {{numberRange.<name>}} (see the Number Ranges app). */
+  @odata.draft.enabled
+  entity NumberRanges as
+    projection on db.NumberRanges {
+      *,
+      virtual lastNumber : String,
+      virtual nextNumber : String
+    }
+    actions {
+      /**
+       * Sets the range back (or forward): the number given is the next one issued. Empty = the start of the range.
+       */
+      @Core.OperationAvailable: in.IsActiveEntity
+      @Common.SideEffects     : {TargetProperties: [
+        'in/current',
+        'in/lastNumber',
+        'in/nextNumber'
+      ]}
+      action reset(nextNumber : Integer64 @Common.Label: 'Next number (empty = start of the range)');
+    };
+
   type ConnectionResult {
     ok        : Boolean;
     message   : String;

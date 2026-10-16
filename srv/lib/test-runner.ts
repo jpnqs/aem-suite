@@ -3,7 +3,7 @@ import { BrokerRecord, currentJwt, loadBroker, needsPassword, needsUsername, res
 import { errMsg, httpError, truncate } from './errors'
 import type { Publisher } from './solace/session'
 import { connect } from './solace/connector'
-import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord } from './test-case-spec'
+import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord, withNumbers } from './test-case-spec'
 import { loadTree } from './tree'
 import { TemplateError } from './template/resolve'
 
@@ -240,7 +240,7 @@ async function runBroker(brokerId: string, results: PendingResult[], ctx: RunCon
       }
       let spec
       try {
-        spec = buildSpec(tc, scopeFor(tc, broker, ctx.vars))
+        spec = buildSpec(tc, await withNumbers(tc, scopeFor(tc, broker, ctx.vars), 'consume'))
       } catch (e) {
         await progress.finish(r, 'ERROR', { errorMessage: truncate(errMsg(e), MAX_ERROR), deliveryMode: tc.deliveryMode })
         continue
