@@ -214,3 +214,19 @@ entity ReceivedMessages : cuid, managed {
   deliveryMode   : ReceivedDeliveryMode;
   receivedAt     : Timestamp;
 }
+
+/**
+ * Saved setups of the live subscriber (per user): broker, source, topics / queue and the username.
+ * Never a password.
+ */
+entity SubscriberPresets : cuid, managed {
+  name       : String(100) @mandatory;
+  broker     : Association to Brokers;
+  sourceType : SourceType default 'TOPIC';
+  /** JSON array of topic subscriptions (TOPIC) */
+  topics     : LargeString;
+  /** queue name (QUEUE_BROWSE / QUEUE_CONSUME) */
+  queue      : String(500);
+  /** only if the user wants it remembered; DIRECT brokers without a maintained username */
+  username   : String(100);
+}

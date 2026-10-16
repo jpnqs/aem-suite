@@ -23,6 +23,14 @@ service SubscribeService {
       action createTestCase() returns TestCaseRef;
     };
 
+  /** The user's saved setups of the live subscriber (broker, source, topics, username - never a password). */
+  @restrict: [{
+    grant: ['READ', 'CREATE', 'UPDATE', 'DELETE'],
+    to   : 'Tester',
+    where: 'createdBy = $user'
+  }]
+  entity SubscriberPresets as projection on db.SubscriberPresets;
+
   type SourceType : db.SourceType;
 
   /**

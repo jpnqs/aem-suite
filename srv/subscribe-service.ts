@@ -22,7 +22,9 @@ interface ReceivedMessage {
 
 export default class SubscribeService extends cds.ApplicationService {
   async init() {
-    const { ReceivedMessages } = this.entities
+    const { ReceivedMessages, SubscriberPresets } = this.entities
+
+    this.before(['CREATE', 'UPDATE'], SubscriberPresets, async (req) => validatePreset(req))
 
     this.on('start', async (req) => {
       const { brokerId, sourceType, topics, queue, password, username } = req.data as {
@@ -110,4 +112,34 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
       value: String(value)
     }))
   }
+}
+
+const SOURCE_TYPES = ['TOPIC', 'QUEUE_BROWSE', 'QUEUE_CONSUME']
+const MAX_PRESET_TOPICS = 50
+
+/** Name (unique per user), source type and topics of a saved setup. */
+async function validatePreset(req: cds.Request): Promise<void> {
+  const d = req.data as { name?: string; sourceType?: string; topics?: string | null; queue?: string | null; username?: string | null; ID?: string }
+  const creating = req.event === 'CREATE'
+  if (creating || d.name !== undefined) {
+    const name = (d.name ?? '').trim()
+    if (!name) return req.reject(400, 'Give the setup a name', 'in/name')
+    if (name.length > 100) return req.reject(400, 'The name may have at most 100 characters', 'in/name')
+    d.name = name
+    const same = (await SELECT.from('aem.suite.SubscriberPresets').columns('ID').where({ name, createdBy: req.user.id })) as { ID: string }[]
+    if (same.some((p) => p.ID !== d.ID)) return req.reject(400, `A setup named "${name}" exists already`, 'in/name')
+  }
+  if (d.sourceType !== undefined && !SOURCE_TYPES.includes(d.sourceType)) return req.reject(400, `sourceType must be ${SOURCE_TYPES.join(', ')}`, 'in/sourceType')
+  if (d.topics) {
+    let list: unknown
+    try {
+      list = JSON.parse(d.topics)
+    } catch {
+      list = null
+    }
+    if (!Array.isArray(list) || list.length > MAX_PRESET_TOPICS || list.some((t) => typeof t !== 'string' || !t.trim() || t.length > 500))
+      return req.reject(400, `topics must be a list of at most ${MAX_PRESET_TOPICS} topic names`, 'in/topics')
+  }
+  if (d.queue && d.queue.length > 500) return req.reject(400, 'The queue name may have at most 500 characters', 'in/queue')
+  if (d.username && d.username.length > 100) return req.reject(400, 'The username may have at most 100 characters', 'in/username')
 }
