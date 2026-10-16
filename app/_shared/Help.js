@@ -8,6 +8,7 @@ sap.ui.define(["module", "./Navigation"], function (module, Navigation) {
   var SECTIONS = {
     brokers: "2-set-up-brokers-admin",
     variables: "3-global-variables-admin",
+    numberranges: "number-ranges-admin",
     folders: "4-organize-test-cases-in-folders",
     testcases: "5-create-and-edit-a-test-case",
     run: "6-run-tests",

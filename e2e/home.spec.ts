@@ -15,7 +15,7 @@ test.describe('home (admin)', () => {
     await expect(page.getByText('Needs attention').or(page.getByText(/^All good/))).toBeVisible()
     // demo data: test/data/aem.suite-TestCases.csv
     await expect(tile(page, 'Test Cases').getByText(/^\d+ test cases$/)).toBeVisible()
-    for (const name of ['Test Runs', 'Live Subscriber', 'Saved Messages', 'Brokers', 'Global Variables', 'Help']) await expect(tile(page, name)).toBeVisible()
+    for (const name of ['Test Runs', 'Live Subscriber', 'Saved Messages', 'Brokers', 'Global Variables', 'Number Ranges', 'Help']) await expect(tile(page, name)).toBeVisible()
     await expect(page.getByText('Latest Runs')).toBeVisible()
   })
 

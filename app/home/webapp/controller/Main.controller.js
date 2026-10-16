@@ -20,6 +20,7 @@ sap.ui.define(
       { key: "messages", intent: "AEMSuiteSavedMessages-display", icon: "sap-icon://inbox", color: "Accent4", role: "tester" },
       { key: "brokers", intent: "AEMSuiteBrokers-manage", icon: "sap-icon://connected", color: "Accent1", role: "admin" },
       { key: "variables", intent: "AEMSuiteVariables-manage", icon: "sap-icon://key-user-settings", color: "Accent3", role: "admin" },
+      { key: "numberranges", intent: "AEMSuiteNumberRanges-manage", icon: "sap-icon://numbered-text", color: "Accent2", role: "admin" },
       { key: "help", intent: "AEMSuiteHelp-display", icon: "sap-icon://sys-help", color: "Accent10", role: null }
     ];
     var LAST_RUNS = 3;
@@ -162,6 +163,8 @@ sap.ui.define(
             return o.brokers ? t("line.brokers", [o.brokers]) : t("line.brokers.none");
           case "variables":
             return t("line.variables");
+          case "numberranges":
+            return t("line.numberranges");
           default:
             return t("line.help");
         }

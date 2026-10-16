@@ -106,6 +106,10 @@ modules:
           artifacts:
             - comaemsuitevariables.zip
           target-path: resources/
+        - name: aem-suite-numberranges
+          artifacts:
+            - comaemsuitenumberranges.zip
+          target-path: resources/
         - name: aem-suite-help
           artifacts:
             - comaemsuitehelp.zip
@@ -215,6 +219,15 @@ modules:
   - name: aem-suite-variables
     type: html5
     path: app/variables
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-numberranges
+    type: html5
+    path: app/numberranges
     build-parameters:
       build-result: dist
       builder: custom
