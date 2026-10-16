@@ -149,12 +149,15 @@ modules:
               ServiceKeyName: aem-suite-auth-key
               sap.cloud.service: aemsuite
             # used by the apps' xs-app.json (same name as the standalone approuter's destination)
+            # (forwarding the token with Authentication: NoAuthentication + HTML5.ForwardAuthToken is refused by this
+            # module: it demands a ServiceInstanceName; the token exchange passes the user on to the backend as well)
             - Name: srv-api
               URL: ~{srv-api/srv-url}
-              Authentication: NoAuthentication
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: aem-suite-auth
+              ServiceKeyName: aem-suite-auth-key
               Type: HTTP
               ProxyType: Internet
-              HTML5.ForwardAuthToken: true
               HTML5.Timeout: 120000
 
   - name: aem-suite-launchpad
