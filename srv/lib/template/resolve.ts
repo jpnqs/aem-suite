@@ -18,6 +18,9 @@ import { randomInt, randomUUID } from 'node:crypto'
  * {{numberRange.NAME as orderNo}} takes a number of its own and keeps it in the temporary variable {{orderNo}}
  * (usable anywhere in the message, also before the definition); two aliases of the same range get two numbers.
  * The numbers are handed out beforehand (see number-ranges.ts), the resolver only inserts them.
+ *
+ * Test data: {{faker.person.fullName}}, {{faker.number.int(1,100)}} ... (faker.js, see fake-data.ts). Like a number,
+ * the value is generated beforehand and is the same everywhere in one message; "as alias" gives a value of its own.
  */
 export interface TemplateScope {
   testCase?: Record<string, string>
@@ -30,13 +33,23 @@ export interface TemplateScope {
   numbers?: Record<string, string>
 }
 
-/** A number this message needs: key as in TemplateScope.numbers, range = name of the number range. */
+/**
+ * A generated value this message needs, key as in TemplateScope.numbers: a number of the range `range`, or (faker)
+ * a faker.js value for `faker.name` with its arguments.
+ */
 export interface NumberSlot {
   key: string
   range: string
+  faker?: { name: string; args?: string }
 }
 
 const RANGE_PREFIX = 'numberRange.'
+const FAKER_PREFIX = 'faker.'
+
+/** The key of a faker expression in TemplateScope.numbers: name and arguments without blanks. */
+export function fakerKey(name: string, args: string | undefined): string {
+  return args === undefined ? name : `${name}(${args.replace(/[ \t]+/g, '')})`
+}
 
 export class TemplateError extends Error {
   constructor(
@@ -98,6 +111,10 @@ export class TemplateResolver {
   }
 
   private lookup(name: string, args: string | undefined, missing: Set<string>, depth: number): string | undefined {
+    if (name.startsWith(FAKER_PREFIX)) {
+      const key = fakerKey(name, args)
+      return this.numberValue(key, key, name, missing)
+    }
     if (args !== undefined) return this.callFunction(name, args, missing)
     if (name.startsWith(RANGE_PREFIX)) return this.numberValue(name, name, name, missing)
     // a temporary variable ({{numberRange.X as alias}}) wins over a variable of the same name
@@ -116,7 +133,8 @@ export class TemplateResolver {
   }
 
   private numberValue(key: string, shown: string, name: string, missing: Set<string>): string | undefined {
-    if (!name.startsWith(RANGE_PREFIX) || name.length === RANGE_PREFIX.length || !(key in this.numbers)) {
+    const generated = name.startsWith(RANGE_PREFIX) ? name.length > RANGE_PREFIX.length : name.startsWith(FAKER_PREFIX) && name.length > FAKER_PREFIX.length
+    if (!generated || !(key in this.numbers)) {
       missing.add(shown)
       return undefined
     }
@@ -142,7 +160,7 @@ export class TemplateResolver {
 
 function isBuiltin(name: string, isCall: boolean): boolean {
   if (isCall) return name === 'randomInt'
-  if (name.startsWith(RANGE_PREFIX)) return true
+  if (name.startsWith(RANGE_PREFIX) || name.startsWith(FAKER_PREFIX)) return true
   return ['uuid', 'newUuid', 'now', 'timestamp', 'date', 'broker.id', 'broker.name', 'broker.msgVpn'].includes(name)
 }
 
@@ -159,8 +177,8 @@ export function jsonError(payload: string, contentType?: string | null): string 
 }
 
 /**
- * The numbers a message needs from number ranges: in the templates and in the variables they use (a variable
- * may contain {{numberRange.X}} itself). Each plain range name and each "as alias" is one slot.
+ * The generated values a message needs (numbers from number ranges, faker values): in the templates and in the variables they use (a variable
+ * may contain {{numberRange.X}} itself). Each plain range name / faker expression and each "as alias" is one slot.
  */
 export function numberSlots(templates: (string | null | undefined)[], scope: TemplateScope = {}): NumberSlot[] {
   const vars: Record<string, string> = Object.assign({}, scope.global, ...(scope.folders ?? []), scope.broker, scope.testCase)
@@ -169,7 +187,7 @@ export function numberSlots(templates: (string | null | undefined)[], scope: Tem
   const direct = templates.filter((t): t is string => !!t)
   // aliases first: a variable of the same name is hidden by the alias and not followed
   for (const text of direct)
-    for (const m of text.matchAll(EXPR)) if (m[3] && m[1].startsWith(RANGE_PREFIX)) aliases.add(m[3])
+    for (const m of text.matchAll(EXPR)) if (m[3] && (m[1].startsWith(RANGE_PREFIX) || m[1].startsWith(FAKER_PREFIX))) aliases.add(m[3])
 
   const seen = new Set<string>()
   const scan = (text: string, depth: number): void => {
@@ -180,6 +198,9 @@ export function numberSlots(templates: (string | null | undefined)[], scope: Tem
         if (!range) continue
         const key = alias ? `as:${alias}` : name
         slots.set(key, { key, range })
+      } else if (name.startsWith(FAKER_PREFIX)) {
+        const key = alias ? `as:${alias}` : fakerKey(name, args)
+        slots.set(key, { key, range: '', faker: { name, args } })
       } else if (args === undefined && depth < MAX_DEPTH && !aliases.has(name) && !seen.has(name) && Object.prototype.hasOwnProperty.call(vars, name)) {
         seen.add(name)
         scan(vars[name] ?? '', depth + 1)

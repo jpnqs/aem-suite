@@ -27,6 +27,10 @@ export interface AemSuiteConfig {
     /** development only: accept broker passwords in runTests (they would pass through the AI conversation) */
     allowDirectCredentials: boolean
   }
+  faker: {
+    /** language of {{faker...}} test data: en, de, fr, es, en_GB, ... (the locales of faker.js) */
+    locale: string
+  }
   mcp: {
     /** public app URL for the OAuth discovery; default: from the approuter's forwarded headers */
     publicUrl?: string
@@ -40,6 +44,7 @@ export const DEFAULTS: AemSuiteConfig = {
   subscriptions: { maxPerUser: 5, idleTimeoutMs: 5 * 60 * 1000, maxMessagesPerSecond: 100, maxPayloadBytes: 512 * 1024 },
   help: { file: 'docs/user-guide.md' },
   agent: { maxRunResults: 100, maxActiveRuns: 2, allowDirectCredentials: false },
+  faker: { locale: 'en' },
   mcp: {}
 }
 
@@ -53,6 +58,7 @@ export function config(): AemSuiteConfig {
     subscriptions: { ...DEFAULTS.subscriptions, ...own.subscriptions },
     help: { ...DEFAULTS.help, ...own.help },
     agent: { ...DEFAULTS.agent, ...own.agent },
+    faker: { ...DEFAULTS.faker, ...own.faker },
     mcp: { ...DEFAULTS.mcp, ...own.mcp }
   }
 }

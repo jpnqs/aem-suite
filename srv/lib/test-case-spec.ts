@@ -2,6 +2,8 @@ import type { BrokerRecord } from './credentials/resolve'
 import type { PublishSpec, DeliveryMode } from './solace/session'
 import { TemplateResolver, TemplateScope, jsonError, TemplateError, numberSlots } from './template/resolve'
 import { allocateNumbers } from './number-ranges'
+import { generateFake } from './fake-data'
+import { config } from './config'
 import { DEFAULT_ACK_TIMEOUT_MS, detectContentType } from './defaults'
 import { NodeRow, selectNodesDeep } from './nodes'
 import { inferPropertyType, PropertyType } from './property-types'
@@ -107,7 +109,11 @@ export function scopeFor(
 export async function withNumbers(tc: TestCaseRecord, scope: TemplateScope, mode: 'consume' | 'peek'): Promise<TemplateScope> {
   const templates = [tc.topic, tc.payload, tc.correlationId, ...(tc.userProperties ?? []).map((p) => p.value)]
   const slots = numberSlots(templates, scope)
-  return slots.length ? { ...scope, numbers: await allocateNumbers(slots, mode) } : scope
+  if (!slots.length) return scope
+  const numbers = await allocateNumbers(slots.filter((s) => !s.faker), mode)
+  // test data of faker.js: new values every time, also in the Preview
+  for (const s of slots) if (s.faker) numbers[s.key] = generateFake(s.faker.name, s.faker.args, config().faker.locale)
+  return { ...scope, numbers }
 }
 
 /**
