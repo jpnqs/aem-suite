@@ -108,6 +108,14 @@ test('brokers', async ({ page }) => {
   await page.screenshot({ path: out('brokers') })
 })
 
+test('number ranges', async ({ page }) => {
+  await open(page, 'AEMSuiteNumberRanges-manage')
+  await expect(page.getByText('ORDERS', { exact: true }).first()).toBeVisible()
+  await page.waitForTimeout(1500)
+  await calm(page)
+  await page.screenshot({ path: out('number-ranges') })
+})
+
 test('help', async ({ page }) => {
   await open(page, 'AEMSuiteHelp-display&/6-run-tests')
   await page.waitForTimeout(2500)

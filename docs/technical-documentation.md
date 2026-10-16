@@ -97,6 +97,7 @@ mta.yaml, xs-security.json    deployment
 | `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE, counters. Composition `results`. |
 | `RunResults` | One test case × broker | `status` PENDING/PASSED/FAILED/ERROR, resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
 | `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
+| `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name, prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
 | `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
 | `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
 
@@ -153,6 +154,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `start(brokerId, sourceType, topics, queue, password, username)` | Opens a dedicated session. `sourceType`: `TOPIC` (direct subscriptions, wildcards), `QUEUE_BROWSE` (messages stay), `QUEUE_CONSUME` (client ack, messages removed). Returns `subscriptionId`. |
 | `stop(subscriptionId)` | Closes the subscription (owner only). |
 | `activeSubscriptions()` | Own subscriptions; also acts as **heartbeat** (keeps them alive). |
+| `NumberRanges` | Draft-enabled, Admin. Virtual `lastNumber` / `nextNumber` (formatted). Bound action `reset(nextNumber)`. `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
 | `SubscriberPresets` | The user's saved subscriber setups. `@restrict` to `createdBy = $user` (a user sees and changes only their own); a `before` handler checks the name (required, unique per user), source type and the topic list. |
 | `ReceivedMessages` | Saved messages (no update). Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
 | `Brokers` | Active brokers (incl. `credentialMode`, `username`). |
@@ -321,6 +323,13 @@ Syntax `{{name}}` or `{{fn(args)}}`. Lookup order (first match wins):
 | `broker.id`, `broker.name`, `broker.msgVpn` | target broker |
 
 Variables may reference other variables (depth 5, cycle detection). Unknown names raise `TemplateError` listing all of them → result `ERROR`. After resolution the payload is validated as JSON when the content type is JSON.
+
+**Number ranges.** `{{numberRange.NAME}}` and `{{numberRange.NAME as alias}}` (temporary variable `{{alias}}`, also usable before its definition) are not computed by the resolver: it is synchronous and only inserts `scope.numbers`. The numbers are handed out beforehand, once per message:
+
+1. `numberSlots(templates, scope)` lists what the message needs: one slot per plain range name (the same number everywhere in the message) and one per alias, also in variables the templates use. Unused variables are not followed, so they never use up numbers.
+2. `withNumbers(tc, scope, mode)` in `test-case-spec.ts` calls `allocateNumbers(slots, mode)` from `number-ranges.ts` and puts the result into the scope.
+3. `consume` (runs) takes the numbers with a compare-and-set `UPDATE` of `NumberRanges.current` in a transaction of its own that commits at once, retried a few times, so parallel runs never get the same number and a number is not reissued if the message fails later. `peek` (Preview, MCP preview) only computes the next numbers.
+4. An exhausted range (`maximum` or digits exceeded) or an unknown range is a `TemplateError`, so the result is `ERROR` and `current` does not move.
 
 ### 7.5 `test-case-spec.ts`
 

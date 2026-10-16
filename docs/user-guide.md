@@ -30,6 +30,7 @@ save messages as **test cases**, send them to one or several brokers with one cl
     - [Where values come from (first match wins)](#where-values-come-from-first-match-wins)
     - [Built-ins](#built-ins)
     - [Example](#example)
+    - [Number ranges (Admin)](#number-ranges-admin)
   - [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
   - [12. Tips and troubleshooting](#12-tips-and-troubleshooting)
 
@@ -48,6 +49,7 @@ Open the launchpad – the suite's own start page, or your SAP Build Work Zone s
 | **Saved Messages** | messages you kept from the live subscriber | Tester |
 | **Brokers** | connections to the brokers | Admin |
 | **Global Variables** | variables for all test cases | Admin |
+| **Number Ranges** | document numbers (like SAP) for your messages | Admin |
 | **Help** | this guide, inside the app | everyone |
 
 **Help is always at hand:** every page has a **Help** button (top right) that opens the matching part of this guide in a new tab, so you do not lose what you are doing. The **Help** tile shows the whole guide with a contents list on the left and a **search** that highlights what it finds.
@@ -320,6 +322,7 @@ Write `{{name}}` anywhere in **topic, payload, correlation ID and user property 
 | `{{date}}` | current date, e.g. `2026-10-14` |
 | `{{randomInt(1,100)}}` | random number between 1 and 100 |
 | `{{broker.name}}`, `{{broker.msgVpn}}`, `{{broker.id}}` | the broker the message is sent to |
+| `{{numberRange.ORDERS}}` | the next number of the number range *ORDERS*, e.g. `SO-000042` – see [Number ranges](#number-ranges-admin) |
 
 Variables may contain other variables, e.g. `topicBase = {{app}}/{{region}}`.
 
@@ -340,6 +343,45 @@ Payload: { "orderId": "6f1c…", "qty": 5, "createdAt": "2026-10-14T20:15:00.000
 ```
 
 If a variable cannot be found, the result is **ERROR** with "Unknown variable(s): …" – use **Preview** to check before running.
+
+### Number ranges (Admin)
+
+Real SAP messages carry identifiers such as sales order `SO-000042` or a delivery number `0080001234`. A **number range** hands out numbers like these – one more with every message, and the counter is kept for you. Maintain them in the app **Number Ranges** (role Admin).
+
+| Field | Meaning |
+|---|---|
+| **Name** | how you use it: `{{numberRange.<name>}}`. Letters, digits, `_` and `-`, e.g. `ORDERS` |
+| **Prefix**, **Suffix** | plain text in front of / after the number, e.g. `SO-` |
+| **Digits** | length of the number, filled with leading zeros (`6` gives `000042`; `0` = no leading zeros) |
+| **First Number**, **Step** | where the range starts and by how much it grows (e.g. start `4500000000`, step `1`) |
+| **Last Allowed Number** | optional end of the range. When it is reached (or the number no longer fits into the digits), runs stop with an error |
+
+The page shows what the **next number** will look like, the **last number issued** and when a run used the range last. **Reset** sets the next number (empty = back to the first number) – for example to start a new test series from the beginning.
+
+Use the range in topic, payload, correlation ID or user properties:
+
+```
+Topic:   shop/orders/created/v1/{{numberRange.ORDERS}}
+Payload: { "orderNumber": "{{numberRange.ORDERS}}", "customer": "{{numberRange.CUSTOMERS}}" }
+```
+
+- Every message gets **its own** number: running a test case twice, or on two brokers, uses numbers 42, 43, ….
+- Within **one message** the same `{{numberRange.ORDERS}}` is always the same number, in topic, payload and properties alike.
+- **Preview** shows the number the message would get, **without** using it up. Only a real run takes a number.
+- If a run fails after the number was taken (for example the broker rejects the message), the number is not given out again.
+
+Need the same generated number several times, or two different numbers from one range, in one message? Give it a **temporary variable** with `as`:
+
+```
+{
+  "orderNumber": "{{numberRange.ORDERS as orderNo}}",
+  "reference":   "{{orderNo}}",
+  "items": [ { "order": "{{orderNo}}", "pos": 10 } ],
+  "followUp":    "{{numberRange.ORDERS as followUpNo}}"
+}
+```
+
+`orderNo` and `followUpNo` are two different numbers of the range `ORDERS`; `{{orderNo}}` can be used anywhere in the message, also before the line that defines it. Temporary variables live for one message only.
 
 ---
 

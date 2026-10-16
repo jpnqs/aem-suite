@@ -10,6 +10,7 @@ Save messages as test cases, send them to several brokers at once, see immediate
 - **Know if the broker really took it.** A result passes only when the broker acknowledges the message (persistent delivery), with the measured ACK latency.
 - **One test, many brokers.** Run a test case or a whole folder against dev, test and prod brokers in parallel, and compare the results per broker.
 - **Reusable messages.** Topics, payloads, correlation IDs and user properties accept `{{variables}}` (global, broker, folder and test case level) plus built-ins such as `{{uuid}}`, `{{now}}` or `{{randomInt(1,10)}}`.
+- **SAP-like numbers.** Number ranges hand out document numbers such as `SO-4500000001` with `{{numberRange.ORDERS}}`, kept per range and resettable.
 - **Passwords stay with you.** Brokers can use a BTP destination, or direct credentials that are asked for on every run and are never stored.
 - **Works with your AI assistant.** An MCP endpoint lets GitHub Copilot, Claude Code and other clients plan, preview and run tests for you.
 - **Help is built in.** Every app has a Help button that opens the matching section of the user guide, rendered from Markdown.
@@ -45,6 +46,12 @@ Pick one or more brokers and run. Progress arrives live, and the results are kep
 `{{name}}` is resolved from the test case, then the broker, then the folders (inner first), then the global variables, then the built-ins. Folder variables are maintained right on the folder page.
 
 ![Variables of a folder](docs/images/folder-variables.png)
+
+### Real-looking identifiers with number ranges
+
+Define number ranges the way SAP does (prefix, suffix, number of digits, first number, step, last allowed number) and use them in any message as `{{numberRange.ORDERS}}`: every message gets the next number, for example `SO-4500000001`. Preview shows the next number without using it up, and **Reset** starts the range again. Need one generated number several times in a payload? `{{numberRange.ORDERS as orderNo}}` keeps it in a temporary variable you can reuse as `{{orderNo}}`.
+
+![Number ranges](docs/images/number-ranges.png)
 
 ### Watch messages live
 
@@ -126,7 +133,7 @@ HANA Cloud · Destination service · XSUAA
 | `runs` | Fiori elements LR/OP | Tester |
 | `subscriber` | Freestyle UI5 in TypeScript | Tester |
 | `messages` | Fiori elements, saved messages | Tester |
-| `brokers`, `variables` | Fiori elements | Admin |
+| `brokers`, `variables`, `numberranges` | Fiori elements | Admin |
 | `help` | Freestyle UI5 | Everyone: the user guide, rendered from `docs/user-guide.md` |
 | `home` | Freestyle UI5 | Everyone: start page with figures, the apps of your roles and the latest runs |
 
