@@ -53,6 +53,7 @@
     "test": "jest",
     "verify": "npm run typecheck && npm run lint && npm test",
     "e2e": "playwright test",
+    "docs:screenshots": "playwright test -c playwright.screenshots.config.ts",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
     "e2e:trace": "playwright show-trace",
