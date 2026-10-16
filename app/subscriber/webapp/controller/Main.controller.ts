@@ -1,6 +1,10 @@
 import DynamicPage from "sap/f/DynamicPage";
-import Select from "sap/m/Select";
+import Select, { Select$ChangeEvent } from "sap/m/Select";
 import Input, { Input$LiveChangeEvent } from "sap/m/Input";
+import Dialog from "sap/m/Dialog";
+import Button from "sap/m/Button";
+import Label from "sap/m/Label";
+import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import Controller from "sap/ui/core/mvc/Controller";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Filter from "sap/ui/model/Filter";
@@ -42,6 +46,8 @@ interface SubscriberPrefs {
 /** The model "state" of the page. */
 interface SubscriberState {
   brokerId: string | null;
+  /** the selected saved setup */
+  presetId: string;
   sourceType: SourceType;
   topics: { text: string }[];
   topicHistory: { text: string }[];
@@ -111,6 +117,7 @@ export default class Main extends Controller {
     const prefs = loadPrefs();
     const initial: SubscriberState = {
       brokerId: prefs.brokerId ?? null,
+      presetId: "",
       sourceType: (prefs.sourceType as SourceType) ?? "TOPIC",
       // topic subscriptions: a list of { text }; the input above the list adds to it
       topics: splitTopics(prefs.topicsText ?? "").map((text) => ({ text })),
@@ -238,6 +245,135 @@ export default class Main extends Controller {
     } catch {
       /* broker list unavailable - user selects manually */
     }
+  }
+
+  // ---------------------------------------------------------------- saved setups
+
+  private presetBinding(): ODataListBinding {
+    return (this.byId("preset") as Select).getBinding("items") as ODataListBinding;
+  }
+
+  private presetContexts(): Context[] {
+    return this.presetBinding().getAllCurrentContexts();
+  }
+
+  /** A saved setup was picked: fills broker, source, topics / queue and username (the password is never part of it). */
+  public async onPresetChange(event: Select$ChangeEvent): Promise<void> {
+    // the key from the event: the binding to the state is updated only after this handler
+    const key = event.getParameter("selectedItem")?.getKey();
+    const ctx = this.presetContexts().find((c) => c.getProperty("ID") === key);
+    if (!ctx) return;
+    // the list of setups only read the names so far
+    const [broker_ID, sourceType, topicsJson, queue, username] = (await ctx.requestProperty(["broker_ID", "sourceType", "topics", "queue", "username"])) as (string | undefined)[];
+    const preset = { name: ctx.getProperty("name") as string, broker_ID, sourceType: sourceType as SourceType | undefined, topics: topicsJson, queue, username };
+    this.state.setProperty("/sourceType", preset.sourceType ?? "TOPIC");
+    let topics: string[] = [];
+    try {
+      topics = JSON.parse(preset.topics || "[]") as string[];
+    } catch {
+      /* ignore */
+    }
+    this.state.setProperty(
+      "/topics",
+      topics.map((text) => ({ text }))
+    );
+    this.state.setProperty("/queue", preset.queue ?? "");
+    if (preset.broker_ID && this.brokers[preset.broker_ID]) {
+      this.state.setProperty("/brokerId", preset.broker_ID);
+      this.onBrokerChange();
+    } else {
+      MessageToast.show("The broker of this setup is not available (any more) - pick another one");
+    }
+    if (this.state.getProperty("/needsUsername")) this.state.setProperty("/enteredUsername", preset.username ?? "");
+    MessageToast.show(`Setup "${preset.name}" loaded`);
+  }
+
+  /** Asks for a name and saves what is on the page; an existing name is updated. */
+  public onSavePreset(): void {
+    const s = this.data();
+    const topics = this.collectTopics();
+    if (!s.brokerId) return void MessageToast.show("Select a broker first");
+    if (s.sourceType === "TOPIC" && !topics.length) return void MessageToast.show("Add at least one topic first");
+    if (s.sourceType !== "TOPIC" && !s.queue?.trim()) return void MessageToast.show("Enter a queue name first");
+
+    const current = (this.byId("preset") as Select).getSelectedItem()?.getText() ?? "";
+    const name = new Input({ value: current, placeholder: "e.g. Orders on dev", maxLength: 100, width: "100%" });
+    const dialog: Dialog = new Dialog({
+      title: "Save setup",
+      contentWidth: "26rem",
+      content: [new Label({ text: "Name (an existing name is updated)", labelFor: name.getId() }), name],
+      beginButton: new Button({
+        text: "Save",
+        type: "Emphasized",
+        press: () => {
+          void this.savePreset(name.getValue().trim(), topics).then((ok) => {
+            if (ok) dialog.close();
+          });
+        }
+      }),
+      endButton: new Button({ text: "Cancel", press: () => dialog.close() }),
+      afterClose: () => dialog.destroy()
+    }).addStyleClass("sapUiContentPadding");
+    this.getView()!.addDependent(dialog);
+    dialog.open();
+  }
+
+  private async savePreset(name: string, topics: string[]): Promise<boolean> {
+    if (!name) {
+      MessageToast.show("Give the setup a name");
+      return false;
+    }
+    const s = this.data();
+    const data = {
+      name,
+      broker_ID: s.brokerId,
+      sourceType: s.sourceType,
+      topics: JSON.stringify(s.sourceType === "TOPIC" ? topics : []),
+      queue: s.sourceType === "TOPIC" ? null : s.queue.trim(),
+      // only a username that was typed in - a maintained one belongs to the broker
+      username: s.needsUsername && s.enteredUsername?.trim() ? s.enteredUsername.trim() : null
+    };
+    try {
+      const existing = this.presetContexts().find((c) => (c.getProperty("name") as string).toLowerCase() === name.toLowerCase());
+      let id: string;
+      if (existing) {
+        for (const [k, v] of Object.entries(data)) if (k !== "name") existing.setProperty(k, v);
+        await this.odata().submitBatch("$auto");
+        id = existing.getProperty("ID") as string;
+      } else {
+        const created = this.presetBinding().create(data);
+        await created.created();
+        id = created.getProperty("ID") as string;
+      }
+      this.state.setProperty("/presetId", id);
+      MessageToast.show(existing ? `Setup "${name}" updated` : `Setup "${name}" saved`);
+      return true;
+    } catch (e) {
+      MessageBox.error(errorText(e));
+      return false;
+    }
+  }
+
+  public onDeletePreset(): void {
+    const key = this.state.getProperty("/presetId") as string;
+    const ctx = this.presetContexts().find((c) => c.getProperty("ID") === key);
+    if (!ctx) return;
+    const name = ctx.getProperty("name") as string;
+    MessageBox.confirm(`Delete the setup "${name}"?`, {
+      title: "Delete setup",
+      actions: [MessageBox.Action.DELETE, MessageBox.Action.CANCEL],
+      emphasizedAction: MessageBox.Action.DELETE,
+      onClose: async (action: string | null) => {
+        if (action !== MessageBox.Action.DELETE) return;
+        try {
+          await ctx.delete();
+          this.state.setProperty("/presetId", "");
+          MessageToast.show(`Setup "${name}" deleted`);
+        } catch (e) {
+          MessageBox.error(errorText(e));
+        }
+      }
+    });
   }
 
   /** Shows the password field for DIRECT brokers, plus a username field if the broker has none. */

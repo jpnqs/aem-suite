@@ -78,6 +78,37 @@
         <VBox class="aemConnect">
           <l:Grid defaultSpan="XL3 L4 M6 S12" hSpacing="1" vSpacing="0.5" containerQuery="true">
             <VBox>
+              <layoutData>
+                <l:GridData span="XL12 L12 M12 S12" />
+              </layoutData>
+              <Label text="Saved setup" labelFor="preset" tooltip="Broker, source, topics / queue and username - never the password" />
+              <HBox alignItems="Center">
+                <Select
+                  id="preset"
+                  width="20rem"
+                  forceSelection="false"
+                  selectedKey="{state>/presetId}"
+                  enabled="{= !${state>/subscriptionId} }"
+                  change=".onPresetChange"
+                  items="{path: '/SubscriberPresets', sorter: {path: 'name'}}">
+                  <core:Item key="{ID}" text="{name}" />
+                </Select>
+                <Button
+                  icon="sap-icon://save"
+                  text="Save as…"
+                  type="Transparent"
+                  class="sapUiTinyMarginBegin"
+                  tooltip="Save the current broker, source, topics and username as a setup (same name: update it)"
+                  press=".onSavePreset" />
+                <Button
+                  icon="sap-icon://delete"
+                  type="Transparent"
+                  enabled="{= !!${state>/presetId} }"
+                  tooltip="Delete the selected setup"
+                  press=".onDeletePreset" />
+              </HBox>
+            </VBox>
+            <VBox>
               <Label text="Broker" labelFor="broker" required="true" />
               <Select
                 id="broker"
