@@ -34,4 +34,23 @@ test.describe('Number Ranges', () => {
       expect(preview.topic).toBe('e2e/SO-004500')
     }
   })
+
+  test('the demo test case "Order with document numbers" resolves with the demo ranges', async ({ request }) => {
+    // test/data: ranges ORDERS, DELIVERIES, INVOICES and the test case in the folder Orders
+    const found = await (await request.get('/odata/v4/test/TestCases?$select=ID&$filter=' + encodeURIComponent("name eq 'Order with document numbers'"))).json()
+    const brokers = await (await request.get('/odata/v4/test/Brokers?$select=ID&$filter=' + encodeURIComponent("name eq 'local-docker'"))).json()
+    const res = await request.post(`/odata/v4/test/TestCases(ID=${found.value[0].ID},IsActiveEntity=true)/TestService.preview`, { data: { brokerId: brokers.value[0].ID } })
+    const preview = await res.json()
+    expect(preview.valid).toBe(true)
+    const payload = JSON.parse(preview.payload)
+    expect(payload.orderNumber).toMatch(/^SO-[0-9]{10}$/)
+    // the temporary variable: the same number in topic, payload, correlation ID and property
+    expect(payload.reference).toBe(payload.orderNumber)
+    expect(payload.items[0].order).toBe(payload.orderNumber)
+    expect(preview.topic.endsWith(payload.orderNumber)).toBe(true)
+    expect(preview.correlationId).toBe(payload.orderNumber)
+    expect(JSON.parse(preview.userProperties).orderNumber).toBe(payload.orderNumber)
+    expect(payload.delivery).toMatch(/^00[0-9]{8}$/)
+    expect(payload.invoice).toMatch(/^INV-[0-9]{5}[/]26$/)
+  })
 })

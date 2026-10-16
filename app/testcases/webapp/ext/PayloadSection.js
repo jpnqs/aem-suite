@@ -18,6 +18,8 @@ sap.ui.define(
     ["{{timestamp}}", "Current time, epoch milliseconds"],
     ["{{date}}", "Current date, YYYY-MM-DD"],
     ["{{randomInt(1,100)}}", "Random integer between min and max (inclusive)"],
+    ["{{numberRange.ORDERS}}", "Next number of the number range ORDERS (e.g. SO-4500000001), same value everywhere in the message"],
+    ["{{numberRange.ORDERS as orderNo}}", "Takes a number and keeps it as {{orderNo}} - reuse it anywhere in the message; each alias gets its own number"],
     ["{{broker.name}}", "Name of the broker the message is sent to"],
     ["{{broker.msgVpn}}", "Message VPN of that broker"],
     ["{{broker.id}}", "ID of that broker"]
