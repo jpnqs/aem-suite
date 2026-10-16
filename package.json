@@ -64,6 +64,13 @@
     "#cds-models/*": "./@cds-models/*/index.js"
   },
   "cds": {
+    "log": {
+      "levels": {
+        "odata": "warn",
+        "sql": "warn",
+        "db": "warn"
+      }
+    },
     "requires": {
       "auth": "xsuaa",
       "[development]": {

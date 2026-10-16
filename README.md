@@ -152,6 +152,7 @@ The MTA build runs `cds build --production` (which compiles the TypeScript), `no
 
 ### Operational notes
 
+- **Logging and passwords**: broker passwords travel in the body of OData action calls (run, connection test, subscription). The app never logs them, and `package.json` pins the log levels of `odata`, `sql` and `db` to `warn`. Do not switch these (or `DEBUG=*`) to `debug` on a system that handles real broker passwords: request data can then end up in the logs.
 - **Single instance**: live subscriptions are held in the memory of the srv instance, so the MTA pins `instances: 1`. To scale out, sticky sessions or a shared session registry would be needed.
 - A subscription is closed when the UI has not sent a heartbeat for 5 minutes (tab closed), or on Stop. Limits: 5 subscriptions per user and 100 msg/s forwarded per subscription. Payloads over 512 KB are truncated in the live view. Change these with `cds.aemSuite.subscriptions` in `package.json` (`maxPerUser`, `idleTimeoutMs`, `maxMessagesPerSecond`, `maxPayloadBytes`).
 - **Consume Queue** acknowledges and removes the messages from the queue. **Browse Queue** leaves them on the queue.
