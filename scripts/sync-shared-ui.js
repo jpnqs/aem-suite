@@ -27,7 +27,8 @@ function plannedCopies() {
     const isTs = fs.existsSync(path.join(appDir, app, 'tsconfig.json'))
     return files
       .filter((f) => isTs || !f.endsWith('.d.ts'))
-      .map((f) => [path.join(appDir, app, 'webapp', 'shared', f), HEADER + fs.readFileSync(path.join(sharedDir, f), 'utf8')])
+      // LF throughout: the header is LF, so an original checked out with CRLF would give a copy with mixed line endings
+      .map((f) => [path.join(appDir, app, 'webapp', 'shared', f), HEADER + fs.readFileSync(path.join(sharedDir, f), 'utf8').replace(/\r\n/g, '\n')])
   })
 }
 

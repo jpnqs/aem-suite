@@ -1,0 +1,7 @@
+# LF in the repository and in every working copy (also on Windows), whatever core.autocrlf says
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.mtar binary
