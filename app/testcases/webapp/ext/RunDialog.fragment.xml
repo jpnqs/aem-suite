@@ -64,7 +64,7 @@
               </HBox>
               <HBox alignItems="Center" class="sapUiTinyMarginBottom">
                 <Label text="{i18n>run.pauseBetweenMessages}" width="14rem" tooltip="{i18n>run.waitBetweenTwoMessagesToThe}" />
-                <StepInput value="{run>/delayMs}" min="0" max="60000" step="100" largerStep="1000" displayValuePrecision="0" description="ms" fieldWidth="60%" width="11rem" change=".onOptionsChange" />
+                <StepInput value="{run>/delayMs}" min="0" max="60000" step="100" largerStep="1000" displayValuePrecision="0" description="{i18n>run.ms}" fieldWidth="60%" width="11rem" change=".onOptionsChange" />
               </HBox>
               <HBox alignItems="Center" class="sapUiTinyMarginBottom" visible="{= ${run>/repetitions} > 1 }">
                 <Label text="{i18n>run.order}" width="14rem" tooltip="{i18n>run.wholeSelectionABCA}" />
@@ -102,7 +102,7 @@
           state="{= ${run>/failed} > 0 ? 'Error' : 'Success' }"
           showValue="true" />
         <HBox class="sapUiSmallMarginTop">
-          <ObjectNumber number="{run>/passed}" unit="passed" state="Success" class="sapUiMediumMarginEnd" />
+          <ObjectNumber number="{run>/passed}" unit="{i18n>run.passed}" state="Success" class="sapUiMediumMarginEnd" />
           <ObjectNumber number="{run>/failed}" unit="{i18n>run.failedError}" state="{= ${run>/failed} > 0 ? 'Error' : 'None' }" class="sapUiMediumMarginEnd" />
           <ObjectNumber number="{run>/skipped}" unit="{i18n>run.notSent}" state="Warning" visible="{= ${run>/skipped} > 0 }" />
         </HBox>
