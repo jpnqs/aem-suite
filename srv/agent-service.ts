@@ -190,7 +190,7 @@ export default class TestAgentService extends cds.ApplicationService {
     this.on('getRunSummary', async (req) => {
       const { runId, waitSeconds } = req.data as { runId: string; waitSeconds?: number | null }
       const deadline = Date.now() + Math.min(Math.max(waitSeconds ?? 0, 0), MAX_WAIT_SECONDS) * 1000
-      type Run = { status: string; totalCount: number; passedCount: number; failedCount: number; summary: string }
+      type Run = { status: string; totalCount: number; passedCount: number; failedCount: number; skippedCount: number | null; summary: string }
       let run: Run | undefined
       // short transactions: a long one would hold the database connection the running tests need
       for (;;) {
@@ -202,7 +202,9 @@ export default class TestAgentService extends cds.ApplicationService {
       const failures = (await cds.db.tx(() =>
         SELECT.from('aem.suite.RunResults')
           .columns('testCaseName', 'brokerName', 'status', 'resolvedTopic', 'errorMessage')
-          .where({ run_ID: runId, status: { '!=': 'PASSED' } })
+          // in the query, not afterwards: otherwise PENDING / SKIPPED rows would take places of the limit
+          .where({ run_ID: runId, status: { in: ['FAILED', 'ERROR'] } })
+          .orderBy('brokerName', 'sequence')
           .limit(MAX_FAILURES)
       )) as { testCaseName: string; brokerName: string; status: string; resolvedTopic: string; errorMessage: string }[]
       const finished = run.status !== 'RUNNING'
@@ -214,10 +216,9 @@ export default class TestAgentService extends cds.ApplicationService {
         total: run.totalCount,
         passed: run.passedCount,
         failed: run.failedCount,
+        skipped: run.skippedCount ?? 0,
         summary: run.summary,
-        failures: failures
-          .filter((f) => f.status !== 'PENDING')
-          .map((f) => ({ testCase: f.testCaseName, broker: f.brokerName, status: f.status, topic: f.resolvedTopic, error: f.errorMessage }))
+        failures: failures.map((f) => ({ testCase: f.testCaseName, broker: f.brokerName, status: f.status, topic: f.resolvedTopic, error: f.errorMessage }))
       }
     })
 

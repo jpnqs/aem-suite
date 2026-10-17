@@ -317,7 +317,7 @@ describe('AI agent service (MCP)', () => {
       expect(run.result.total).toBe(3) // Order created, ping/a, rejected
 
       const summary = await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
-      expect(summary.result).toMatchObject({ finished: true, status: 'DONE', outcome: 'FAILED', total: 3, passed: 2, failed: 1 })
+      expect(summary.result).toMatchObject({ finished: true, status: 'DONE', outcome: 'FAILED', total: 3, passed: 2, failed: 1, skipped: 0 })
       expect(summary.result.failures).toEqual([
         expect.objectContaining({ testCase: 'rejected', broker: 'dest', status: 'FAILED', error: 'Rejected by broker: no subscribers' })
       ])
@@ -327,6 +327,26 @@ describe('AI agent service (MCP)', () => {
       // details are readable, too
       const results = await query(`SELECT testCaseName, status, ackLatencyMs from RunResults where run_ID = '${run.result.runId}'`)
       expect(results.map((r) => `${r.testCaseName}:${r.status}`).sort()).toEqual(['Order created:PASSED', 'ping/a:PASSED', 'rejected:FAILED'])
+    })
+
+    it('lists up to 25 failures, never skipped or pending messages, and counts the skipped ones', async () => {
+      const id = cds.utils.uuid()
+      const rows = (status: string, n: number, from: number) =>
+        Array.from({ length: n }, (_, i) => ({ ID: cds.utils.uuid(), run_ID: id, testCaseName: `${status} ${i}`, brokerName: 'dest', status, sequence: from + i }))
+      await INSERT.into('aem.suite.TestRuns').entries({ ID: id, summary: 'x', status: 'DONE', totalCount: 38, passedCount: 0, failedCount: 30, skippedCount: 5, createdBy: 'tester' })
+      // PENDING and SKIPPED first: they must not take the places of the failures
+      await INSERT.into('aem.suite.RunResults').entries([...rows('PENDING', 3, 1), ...rows('SKIPPED', 5, 4), ...rows('ERROR', 30, 9)])
+      try {
+        const s = (await call('getRunSummary', { runId: id })).result
+        expect(s).toMatchObject({ failed: 30, skipped: 5 })
+        expect(s.failures).toHaveLength(25)
+        expect(s.failures.every((f: { status: string }) => f.status === 'ERROR')).toBe(true)
+        const [run] = await query(`SELECT skippedCount, repetitions from TestRuns where ID = '${id}'`)
+        expect(run).toMatchObject({ skippedCount: 5, repetitions: 1 })
+      } finally {
+        await DELETE.from('aem.suite.RunResults').where({ run_ID: id })
+        await DELETE.from('aem.suite.TestRuns').where({ ID: id })
+      }
     })
 
     it('reports a running run as such when it does not wait', async () => {
