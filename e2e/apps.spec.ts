@@ -25,7 +25,7 @@ test.describe('apps (admin)', () => {
     // not "no runs yet": the run dialog specs start runs on the same server in parallel
     await openApp(page, apps.runs)
     await expectAppOpen(page, apps.runs)
-    await expect(page.getByRole('columnheader', { name: 'Test Cases → Brokers' }).first()).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Test Case', exact: true }).first()).toBeVisible()
   })
 
   test('Saved Messages opens', async ({ page }) => {
