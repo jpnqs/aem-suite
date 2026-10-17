@@ -113,13 +113,16 @@ function sourcesOf(req: StartRequest): string[] {
 
 async function open(req: StartRequest, sources: string[]): Promise<string> {
   const broker = await loadBroker(req.brokerId)
-  let conn
+  // same rule as for runs
+  if (broker.active === false) throw httpError(400, `Broker "${broker.name}" is inactive`)
+  // a wrong password or an unreachable broker is the user's to fix: 400 with the broker's reason
+  // (CAP would hide the message of a 5xx in production)
+  let session
   try {
-    conn = await resolveConnection(broker, req.jwt, req.password, req.username)
+    session = await openSession(await resolveConnection(broker, req.jwt, req.password, req.username))
   } catch (e) {
     throw httpError(400, errMsg(e))
   }
-  const session = await openSession(conn)
 
   const sub: Subscription = {
     id: cds.utils.uuid(),

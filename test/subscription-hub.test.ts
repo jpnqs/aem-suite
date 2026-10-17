@@ -179,4 +179,17 @@ describe('subscription hub (live view)', () => {
         expect.objectContaining({ data: expect.objectContaining({ status: 'STOPPED', message: expect.stringMatching(/idle timeout/) }) })
       ])
     }))
+
+  it('answers user errors with 4xx: unknown or inactive broker, failed connect', async () => {
+    const status = async (p: Promise<unknown>) => p.then(() => 'ok', (e: { status?: number; message: string }) => `${e.status}: ${e.message}`)
+    expect(await status(start({ brokerId: cds.utils.uuid() }))).toMatch(/^404: Broker .* not found$/)
+    const inactive = cds.utils.uuid()
+    await INSERT.into('aem.suite.Brokers').entries({ ID: inactive, name: 'off', credentialMode: 'DIRECT', url: 'wss://off:443', msgVpn: 'v', username: 'u', active: false })
+    expect(await status(start({ brokerId: inactive }))).toBe('400: Broker "off" is inactive')
+    setSessionFactory(async () => {
+      throw new Error('Connect failed: Unauthorized')
+    })
+    expect(await status(start())).toBe('400: Connect failed: Unauthorized')
+    expect(sessions).toHaveLength(0)
+  })
 })

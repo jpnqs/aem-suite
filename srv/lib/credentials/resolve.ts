@@ -2,7 +2,7 @@ import cds from '@sap/cds'
 import { getDestination } from '@sap-cloud-sdk/connectivity'
 import type { ConnectionConfig } from '../solace/session'
 import { readBrokerProps, toSmfUrl } from '../broker-url'
-import { HttpError } from '../errors'
+import { httpError, HttpError } from '../errors'
 import { DEFAULT_CLIENT_NAME_PREFIX, DEFAULT_CONNECT_TIMEOUT_MS } from '../defaults'
 
 export type CredentialMode = 'DESTINATION' | 'DIRECT'
@@ -28,7 +28,7 @@ export interface BrokerConnection extends ConnectionConfig {
 /** Reads a broker (bypasses service projections). */
 export async function loadBroker(brokerId: string): Promise<BrokerRecord> {
   const broker = await SELECT.one.from('aem.suite.Brokers').where({ ID: brokerId })
-  if (!broker) throw new Error(`Broker ${brokerId} not found`)
+  if (!broker) throw httpError(404, `Broker ${brokerId} not found`)
   return broker as BrokerRecord
 }
 
