@@ -13,6 +13,9 @@ import { columnLength } from './model'
 
 const LOG = cds.log('aem-runner')
 
+/** live progress of a run: at most one event in this time, plus the final one */
+const PROGRESS_MS = 250
+
 /** a text cut to the length of RunResults.errorMessage */
 const errorText = (message: string) => truncate(message, columnLength('RunResults', 'errorMessage'))
 
@@ -231,6 +234,10 @@ class RunProgress {
   private readonly counts = { done: 0, passed: 0, failed: 0, skipped: 0 }
   /** per test case: outcome over all brokers */
   private readonly perTestCase = new Map<string, Outcome[]>()
+  /** live progress is throttled (see progressed): when the last event went out, the event still to come */
+  private lastEmit = 0
+  private trailing?: NodeJS.Timeout
+  private lastResultId?: string
 
   constructor(
     private readonly runId: string,
@@ -246,7 +253,7 @@ class RunProgress {
     if (status === 'PASSED') this.counts.passed++
     else this.counts.failed++
     await cds.db.tx(() => UPDATE(RunResults, r.ID).with({ status, executedAt: new Date().toISOString(), ...data }))
-    await this.emit(r.ID)
+    await this.progressed(r.ID)
   }
 
   /** A message that is not sent (run stopped, stop on first failure): counts as done, not as failed. */
@@ -254,7 +261,7 @@ class RunProgress {
     this.counts.done++
     this.counts.skipped++
     await cds.db.tx(() => UPDATE(RunResults, r.ID).with({ status: 'SKIPPED', executedAt: new Date().toISOString(), errorMessage: reason }))
-    await this.emit(r.ID)
+    await this.progressed(r.ID)
   }
 
   /** Marks the run DONE once every result is stored. */
@@ -270,8 +277,35 @@ class RunProgress {
       })
     )
     await updateTestCaseStats(this.runId, this.perTestCase)
+    this.stop()
     await this.emit(undefined, 'DONE')
     LOG.info(`Run ${this.runId} finished: ${passed}/${this.total} passed`)
+  }
+
+  /** No more live progress (the run ends, or it crashed and failRuns takes over). */
+  stop(): void {
+    clearTimeout(this.trailing)
+    this.trailing = undefined
+  }
+
+  /**
+   * At most one progress event per PROGRESS_MS, the latest state coming last: a run of thousands of messages to a
+   * fast broker would otherwise push an event for every one. The result rows themselves are still stored one by one
+   * (each in its own transaction), so a failed write stops exactly that broker (see executeRun).
+   */
+  private progressed(resultId: string): Promise<void> {
+    this.lastResultId = resultId
+    const wait = this.lastEmit + PROGRESS_MS - Date.now()
+    if (wait <= 0) {
+      this.lastEmit = Date.now()
+      return this.emit(resultId)
+    }
+    this.trailing ??= setTimeout(() => {
+      this.trailing = undefined
+      this.lastEmit = Date.now()
+      void this.emit(this.lastResultId)
+    }, wait)
+    return Promise.resolve()
   }
 
   private emit(resultId?: string, status = 'RUNNING'): Promise<void> {
@@ -318,7 +352,10 @@ async function executeRun(runId: string, jwt: string | undefined, credentials: C
   // a broker loop only stops early when storing a result failed: then the run cannot be completed as DONE
   // (results would stay PENDING) - executeRunInBackground marks it FAILED instead
   const crashed = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected')
-  if (crashed) throw crashed.reason
+  if (crashed) {
+    ctx.progress.stop()
+    throw crashed.reason
+  }
   await ctx.progress.complete()
 }
 

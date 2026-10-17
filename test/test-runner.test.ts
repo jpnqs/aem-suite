@@ -87,7 +87,7 @@ describe('test runner', () => {
     }
   })
 
-  it('reports the progress to the run dialog after every message and at the end', async () => {
+  it('reports the progress to the run dialog - throttled - and always the end', async () => {
     const live = await cds.connect.to('LiveService')
     const emit = jest.spyOn(live, 'emit')
     try {
@@ -97,9 +97,9 @@ describe('test runner', () => {
       // emit(event, data) - the typings only know emit({ event, data })
       const calls = emit.mock.calls as unknown as [string, { runId: string }][]
       const events = calls.filter(([event, data]) => event === 'runProgress' && data.runId === runId).map(([, data]) => data)
+      // the first message right away, the second within 250 ms of it: no event of its own, the end follows
       expect(events).toEqual([
         expect.objectContaining({ status: 'RUNNING', total: 2, done: 1, passed: 1, failed: 0, skipped: 0, resultId: expect.any(String) }),
-        expect.objectContaining({ status: 'RUNNING', total: 2, done: 2, passed: 2 }),
         expect.objectContaining({ status: 'DONE', total: 2, done: 2, passed: 2, failed: 0 })
       ])
     } finally {

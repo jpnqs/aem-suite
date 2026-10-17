@@ -91,10 +91,15 @@ async function siblingsOf(parentId: string | null): Promise<Sibling[]> {
   return siblings.sort(compareSiblings)
 }
 
-/** Gives the nodes a clean 10, 20, 30 ... order (default: the current order of the folder's children). */
+/**
+ * Gives the nodes a clean 10, 20, 30 ... order (default: the current order of the folder's children).
+ * One UPDATE per node whose position changes - nodes that already have theirs are not written (the values differ
+ * per row, so the updates cannot be one statement).
+ */
 export async function renumberSiblings(parentId: string | null, order?: Sibling[]): Promise<void> {
   for (const [i, s] of (order ?? (await siblingsOf(parentId))).entries()) {
-    await UPDATE(TestCases, s.ID).with({ sortOrder: (i + 1) * SORT_STEP, ...unchanged(s) })
+    const sortOrder = (i + 1) * SORT_STEP
+    if (s.sortOrder !== sortOrder) await UPDATE(TestCases, s.ID).with({ sortOrder, ...unchanged(s) })
   }
 }
 

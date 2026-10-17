@@ -33,35 +33,35 @@ export async function copyNodes(ids: string[]): Promise<CopyResult[]> {
 }
 
 async function copySubtree(rootId: string, children: Map<string | null, TreeNode[]>): Promise<CopyResult> {
-  // original and everything below it, parents before children
-  const order: string[] = []
-  for (let queue = [rootId]; queue.length; ) {
-    const id = queue.shift()!
-    order.push(id)
-    queue.push(...(children.get(id) ?? []).map((c) => c.ID))
-  }
+  // original and everything below it, level by level (parents before children)
+  const levels: string[][] = []
+  for (let level = [rootId]; level.length; level = level.flatMap((id) => (children.get(id) ?? []).map((c) => c.ID))) levels.push(level)
+  const order = levels.flat()
   const rows = await selectNodesDeep({ ID: { in: order } })
   const byId = new Map(rows.map((r) => [r.ID, r]))
 
   const newIds = new Map(order.map((id) => [id, cds.utils.uuid()]))
   const original = byId.get(rootId)!
-  let copyName = ''
-  for (const id of order) {
+  const copyName = `${original.name ?? ''} (Copy)`.slice(0, columnLength('TestCases', 'name'))
+  const copyOf = (id: string) => {
     const row = byId.get(id)
-    if (!row) continue // deleted meanwhile
+    if (!row) return undefined // deleted meanwhile
     const isRoot = id === rootId
-    const name = isRoot ? `${row.name ?? ''} (Copy)`.slice(0, columnLength('TestCases', 'name')) : row.name
-    if (isRoot) copyName = name!
-    await INSERT.into(TestCases).entries({
+    return {
       ...omit(row, [...MANAGED, 'userProperties', 'variables']),
       ID: newIds.get(id),
       parent_ID: isRoot ? row.parent_ID : newIds.get(row.parent_ID as string),
-      name,
+      name: isRoot ? copyName : row.name,
       // right behind the original; the siblings are renumbered below
       ...(isRoot ? { sortOrder: (row.sortOrder ?? 0) + 1 } : {}),
       userProperties: (row.userProperties ?? []).map((p) => omit(p, CHILD_KEYS)),
       variables: (row.variables ?? []).map((v) => omit(v, CHILD_KEYS))
-    })
+    }
+  }
+  // one (deep) INSERT per level
+  for (const level of levels) {
+    const entries = level.map(copyOf).filter((e) => e !== undefined)
+    if (entries.length) await INSERT.into(TestCases).entries(entries)
   }
   await renumberSiblings(original.parent_ID ?? null)
   return { ID: newIds.get(rootId)!, name: copyName }
