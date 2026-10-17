@@ -9,7 +9,13 @@ function useFake(fake: FakeSession) {
   return jest.spyOn(sol().SolclientFactory, 'createSession').mockReturnValue(fake as unknown as solaceTypes.Session)
 }
 
-afterEach(() => jest.restoreAllMocks())
+/** timers faked, the event loop (setImmediate) left alone: the fake broker answers through it */
+const fakeTimers = () => jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] })
+
+afterEach(() => {
+  jest.useRealTimers()
+  jest.restoreAllMocks()
+})
 
 describe('SolaceSession', () => {
   it('connects and resolves PERSISTENT publish on ACK', async () => {
@@ -37,7 +43,45 @@ describe('SolaceSession', () => {
   it('rejects when no ACK arrives in time', async () => {
     useFake(new FakeSession(true, 'silent'))
     const s = await SolaceSession.connect(cfg)
-    await expect(s.publish(spec)).rejects.toThrow(/No broker acknowledgement within 200 ms/)
+    fakeTimers()
+    const published = s.publish(spec)
+    jest.advanceTimersByTime(spec.ackTimeoutMs)
+    await expect(published).rejects.toThrow(/No broker acknowledgement within 200 ms/)
+  })
+
+  it('gives up connecting when the library never reports back', async () => {
+    useFake(new FakeSession('silent'))
+    fakeTimers()
+    const connecting = SolaceSession.connect(cfg)
+    jest.advanceTimersByTime(cfg.connectTimeoutMs + 2000)
+    await expect(connecting).rejects.toThrow('Connect timeout after 1000 ms')
+  })
+
+  it('subscribes to a topic once the broker confirms it, and reports a refusal or no answer', async () => {
+    const fake = new FakeSession(true, 'ack')
+    useFake(fake)
+    const s = await SolaceSession.connect(cfg)
+    await expect(s.subscribe('a/>')).resolves.toBeUndefined()
+    fake.subscribeAnswer = 'error'
+    await expect(s.subscribe('b/>')).rejects.toThrow('Subscription rejected: Subscription ACL Denied')
+    fake.subscribeAnswer = 'silent'
+    fakeTimers()
+    const pending = s.subscribe('c/>', 500)
+    jest.advanceTimersByTime(1500)
+    await expect(pending).rejects.toThrow('Subscription to "c/>" not confirmed within 500 ms')
+  })
+
+  it('closes after 3 s even when the broker does not confirm the disconnect', async () => {
+    const fake = new FakeSession(true, 'ack')
+    fake.disconnectAnswer = 'silent'
+    useFake(fake)
+    const s = await SolaceSession.connect(cfg)
+    fakeTimers()
+    const closing = s.close()
+    jest.advanceTimersByTime(3000)
+    await closing
+    expect(fake.disposed).toBe(1)
+    await expect(s.publish(spec)).rejects.toThrow('Session is closed')
   })
 
   it('resolves DIRECT publish without waiting for an ACK', async () => {
@@ -123,6 +167,17 @@ describe('buildMessage / readMessage', () => {
     expect(r.correlationId).toBe('c-1')
     expect(r.deliveryMode).toBe('PERSISTENT')
     expect(r.userProperties).toEqual({ source: 'test', count: 42, flag: true, flag1: true, flag0: false })
+  })
+
+  it('reads the text of a TEXT message (not a binary attachment)', () => {
+    const s = sol()
+    const m = s.SolclientFactory.createMessage()
+    m.setDestination(s.SolclientFactory.createTopicDestination('acme/text'))
+    // not in srv/types/solclientjs.d.ts: the app only reads TEXT messages
+    const sdt = (s as unknown as { SDTField: { create(type: unknown, value: string): unknown } }).SDTField.create(s.SDTFieldType.STRING, 'hello')
+    ;(m as unknown as { setSdtContainer(field: unknown): void }).setSdtContainer(sdt)
+    m.setDeliveryMode(s.MessageDeliveryModeType.DIRECT)
+    expect(readMessage(m)).toMatchObject({ topic: 'acme/text', payload: 'hello', deliveryMode: 'DIRECT', userProperties: {}, correlationId: null })
   })
 
   it('rejects non-integer INT properties', () => {

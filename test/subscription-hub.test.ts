@@ -157,6 +157,36 @@ describe('subscription hub (live view)', () => {
       await expect(start()).resolves.toBeTruthy()
     }))
 
+  it('closes the session and answers 400 when the broker refuses a topic', async () => {
+    setSessionFactory(async () => {
+      const s = new FakeSubscriberSession()
+      s.failSubscribe = 'secret'
+      sessions.push(s)
+      return s
+    })
+    await expect(start({ topics: ['acme/>', 'secret/>'] })).rejects.toMatchObject({ status: 400, message: 'Subscription rejected: Subscription ACL Denied (secret/>)' })
+    expect(sessions[0].closed).toBe(true)
+    expect(listSubscriptions('alice')).toEqual([])
+  })
+
+  it('closes a queue subscription whose flow went down', async () => {
+    const id = await start({ sourceType: 'QUEUE_CONSUME', queue: 'orders' })
+    sessions[0].flow.emit(sol().MessageConsumerEventName.DOWN_ERROR)
+    await settle()
+    expect(listSubscriptions('alice')).toEqual([])
+    expect(sessions[0].closed).toBe(true)
+    expect(statusOf(id)).toEqual([expect.objectContaining({ data: expect.objectContaining({ status: 'DOWN', message: 'Queue consumer went down' }) })])
+  })
+
+  it('still shows a consumed message when acknowledging it fails', async () => {
+    const id = await start({ sourceType: 'QUEUE_CONSUME', queue: 'orders' })
+    sessions[0].flow.failAck = true
+    sessions[0].flow.deliver(sol().MessageConsumerEventName.MESSAGE)
+    await settle()
+    expect(messagesOf(id)).toHaveLength(1)
+    expect(listSubscriptions('alice')).toHaveLength(1)
+  })
+
   it('closes subscriptions the broker dropped', async () => {
     const id = await start()
     sessions[0].drop()

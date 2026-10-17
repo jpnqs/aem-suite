@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
-import { waitForRun } from '../srv/lib/test-runner'
-import { createActive, fakeBroker, resetDatabase, startServer, users } from './helpers'
+import * as testCaseSpec from '../srv/lib/test-case-spec'
+import { createActive, fakeBroker, resetDatabase, runAndWait, startServer, users } from './helpers'
 
 const { GET, POST } = startServer()
 const { admin, tester } = users
@@ -13,11 +13,11 @@ describe('test runner', () => {
 
   const run = async (testCaseIds: string[]) => {
     published.length = 0
-    const res = await POST('/odata/v4/test/runTests', { testCaseIds, brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'pw' }] }, tester)
+    const res = await runAndWait(POST, { testCaseIds, brokerIds: [broker.ID] })
     expect(res.status).toBe(200)
-    await waitForRun(res.data.runId)
     return res.data.runId as string
   }
+  const tc = (name: string, topic: string) => createActive(POST, 'test', 'TestCases', { name, topic, payload: '{}', deliveryMode: 'PERSISTENT' })
   const resultsOf = async (runId: string) =>
     (await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${runId}&$orderby=sequence`, tester)).data.value as Record<string, unknown>[]
   const runOf = async (runId: string) => (await GET(`/odata/v4/test/TestRuns(${runId})`, tester)).data
@@ -34,7 +34,6 @@ describe('test runner', () => {
   })
 
   it('a failed database write ends the run FAILED instead of DONE with PENDING results', async () => {
-    const tc = (name: string, topic: string) => createActive(POST, 'test', 'TestCases', { name, topic, payload: '{}', deliveryMode: 'PERSISTENT' })
     const ok = await tc('ok', 'run/ok')
     const broken = await tc('broken', 'run/dbfail')
     const after = await tc('after', 'run/after')
@@ -64,5 +63,46 @@ describe('test runner', () => {
     expect(row.resolvedTopic).toHaveLength(500)
     expect(row.correlationId).toHaveLength(200)
     expect(String(row.resolvedTopic).endsWith('...')).toBe(true)
+  })
+
+  it('a message that cannot be resolved is an ERROR and is not sent', async () => {
+    const unknown = await tc('unknown', 'run/{{nope}}')
+    const runId = await run([unknown.ID])
+    expect(published).toEqual([])
+    const [row] = await resultsOf(runId)
+    expect(row).toMatchObject({ status: 'ERROR', errorMessage: 'Unknown variable(s): nope' })
+    expect(await runOf(runId)).toMatchObject({ status: 'DONE', outcome: 'FAILED', failedCount: 1 })
+  })
+
+  it('a test case deleted before the run executes ends as ERROR', async () => {
+    const gone = await tc('gone', 'run/gone')
+    // the run was created, but the test case is gone when the run loads it
+    const load = jest.spyOn(testCaseSpec, 'loadTestCases').mockResolvedValueOnce([])
+    try {
+      const runId = await run([gone.ID])
+      expect((await resultsOf(runId))[0]).toMatchObject({ status: 'ERROR', errorMessage: 'Test case was deleted' })
+    } finally {
+      load.mockRestore()
+    }
+  })
+
+  it('reports the progress to the run dialog after every message and at the end', async () => {
+    const live = await cds.connect.to('LiveService')
+    const emit = jest.spyOn(live, 'emit')
+    try {
+      const a = await tc('progress a', 'run/p/a')
+      const b = await tc('progress b', 'run/p/b')
+      const runId = await run([a.ID, b.ID])
+      // emit(event, data) - the typings only know emit({ event, data })
+      const calls = emit.mock.calls as unknown as [string, { runId: string }][]
+      const events = calls.filter(([event, data]) => event === 'runProgress' && data.runId === runId).map(([, data]) => data)
+      expect(events).toEqual([
+        expect.objectContaining({ status: 'RUNNING', total: 2, done: 1, passed: 1, failed: 0, skipped: 0, resultId: expect.any(String) }),
+        expect.objectContaining({ status: 'RUNNING', total: 2, done: 2, passed: 2 }),
+        expect.objectContaining({ status: 'DONE', total: 2, done: 2, passed: 2, failed: 0 })
+      ])
+    } finally {
+      emit.mockRestore()
+    }
   })
 })

@@ -1,3 +1,4 @@
+import { allFakers } from '@faker-js/faker'
 import { generateFake } from '../srv/lib/fake-data'
 import { TemplateError, TemplateResolver, fakerKey, numberSlots } from '../srv/lib/template/resolve'
 import { createActive, resetDatabase, startServer, users, withAemSuiteConfig } from './helpers'
@@ -115,5 +116,7 @@ describe('faker test data in previews and runs', () => {
   it('uses the language of the setting', async () => {
     const p = await withAemSuiteConfig({ faker: { locale: 'de' } }, () => preview({ name: 'de', topic: 'x/{{faker.location.country}}', payload: '{}' }))
     expect(p.valid).toBe(true)
+    // a country name of the German list (e.g. "Deutschland", "Frankreich")
+    expect(allFakers.de.definitions.location?.country).toContain(p.topic.slice(2))
   })
 })

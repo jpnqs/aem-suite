@@ -1,7 +1,6 @@
-import { startServer, withAemSuiteConfig } from './helpers'
+import { MCP_HEADERS, startServer, withAemSuiteConfig } from './helpers'
 
 const { GET, POST } = startServer()
-const MCP_HEADERS = { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' }
 const UAA = 'https://acme.authentication.eu10.hana.ondemand.com'
 
 const anonymousRpc = () => POST('/mcp/agent', { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }, { headers: MCP_HEADERS })

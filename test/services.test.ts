@@ -3,7 +3,7 @@ import * as testCaseSpec from '../srv/lib/test-case-spec'
 import { failRuns, waitForRun } from '../srv/lib/test-runner'
 import { setSessionFactory, stopAll } from '../srv/lib/solace/subscription-hub'
 import { FakeSubscriberSession } from './fakes/solace'
-import { createActive, fakeBroker, resetDatabase, startServer, users } from './helpers'
+import { createActive, draft, fakeBroker, resetDatabase, runAndWait, startServer, users, withDestinations } from './helpers'
 
 const { GET, POST, PATCH, DELETE: DEL } = startServer()
 const { admin, tester } = users
@@ -54,25 +54,24 @@ describe('AEM test suite services', () => {
   })
 
   it('creates direct brokers without storing any password', async () => {
-    const { data: draft } = await POST(
+    const { data: created } = await POST(
       '/odata/v4/admin/Brokers',
       { name: 'no-password', credentialMode: 'DIRECT', url: 'dev.example', msgVpn: 'dev-vpn', username: 'solace-cloud-client' },
       admin
     )
-    expect(draft.username).toBe('solace-cloud-client')
-    expect(draft.url).toBe('wss://dev.example:443')
-    const { data: active, status } = await POST(
-      `/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=false)/AdminService.draftActivate`,
-      {},
-      admin
-    )
+    expect(created.username).toBe('solace-cloud-client')
+    expect(created.url).toBe('wss://dev.example:443')
+    const { data: active, status } = await draft.activate(POST, 'admin', 'Brokers', created.ID, admin)
     expect(status).toBe(201)
     // no automatic connection test for direct brokers - there is no password to test with
     expect(active.lastConnectionStatus ?? null).toBeNull()
     expect(Object.keys(active).filter((k) => /password/i.test(k))).toEqual([])
     const row = await SELECT.one.from('aem.suite.Brokers', active.ID)
     expect(Object.keys(row).filter((k) => /password/i.test(k))).toEqual([])
-    // host:port of an SMF port becomes tcps://
+  })
+
+  it('completes the broker URL from the host and port', async () => {
+    // host:port of an SMF port becomes tcps:// (the broker of beforeAll)
     expect(badBroker.url).toBe('tcps://nope.example:55443')
   })
 
@@ -89,49 +88,53 @@ describe('AEM test suite services', () => {
     expect(JSON.stringify(row)).not.toContain('pw-test')
   })
 
-  it('tests destination brokers automatically on save', async () => {
-    process.env.destinations = JSON.stringify([
-      { name: 'aem-dest', url: 'https://dest.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }
-    ])
-    try {
-      const { data: draft } = await POST(
-        '/odata/v4/admin/Brokers',
-        { name: 'dest', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: false },
-        admin
-      )
+  it('tests destination brokers automatically on save', () =>
+    withDestinations([{ name: 'aem-dest', url: 'https://dest.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }], async () => {
       // inactive: saved without test
-      let res = await POST(`/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=false)/AdminService.draftActivate`, {}, admin)
+      let res = await draft.save(POST, 'admin', 'Brokers', { name: 'dest', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: false }, admin)
+      const { ID } = res.data
       expect(res.data.lastConnectionStatus ?? null).toBeNull()
+      try {
+        await draft.edit(POST, 'admin', 'Brokers', ID, admin)
+        await PATCH(`/odata/v4/admin/Brokers(ID=${ID},IsActiveEntity=false)`, { active: true }, admin)
+        res = await draft.activate(POST, 'admin', 'Brokers', ID, admin)
+        expect(res.data).toMatchObject({ lastConnectionStatus: 'OK' })
+        expect(String(res.headers['sap-messages'])).toMatch(/Connection test successful/)
+        expect(connectedWith.dest).toBe('dp')
+      } finally {
+        // later tests list the active brokers
+        await UPDATE('aem.suite.Brokers', ID).with({ active: false })
+      }
+    }))
 
-      await POST(`/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=true)/AdminService.draftEdit`, {}, admin)
-      await PATCH(`/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=false)`, { active: true }, admin)
-      res = await POST(`/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=false)/AdminService.draftActivate`, {}, admin)
-      expect(res.data).toMatchObject({ lastConnectionStatus: 'OK' })
-      expect(String(res.headers['sap-messages'])).toMatch(/Connection test successful/)
-      expect(connectedWith.dest).toBe('dp')
-      await UPDATE('aem.suite.Brokers', draft.ID).with({ active: false })
-    } finally {
-      delete process.env.destinations
-    }
-  })
+  it('saves a destination broker whose connection test fails, with a warning', () =>
+    withDestinations([{ name: 'aem-down', url: 'https://down.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }], async () => {
+      // the fake broker refuses connections to brokers named "unreachable"
+      const res = await draft.save(POST, 'admin', 'Brokers', { name: 'unreachable', credentialMode: 'DESTINATION', destinationName: 'aem-down' }, admin)
+      try {
+        expect(res.status).toBe(201)
+        expect(res.data).toMatchObject({ lastConnectionStatus: 'ERROR', lastConnectionMessage: 'Connect failed: Unauthorized' })
+        expect(String(res.headers['sap-messages'])).toMatch(/Saved, but the connection test failed: Connect failed: Unauthorized/)
+      } finally {
+        await UPDATE('aem.suite.Brokers', res.data.ID).with({ active: false })
+      }
+    }))
 
   it('validates broker input', async () => {
-    const { data: draft } = await POST('/odata/v4/admin/Brokers', { name: 'broken', credentialMode: 'DESTINATION' }, admin)
-    const res = await POST(
-      `/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=false)/AdminService.draftActivate`,
-      {},
-      admin
-    )
-    expect(res.status).toBe(400)
-    expect(JSON.stringify(res.data)).toMatch(/Destination name is required/)
+    const messages = async (data: object) => {
+      const res = await draft.save(POST, 'admin', 'Brokers', data, admin)
+      expect(res.status).toBe(400)
+      const error = res.data.error
+      return (error.details ?? [error]).map((e: { message: string; target: string }) => `${e.target}: ${e.message}`)
+    }
+    expect(await messages({ name: 'broken', credentialMode: 'DESTINATION' })).toEqual(['in/destinationName: Destination name is required'])
+    expect(await messages({ name: 'broken', credentialMode: 'DIRECT' })).toEqual(['in/url: URL is required', 'in/msgVpn: Message VPN is required'])
+    expect((await messages({ name: 'broken', credentialMode: 'DIRECT', url: 'ftp://x.example', msgVpn: 'v' })).join()).toMatch(/^in\/url: .*ftp/)
   })
 
   it('checks broker variable names like test case variables', async () => {
     const broker = { credentialMode: 'DIRECT', url: 'vars.example', msgVpn: 'v' }
-    const activate = async (data: object) => {
-      const { data: draft } = await POST('/odata/v4/admin/Brokers', data, admin)
-      return POST(`/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=false)/AdminService.draftActivate`, {}, admin)
-    }
+    const activate = (data: object) => draft.save(POST, 'admin', 'Brokers', data, admin)
     const invalid = await activate({ ...broker, name: 'vars1', variables: [{ name: 'my var', value: 'x' }] })
     expect(invalid.status).toBe(400)
     expect(invalid.data.error).toMatchObject({ message: 'Invalid variable name "my var"', target: 'in/variables(0)/name' })
@@ -142,10 +145,7 @@ describe('AEM test suite services', () => {
   })
 
   it('rejects enum values and numbers outside the schema limits on the OData paths too', async () => {
-    const activate = async (service: 'admin' | 'test', entity: string, data: object, auth: object) => {
-      const { data: draft } = await POST(`/odata/v4/${service}/${entity}`, data, auth)
-      return POST(`/odata/v4/${service}/${entity}(ID=${draft.ID},IsActiveEntity=false)/${service === 'admin' ? 'AdminService' : 'TestService'}.draftActivate`, {}, auth)
-    }
+    const activate = (service: 'admin' | 'test', entity: string, data: object, auth: object) => draft.save(POST, service, entity, data, auth)
     const message = (res: { data: unknown }) => JSON.stringify(res.data)
     const tc = { name: 'enum', topic: 't/enum', payload: '{}' }
     const results = [
@@ -163,29 +163,20 @@ describe('AEM test suite services', () => {
     expect(message(results[4])).toMatch(/between 1000 and 120000.*in\/connectTimeoutMs/)
   })
 
-  it('creates global variables and rejects duplicates', async () => {
+  it('creates global variables and rejects duplicates and invalid names', async () => {
     await createActive(POST, 'admin', 'GlobalVariables', { name: 'tenant', value: 'acme' }, admin)
-    const { data: draft } = await POST('/odata/v4/admin/GlobalVariables', { name: 'tenant', value: 'x' }, admin)
-    const res = await POST(
-      `/odata/v4/admin/GlobalVariables(ID=${draft.ID},IsActiveEntity=false)/AdminService.draftActivate`,
-      {},
-      admin
-    )
-    expect(res.status).toBe(409)
+    const duplicate = await draft.save(POST, 'admin', 'GlobalVariables', { name: 'tenant', value: 'x' }, admin)
+    expect(duplicate.status).toBe(409)
+    expect(duplicate.data.error.message).toBe('Global variable "tenant" already exists')
+    const invalid = await draft.save(POST, 'admin', 'GlobalVariables', { name: 'my tenant', value: 'x' }, admin)
+    expect(invalid.status).toBe(400)
+    expect(invalid.data.error).toMatchObject({ message: expect.stringMatching(/^Variable names must start with a letter/), target: 'in/name' })
   })
 
   it('rejects invalid JSON payloads but accepts templated numbers', async () => {
-    const { data: draft } = await POST(
-      '/odata/v4/test/TestCases',
-      { name: 'bad', topic: 't', payload: '{"a": }' },
-      tester
-    )
-    const res = await POST(
-      `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)/TestService.draftActivate`,
-      {},
-      tester
-    )
+    const res = await draft.save(POST, 'test', 'TestCases', { name: 'bad', topic: 't', payload: '{"a": }' })
     expect(res.status).toBe(400)
+    expect(res.data.error).toMatchObject({ message: expect.stringMatching(/^Payload is not valid JSON/), target: 'in/payload' })
     // the test case of beforeAll has a variable where a number goes - saved as is
     expect(testCase.payload).toContain('"qty":{{qty}}')
   })
@@ -315,17 +306,8 @@ describe('AEM test suite services', () => {
 
   it('runs several test cases and marks broker rejections as FAILED', async () => {
     const rejecting = await createActive(POST, 'test', 'TestCases', { name: 'rejected', topic: 'reject/me', payload: '{}', deliveryMode: 'DIRECT' })
-    const res = await POST(
-      '/odata/v4/test/runTests',
-      {
-        testCaseIds: [testCase.ID, rejecting.ID],
-        brokerIds: [goodBroker.ID],
-        credentials: [{ brokerId: goodBroker.ID, password: 'pw-dev' }]
-      },
-      tester
-    )
+    const res = await runAndWait(POST, { testCaseIds: [testCase.ID, rejecting.ID], brokerIds: [goodBroker.ID] })
     expect(res.status).toBe(200)
-    await waitForRun(res.data.runId)
     const { data } = await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${res.data.runId}`, tester)
     const statuses = data.value.map((r: { testCaseName: string; status: string }) => `${r.testCaseName}:${r.status}`).sort()
     expect(statuses).toEqual(['Order created:PASSED', 'rejected:FAILED'])
@@ -338,13 +320,8 @@ describe('AEM test suite services', () => {
   it('marks a run that crashed as FAILED, so it neither shows as running nor blocks run slots', async () => {
     const crash = jest.spyOn(testCaseSpec, 'loadTestCases').mockRejectedValueOnce(new Error('database gone'))
     try {
-      const res = await POST(
-        '/odata/v4/test/runTests',
-        { testCaseIds: [testCase.ID], brokerIds: [goodBroker.ID], credentials: [{ brokerId: goodBroker.ID, password: 'pw-dev' }] },
-        tester
-      )
+      const res = await runAndWait(POST, { testCaseIds: [testCase.ID], brokerIds: [goodBroker.ID] })
       expect(res.status).toBe(200)
-      await waitForRun(res.data.runId)
       const { data: run } = await GET(`/odata/v4/test/TestRuns(${res.data.runId})?$expand=results`, tester)
       expect(run).toMatchObject({ status: 'FAILED', outcome: 'FAILED', statusCriticality: 1, passedCount: 0, failedCount: 1 })
       expect(run.finishedAt).toBeTruthy()
@@ -367,8 +344,11 @@ describe('AEM test suite services', () => {
   })
 
   it('validates run input', async () => {
-    const res = await POST('/odata/v4/test/runTests', { testCaseIds: [testCase.ID], brokerIds: [] }, tester)
-    expect(res.status).toBe(400)
+    const noBroker = await POST('/odata/v4/test/runTests', { testCaseIds: [testCase.ID], brokerIds: [] }, tester)
+    expect(noBroker.status).toBe(400)
+    expect(noBroker.data.error.message).toBe('Select at least one broker')
+    const noTest = await POST('/odata/v4/test/runTests', { testCaseIds: [], brokerIds: [goodBroker.ID] }, tester)
+    expect(noTest.data.error.message).toBe('Select at least one test case or folder')
   })
 
   it('duplicates a test case including children', async () => {
@@ -502,39 +482,31 @@ describe('AEM test suite services', () => {
   })
 
   it('lets admins update brokers via draft edit', async () => {
-    await POST(`/odata/v4/admin/Brokers(ID=${goodBroker.ID},IsActiveEntity=true)/AdminService.draftEdit`, {}, admin)
+    await draft.edit(POST, 'admin', 'Brokers', goodBroker.ID, admin)
     await PATCH(`/odata/v4/admin/Brokers(ID=${goodBroker.ID},IsActiveEntity=false)`, { description: 'changed' }, admin)
-    const res = await POST(
-      `/odata/v4/admin/Brokers(ID=${goodBroker.ID},IsActiveEntity=false)/AdminService.draftActivate`,
-      {},
-      admin
-    )
+    const res = await draft.activate(POST, 'admin', 'Brokers', goodBroker.ID, admin)
     expect(res.status).toBe(200)
     const row = await SELECT.one.from('aem.suite.Brokers', goodBroker.ID)
     expect(row.description).toBe('changed')
   })
 
   it('starts new test cases from a template and fills empty types on save', async () => {
-    const { data: draft } = await POST('/odata/v4/test/TestCases', {}, tester)
-    expect(draft.payload).toContain('"id": "{{uuid}}"')
-    expect(draft.correlationId).toBe('{{uuid}}')
-    expect(draft.priority ?? null).toBeNull()
+    const { data: created } = await POST('/odata/v4/test/TestCases', {}, tester)
+    expect(created.payload).toContain('"id": "{{uuid}}"')
+    expect(created.correlationId).toBe('{{uuid}}')
+    expect(created.priority ?? null).toBeNull()
 
     await PATCH(
-      `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)`,
+      `/odata/v4/test/TestCases(ID=${created.ID},IsActiveEntity=false)`,
       { name: 'auto', topic: 'a/b', payload: 'plain text {{uuid}}', contentType: null },
       tester
     )
     for (const [name, value] of [['n', '42'], ['b', 'true'], ['s', 'x'], ['t', '{{qty}}']])
-      await POST(`/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)/userProperties`, { name, value }, tester)
-    const res = await POST(
-      `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)/TestService.draftActivate`,
-      {},
-      tester
-    )
+      await POST(`/odata/v4/test/TestCases(ID=${created.ID},IsActiveEntity=false)/userProperties`, { name, value }, tester)
+    const res = await draft.activate(POST, 'test', 'TestCases', created.ID)
     expect(res.status).toBe(201)
     const { data: tc } = await GET(
-      `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=true)?$expand=userProperties`,
+      `/odata/v4/test/TestCases(ID=${created.ID},IsActiveEntity=true)?$expand=userProperties`,
       tester
     )
     expect(tc.contentType).toBe('text/plain')
@@ -543,9 +515,9 @@ describe('AEM test suite services', () => {
   })
 
   it('takes the name from the topic until the user names the test case', async () => {
-    const { data: draft } = await POST('/odata/v4/test/TestCases', {}, tester)
-    expect(draft.contentType).toBe('application/json')
-    const url = `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)`
+    const { data: created } = await POST('/odata/v4/test/TestCases', {}, tester)
+    expect(created.contentType).toBe('application/json')
+    const url = `/odata/v4/test/TestCases(ID=${created.ID},IsActiveEntity=false)`
 
     let { data } = await PATCH(url, { topic: 'acme/orders' }, tester)
     expect(data.name).toBe('acme/orders')
@@ -559,15 +531,15 @@ describe('AEM test suite services', () => {
     // saved without a name -> topic is used
     const { data: d2 } = await POST('/odata/v4/test/TestCases', {}, tester)
     await PATCH(`/odata/v4/test/TestCases(ID=${d2.ID},IsActiveEntity=false)`, { topic: 'x/y', name: null }, tester)
-    const res = await POST(`/odata/v4/test/TestCases(ID=${d2.ID},IsActiveEntity=false)/TestService.draftActivate`, {}, tester)
+    const res = await draft.activate(POST, 'test', 'TestCases', d2.ID)
     expect(res.status).toBe(201)
     expect(res.data.name).toBe('x/y')
   })
 
   it('previews a draft while it is being edited', async () => {
-    const { data: draft } = await POST('/odata/v4/test/TestCases', { topic: 'draft/{{region}}' }, tester)
+    const { data: created } = await POST('/odata/v4/test/TestCases', { topic: 'draft/{{region}}' }, tester)
     const { data, status } = await POST(
-      `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)/TestService.preview`,
+      `/odata/v4/test/TestCases(ID=${created.ID},IsActiveEntity=false)/TestService.preview`,
       { brokerId: goodBroker.ID },
       tester
     )
@@ -575,23 +547,22 @@ describe('AEM test suite services', () => {
     expect(data).toMatchObject({ valid: true, topic: 'draft/eu' })
   })
 
-  it('lists destinations for the value help', async () => {
-    process.env.destinations = JSON.stringify([
-      { name: 'aem-dev', url: 'https://mr-dev.messaging.solace.cloud:443', username: 'u', password: 'p', msgVpn: 'dev' },
-      // the connection accepts the aem. prefix - the value help must too
-      { name: 'aem-prefixed', url: 'ftp://ignored', 'aem.smfUrl': 'tcps://mr-x:55443', 'aem.msgVpn': 'x' },
-      { name: 'some-http-api', url: 'ftp://not-a-broker' }
-    ])
-    try {
-      const { data } = await GET('/odata/v4/admin/Destinations', admin)
-      expect(data.value).toEqual([
-        expect.objectContaining({ name: 'aem-dev', msgVpn: 'dev', source: 'ENV', authentication: 'BasicAuthentication' }),
-        expect.objectContaining({ name: 'aem-prefixed', url: 'tcps://mr-x:55443', msgVpn: 'x' })
-      ])
-      const { data: search } = await GET('/odata/v4/admin/Destinations?$search=nothing', admin)
-      expect(search.value).toEqual([])
-    } finally {
-      delete process.env.destinations
-    }
-  })
+  it('lists destinations for the value help', () =>
+    withDestinations(
+      [
+        { name: 'aem-dev', url: 'https://mr-dev.messaging.solace.cloud:443', username: 'u', password: 'p', msgVpn: 'dev' },
+        // the connection accepts the aem. prefix - the value help must too
+        { name: 'aem-prefixed', url: 'ftp://ignored', 'aem.smfUrl': 'tcps://mr-x:55443', 'aem.msgVpn': 'x' },
+        { name: 'some-http-api', url: 'ftp://not-a-broker' }
+      ],
+      async () => {
+        const { data } = await GET('/odata/v4/admin/Destinations', admin)
+        expect(data.value).toEqual([
+          expect.objectContaining({ name: 'aem-dev', msgVpn: 'dev', source: 'ENV', authentication: 'BasicAuthentication' }),
+          expect.objectContaining({ name: 'aem-prefixed', url: 'tcps://mr-x:55443', msgVpn: 'x' })
+        ])
+        const { data: search } = await GET('/odata/v4/admin/Destinations?$search=nothing', admin)
+        expect(search.value).toEqual([])
+      }
+    ))
 })

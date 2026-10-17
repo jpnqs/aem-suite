@@ -1,7 +1,6 @@
 import cds from '@sap/cds'
-import { waitForRun } from '../srv/lib/test-runner'
 import { Tree } from '../srv/lib/tree'
-import { createActive, fakeBroker, resetDatabase, startServer, users } from './helpers'
+import { createActive, draft, fakeBroker, resetDatabase, runAndWait, startServer, users } from './helpers'
 
 const { GET, POST, PATCH, axios } = startServer()
 const { tester } = users
@@ -26,14 +25,10 @@ describe('test case tree (folders)', () => {
   const broker = { ID: cds.utils.uuid() }
   const fake = fakeBroker()
 
-  beforeAll(async () => {
-    await resetDatabase()
-    await INSERT.into('aem.suite.Brokers').entries({ ID: broker.ID, name: 'b', credentialMode: 'DIRECT', url: 'wss://b:443', msgVpn: 'v', username: 'u', active: true })
-  })
-
   // every test starts from the same tree: Orders / EU / (created, cancelled), and ping at top level
   beforeEach(async () => {
-    for (const e of ['RunResults', 'TestRuns', 'TestCaseStats', 'TestCaseProperties', 'TestCaseVariables', 'TestCases']) await DELETE.from(`aem.suite.${e}`)
+    await resetDatabase()
+    await INSERT.into('aem.suite.Brokers').entries({ ID: broker.ID, name: 'b', credentialMode: 'DIRECT', url: 'wss://b:443', msgVpn: 'v', username: 'u', active: true })
     fake.published.length = 0
     orders = await create({ kind: 'FOLDER', name: 'Orders', variables: [{ name: 'domain', value: 'orders' }] })
     eu = await create({ kind: 'FOLDER', name: 'EU', parent_ID: orders.ID, variables: [{ name: 'region', value: 'eu' }] })
@@ -55,14 +50,13 @@ describe('test case tree (folders)', () => {
   })
 
   it('rejects invalid structures', async () => {
-    const { data: d1 } = await POST('/odata/v4/test/TestCases', { topic: 'x', parent_ID: ping.ID }, tester)
-    let res = await POST(`/odata/v4/test/TestCases(ID=${d1.ID},IsActiveEntity=false)/TestService.draftActivate`, {}, tester)
+    let res = await draft.save(POST, 'test', 'TestCases', { topic: 'x', parent_ID: ping.ID })
     expect(res.status).toBe(400)
     expect(res.data.error.message).toBe('Test cases can only be placed in folders')
 
     const { data: d2 } = await POST('/odata/v4/test/TestCases', { kind: 'FOLDER' }, tester)
     expect(d2.payload ?? null).toBeNull() // no starter template for folders
-    res = await POST(`/odata/v4/test/TestCases(ID=${d2.ID},IsActiveEntity=false)/TestService.draftActivate`, {}, tester)
+    res = await draft.activate(POST, 'test', 'TestCases', d2.ID)
     expect(res.status).toBe(400)
     expect(JSON.stringify(res.data)).toMatch(/Folder name is required/)
   })
@@ -137,13 +131,8 @@ describe('test case tree (folders)', () => {
 
   it('runs a whole folder with folder variables', async () => {
     await UPDATE('aem.suite.TestCases', ping.ID).with({ parent_ID: orders.ID })
-    const res = await POST(
-      '/odata/v4/test/runTests',
-      { testCaseIds: [orders.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'p' }] },
-      tester
-    )
+    const res = await runAndWait(POST, { testCaseIds: [orders.ID], brokerIds: [broker.ID] })
     expect(res.status).toBe(200)
-    await waitForRun(res.data.runId)
     // tree order: EU folder first (created, cancelled), then ping
     expect(fake.published.map((p) => p.spec.topic)).toEqual(['orders/eu/created', 'orders/eu/cancelled', 'ping'])
     const { data: run } = await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)
@@ -152,19 +141,15 @@ describe('test case tree (folders)', () => {
 
   it('refuses to run an empty folder', async () => {
     const empty = await create({ kind: 'FOLDER', name: 'Empty' })
-    const res = await POST(
-      '/odata/v4/test/runTests',
-      { testCaseIds: [empty.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'p' }] },
-      tester
-    )
+    const res = await runAndWait(POST, { testCaseIds: [empty.ID], brokerIds: [broker.ID] })
     expect(res.status).toBe(400)
     expect(res.data.error.message).toBe('The selected folders contain no test cases')
   })
 
   it('previews with folder variables for drafts inside a folder', async () => {
-    const { data: draft } = await POST('/odata/v4/test/TestCases', { topic: '{{domain}}/{{region}}/x', parent_ID: eu.ID }, tester)
+    const { data: inFolder } = await POST('/odata/v4/test/TestCases', { topic: '{{domain}}/{{region}}/x', parent_ID: eu.ID }, tester)
     const { data } = await POST(
-      `/odata/v4/test/TestCases(ID=${draft.ID},IsActiveEntity=false)/TestService.preview`,
+      `/odata/v4/test/TestCases(ID=${inFolder.ID},IsActiveEntity=false)/TestService.preview`,
       {},
       tester
     )
@@ -263,12 +248,11 @@ describe('folder variables on the object page', () => {
     // folders created before the field was optional have no delivery mode
     await UPDATE('aem.suite.TestCases').set({ deliveryMode: null }).where({ ID: folder.ID })
     const base = `/odata/v4/test/TestCases(ID=${folder.ID},IsActiveEntity=true)`
-    const edit = await POST(`${base}/TestService.draftEdit`, { PreserveChanges: true }, tester)
+    const edit = await draft.edit(POST, 'test', 'TestCases', folder.ID)
     expect(edit.status).toBeLessThan(300)
-    const draft = `/odata/v4/test/TestCases(ID=${folder.ID},IsActiveEntity=false)`
-    const add = await POST(`${draft}/variables`, { name: 'domain', value: 'orders' }, tester)
+    const add = await POST(`/odata/v4/test/TestCases(ID=${folder.ID},IsActiveEntity=false)/variables`, { name: 'domain', value: 'orders' }, tester)
     expect(add.status).toBeLessThan(300)
-    const save = await POST(`${draft}/TestService.draftActivate`, {}, tester)
+    const save = await draft.activate(POST, 'test', 'TestCases', folder.ID)
     expect(save.status).toBeLessThan(300)
     const vars = await GET(`${base}/variables?$select=name,value`, tester)
     expect(vars.data.value).toEqual([expect.objectContaining({ name: 'domain', value: 'orders' })])

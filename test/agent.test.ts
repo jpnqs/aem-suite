@@ -1,29 +1,10 @@
 import cds from '@sap/cds'
-import { fakeBroker, resetDatabase, startServer, users, withAemSuiteConfig } from './helpers'
+import { fakeBroker, mcpRpc, resetDatabase, startServer, useDestinations, users, withAemSuiteConfig } from './helpers'
 
 const { POST, GET } = startServer()
 const { tester } = users
-const MCP_HEADERS = { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' }
 
-/** One MCP JSON-RPC request to the agent endpoint (the server answers as an event stream). */
-async function rpc(method: string, params: object = {}, auth: object | null = tester) {
-  const res = await POST(
-    '/mcp/agent',
-    { jsonrpc: '2.0', id: 1, method, params },
-    { ...(auth ?? {}), headers: MCP_HEADERS, responseType: 'text', transformResponse: (r: string) => r }
-  )
-  const data = String(res.data)
-  const line = data.split('\n').find((l) => l.startsWith('data:'))
-  return { status: res.status, body: line ? JSON.parse(line.slice(5)) : data.length ? safeJson(data) : null }
-}
-
-const safeJson = (s: string) => {
-  try {
-    return JSON.parse(s)
-  } catch {
-    return s
-  }
-}
+const rpc = (method: string, params: object = {}, auth: object | null = tester) => mcpRpc(POST, method, params, auth)
 
 type ToolResult = { ok: boolean; result?: any; error?: string }
 
@@ -49,9 +30,10 @@ describe('AI agent service (MCP)', () => {
   let folder: { ID: string }
   let testCase: { ID: string }
 
+  useDestinations([{ name: 'aem-dest', url: 'https://dest.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }])
+
   beforeAll(async () => {
     await resetDatabase()
-    process.env.destinations = JSON.stringify([{ name: 'aem-dest', url: 'https://dest.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }])
     await INSERT.into('aem.suite.Brokers').entries([
       { ID: dest.ID, name: 'dest', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: true },
       { ID: direct.ID, name: 'direct', credentialMode: 'DIRECT', url: 'wss://d:443', msgVpn: 'v', username: 'u', active: true }
@@ -69,10 +51,6 @@ describe('AI agent service (MCP)', () => {
     await call('createTestCase', { topic: 'ping/a', parentId: folder.ID })
   })
 
-  afterAll(() => {
-    delete process.env.destinations
-  })
-
   describe('access', () => {
     it('speaks MCP to testers only', async () => {
       const init = await rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'test', version: '1' } })
@@ -82,6 +60,9 @@ describe('AI agent service (MCP)', () => {
 
       const anonymous = await rpc('tools/list', {}, null)
       expect(anonymous.status).toBe(401)
+      // logged in, but without the Tester role
+      const noRole = await rpc('tools/list', {}, users.noRole)
+      expect(noRole.status).toBe(403)
     })
 
     it('offers describe, query and call - and no way to reach admin data or delete', async () => {
@@ -384,7 +365,8 @@ describe('AI agent service (MCP)', () => {
           credentials: [{ brokerId: direct.ID, password: 'pw' }]
         })
         expect(run.ok).toBe(true)
-        await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
+        const summary = await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
+        expect(summary.result).toMatchObject({ finished: true, passed: 1 })
         expect(connectedAs.direct).toBe('u')
       }))
 
