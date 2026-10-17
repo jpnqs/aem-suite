@@ -307,118 +307,118 @@ entity NumberRanges : cuid, managed {
 // The apps (app/*/annotations.cds) only add their layout. Timestamps are worded "<what> At".
 
 annotate Brokers with {
-  name                  @title: 'Name';
-  description           @title: 'Description';
-  credentialMode        @title: 'Credentials';
-  destinationName       @title: 'Destination'
-                        @Common.QuickInfo: 'BTP destination: URL = wss:// endpoint, additional property msgVpn';
-  url                   @title: 'URL'
-                        @Common.QuickInfo: 'Host is enough, e.g. mr-xyz.messaging.solace.cloud - completed to wss://host:443 (port 55443 gives tcps, 55555 gives tcp)';
-  msgVpn                @title: 'Message VPN';
-  username              @title: 'Username'
-                        @Common.QuickInfo: 'Optional. If empty, the username is asked for together with the password when running tests, testing the connection or subscribing. The password is never stored';
-  clientNamePrefix      @title: 'Client Name Prefix';
-  connectTimeoutMs      @title: 'Connect Timeout (ms)';
-  active                @title: 'Active';
-  lastConnectionStatus  @title: 'Status';
-  lastConnectionAt      @title: 'Tested At';
-  lastConnectionMessage @title: 'Message';
+  name                  @title: '{i18n>Name}';
+  description           @title: '{i18n>Description}';
+  credentialMode        @title: '{i18n>Credentials}';
+  destinationName       @title: '{i18n>Destination}'
+                        @Common.QuickInfo: '{i18n>InfoBTPDestinationURLWssEndpointAddition}';
+  url                   @title: '{i18n>URL}'
+                        @Common.QuickInfo: '{i18n>InfoHostIsEnoughEGMrXyzMessagingSolaceCl}';
+  msgVpn                @title: '{i18n>MessageVPN}';
+  username              @title: '{i18n>Username}'
+                        @Common.QuickInfo: '{i18n>InfoOptionalIfEmptyTheUsernameIsAskedFor}';
+  clientNamePrefix      @title: '{i18n>ClientNamePrefix}';
+  connectTimeoutMs      @title: '{i18n>ConnectTimeoutMs}';
+  active                @title: '{i18n>Active}';
+  lastConnectionStatus  @title: '{i18n>Status}';
+  lastConnectionAt      @title: '{i18n>TestedAt}';
+  lastConnectionMessage @title: '{i18n>Message}';
 };
 
 annotate Variables with {
-  name  @title: 'Name'  @Common.QuickInfo: 'Reference it in double curly braces in topics, payloads, correlation ids and user properties';
-  value @title: 'Value';
+  name  @title: '{i18n>Name}'  @Common.QuickInfo: '{i18n>InfoReferenceItInDoubleCurlyBracesInTopi}';
+  value @title: '{i18n>Value}';
 };
 
 annotate TestCases with {
-  name          @title: 'Name'  @Common.QuickInfo: 'Test cases: empty = topic';
-  kind          @title: 'Type';
-  description   @title: 'Description';
-  topic         @title: 'Topic'  @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. variable region or built-in uuid';
-  payload       @title: 'Payload';
-  contentType   @title: 'Content Type'  @Common.QuickInfo: 'Default application/json - empty = detected on save (JSON or text/plain)';
-  deliveryMode  @title: 'Delivery Mode';
-  timeToLiveMs  @title: 'Time to Live (ms)'  @Common.QuickInfo: 'Empty or 0 = no expiry';
-  dmqEligible   @title: 'DMQ Eligible'  @Common.QuickInfo: 'Empty = broker default';
-  priority      @title: 'Priority (0-255)'  @Common.QuickInfo: 'Empty = broker default';
-  correlationId @title: 'Correlation ID'  @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. built-in uuid';
-  ackTimeoutMs  @title: 'ACK Timeout (ms)';
-  createdBy     @title: 'Created By';
-  modifiedAt    @title: 'Changed At';
-  modifiedBy    @title: 'Changed By';
+  name          @title: '{i18n>Name}'  @Common.QuickInfo: '{i18n>InfoTestCasesEmptyTopic}';
+  kind          @title: '{i18n>Type}';
+  description   @title: '{i18n>Description}';
+  topic         @title: '{i18n>Topic}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur}';
+  payload       @title: '{i18n>Payload}';
+  contentType   @title: '{i18n>ContentType}'  @Common.QuickInfo: '{i18n>InfoDefaultApplicationJsonEmptyDetectedO}';
+  deliveryMode  @title: '{i18n>DeliveryMode}';
+  timeToLiveMs  @title: '{i18n>TimeToLiveMs}'  @Common.QuickInfo: '{i18n>InfoEmptyOr0NoExpiry}';
+  dmqEligible   @title: '{i18n>DMQEligible}'  @Common.QuickInfo: '{i18n>InfoEmptyBrokerDefault}';
+  priority      @title: '{i18n>Priority0255}'  @Common.QuickInfo: '{i18n>InfoEmptyBrokerDefault}';
+  correlationId @title: '{i18n>CorrelationID}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur2}';
+  ackTimeoutMs  @title: '{i18n>ACKTimeoutMs}';
+  createdBy     @title: '{i18n>CreatedBy}';
+  modifiedAt    @title: '{i18n>ChangedAt}';
+  modifiedBy    @title: '{i18n>ChangedBy}';
 };
 
 annotate TestCaseProperties with {
-  name  @title: 'Name';
-  value @title: 'Value'  @Common.QuickInfo: 'Supports template variables in double curly braces';
-  type  @title: 'Type'  @Common.QuickInfo: 'Empty = detected on save (42 = Integer, true = Boolean, else String)';
+  name  @title: '{i18n>Name}';
+  value @title: '{i18n>Value}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur3}';
+  type  @title: '{i18n>Type}'  @Common.QuickInfo: '{i18n>InfoEmptyDetectedOnSave42IntegerTrueBool}';
 };
 
 annotate TestCaseVariables with {
-  name  @title: 'Name';
-  value @title: 'Value';
+  name  @title: '{i18n>Name}';
+  value @title: '{i18n>Value}';
 };
 
 annotate TestCaseStats with {
-  status  @title: 'Status';
-  runAt   @title: 'Run At';
-  brokers @title: 'Brokers';
-  message @title: 'Problems';
+  status  @title: '{i18n>Status}';
+  runAt   @title: '{i18n>RunAt}';
+  brokers @title: '{i18n>Brokers}';
+  message @title: '{i18n>Problems}';
 };
 
 annotate TestRuns with {
-  createdAt       @title: 'Started At';
-  createdBy       @title: 'Started By';
-  summary         @title: 'Test Cases → Brokers';
-  startedAt       @title: 'Started At';
-  finishedAt      @title: 'Finished At';
-  status          @title: 'Run Status';
-  totalCount      @title: 'Total';
-  passedCount     @title: 'Passed';
-  failedCount     @title: 'Failed / Error';
-  skippedCount    @title: 'Not Sent'  @Common.QuickInfo: 'Messages that were not sent: the run was stopped, or stop on first failure';
-  repetitions     @title: 'Repetitions';
-  repetitionOrder @title: 'Order'  @Common.QuickInfo: 'Whole selection (a b c, a b c) or each test case in a row (a a, b b, c c)';
-  delayMs         @title: 'Pause (ms)'  @Common.QuickInfo: 'Pause between two messages to the same broker';
-  stopOnFailure   @title: 'Stop at First Failure';
+  createdAt       @title: '{i18n>StartedAt}';
+  createdBy       @title: '{i18n>StartedBy}';
+  summary         @title: '{i18n>TestCasesBrokers}';
+  startedAt       @title: '{i18n>StartedAt}';
+  finishedAt      @title: '{i18n>FinishedAt}';
+  status          @title: '{i18n>RunStatus}';
+  totalCount      @title: '{i18n>Total}';
+  passedCount     @title: '{i18n>Passed}';
+  failedCount     @title: '{i18n>FailedError}';
+  skippedCount    @title: '{i18n>NotSent}'  @Common.QuickInfo: '{i18n>InfoMessagesThatWereNotSentTheRunWasStop}';
+  repetitions     @title: '{i18n>Repetitions}';
+  repetitionOrder @title: '{i18n>Order}'  @Common.QuickInfo: '{i18n>InfoWholeSelectionABCABCOrEachTestCaseIn}';
+  delayMs         @title: '{i18n>PauseMs}'  @Common.QuickInfo: '{i18n>InfoPauseBetweenTwoMessagesToTheSameBrok}';
+  stopOnFailure   @title: '{i18n>StopAtFirstFailure}';
 };
 
 annotate RunResults with {
-  testCaseName    @title: 'Test Case';
-  brokerName      @title: 'Broker';
-  status          @title: 'Status';
-  iteration       @title: 'Repetition'  @Common.QuickInfo: 'Which repetition of the test case this is (1 = the first)';
-  deliveryMode    @title: 'Delivery Mode';
-  resolvedTopic   @title: 'Topic';
-  resolvedPayload @title: 'Payload';
-  correlationId   @title: 'Correlation ID';
-  ackLatencyMs    @title: 'ACK Latency (ms)';
-  errorMessage    @title: 'Error';
-  executedAt      @title: 'Executed At';
+  testCaseName    @title: '{i18n>TestCase}';
+  brokerName      @title: '{i18n>Broker}';
+  status          @title: '{i18n>Status}';
+  iteration       @title: '{i18n>Repetition}'  @Common.QuickInfo: '{i18n>InfoWhichRepetitionOfTheTestCaseThisIs1T}';
+  deliveryMode    @title: '{i18n>DeliveryMode}';
+  resolvedTopic   @title: '{i18n>Topic}';
+  resolvedPayload @title: '{i18n>Payload}';
+  correlationId   @title: '{i18n>CorrelationID}';
+  ackLatencyMs    @title: '{i18n>ACKLatencyMs}';
+  errorMessage    @title: '{i18n>Error}';
+  executedAt      @title: '{i18n>ExecutedAt}';
 };
 
 annotate ReceivedMessages with {
-  brokerName     @title: 'Broker';
-  source         @title: 'Subscription / Queue';
-  sourceType     @title: 'Source Type';
-  topic          @title: 'Topic';
-  payload        @title: 'Payload';
-  contentType    @title: 'Content Type';
-  userProperties @title: 'User Properties';
-  correlationId  @title: 'Correlation ID';
-  deliveryMode   @title: 'Delivery Mode';
-  receivedAt     @title: 'Received At';
-  createdBy      @title: 'Saved By';
+  brokerName     @title: '{i18n>Broker}';
+  source         @title: '{i18n>SubscriptionQueue}';
+  sourceType     @title: '{i18n>SourceType}';
+  topic          @title: '{i18n>Topic}';
+  payload        @title: '{i18n>Payload}';
+  contentType    @title: '{i18n>ContentType}';
+  userProperties @title: '{i18n>UserProperties}';
+  correlationId  @title: '{i18n>CorrelationID}';
+  deliveryMode   @title: '{i18n>DeliveryMode}';
+  receivedAt     @title: '{i18n>ReceivedAt}';
+  createdBy      @title: '{i18n>SavedBy}';
 };
 
 annotate NumberRanges with {
-  name        @title: 'Name'  @Common.QuickInfo: 'Use it in topics, payloads, correlation ids and user properties as {{numberRange.<name>}}';
-  description @title: 'Description';
-  prefix      @title: 'Prefix'  @Common.QuickInfo: 'Text in front of the number, e.g. SO-';
-  suffix      @title: 'Suffix'  @Common.QuickInfo: 'Text after the number, e.g. -EU';
-  length      @title: 'Digits'  @Common.QuickInfo: 'Length of the number, filled with leading zeros (0 = no leading zeros)';
-  start       @title: 'First Number';
-  step        @title: 'Step'  @Common.QuickInfo: 'Increment between two numbers';
-  maximum     @title: 'Last Allowed Number'  @Common.QuickInfo: 'Empty = until the number no longer fits into the digits';
-  lastUsedAt  @title: 'Last Used At'  @Common.QuickInfo: 'When a run took a number last';
+  name        @title: '{i18n>Name}'  @Common.QuickInfo: '{i18n>InfoUseItInTopicsPayloadsCorrelationIdsA}';
+  description @title: '{i18n>Description}';
+  prefix      @title: '{i18n>Prefix}'  @Common.QuickInfo: '{i18n>InfoTextInFrontOfTheNumberEGSO}';
+  suffix      @title: '{i18n>Suffix}'  @Common.QuickInfo: '{i18n>InfoTextAfterTheNumberEGEU}';
+  length      @title: '{i18n>Digits}'  @Common.QuickInfo: '{i18n>InfoLengthOfTheNumberFilledWithLeadingZe}';
+  start       @title: '{i18n>FirstNumber}';
+  step        @title: '{i18n>Step}'  @Common.QuickInfo: '{i18n>InfoIncrementBetweenTwoNumbers}';
+  maximum     @title: '{i18n>LastAllowedNumber}'  @Common.QuickInfo: '{i18n>InfoEmptyUntilTheNumberNoLongerFitsIntoT}';
+  lastUsedAt  @title: '{i18n>LastUsedAt}'  @Common.QuickInfo: '{i18n>InfoWhenARunTookANumberLast}';
 };

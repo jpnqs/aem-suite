@@ -4,8 +4,8 @@ using TestService as service from '../../srv/test-service';
 
 annotate service.TestCases with @(
   UI.HeaderInfo        : {
-    TypeName      : 'Test Case',
-    TypeNamePlural: 'Test Cases',
+    TypeName      : '{i18n>TestCase}',
+    TypeNamePlural: '{i18n>TestCases}',
     Title         : {Value: name},
     Description   : {Value: topic}
   },
@@ -31,11 +31,11 @@ annotate service.TestCases with @(
     {
       Value      : lastResult.status,
       Criticality: lastResult.criticality,
-      Label      : 'Last Result'
+      Label      : '{i18n>LastResult}'
     },
     {
       Value: lastResult.runAt,
-      Label: 'Last Run At'
+      Label: '{i18n>LastRunAt}'
     },
     {Value: deliveryMode},
     {Value: modifiedAt}
@@ -43,7 +43,7 @@ annotate service.TestCases with @(
   UI.HeaderFacets      : [{
     $Type        : 'UI.ReferenceFacet',
     Target       : '@UI.FieldGroup#LastResult',
-    Label        : 'Last Result',
+    Label        : '{i18n>LastResult}',
     ![@UI.Hidden]: (kind = 'FOLDER')
   }],
   UI.FieldGroup #LastResult: {Data: [
@@ -70,13 +70,13 @@ annotate service.TestCases with @(
     {
       $Type        : 'UI.CollectionFacet',
       ID           : 'AdvancedSection',
-      Label        : 'Advanced',
+      Label        : '{i18n>Advanced}',
       ![@UI.Hidden]: (kind = 'FOLDER'),
       Facets: [{
         $Type              : 'UI.ReferenceFacet',
         ID                 : 'Advanced',
         Target             : '@UI.FieldGroup#Advanced',
-        Label              : 'Optional settings',
+        Label              : '{i18n>OptionalSettings}',
         ![@UI.PartOfPreview]: false
       }]
     },
@@ -84,14 +84,14 @@ annotate service.TestCases with @(
       $Type        : 'UI.ReferenceFacet',
       ID           : 'UserProperties',
       Target       : 'userProperties/@UI.LineItem',
-      Label        : 'User Properties',
+      Label        : '{i18n>UserProperties}',
       ![@UI.Hidden]: (kind = 'FOLDER')
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Variables',
       Target: 'variables/@UI.LineItem',
-      Label : 'Variables'
+      Label : '{i18n>Variables}'
     }
   ]
 ) {
@@ -135,8 +135,8 @@ annotate service.TestCases actions {
 
 annotate service.TestCaseProperties with @(
   UI.HeaderInfo: {
-    TypeName      : 'User Property',
-    TypeNamePlural: 'User Properties',
+    TypeName      : '{i18n>UserProperty}',
+    TypeNamePlural: '{i18n>UserProperties}',
     Title         : {Value: name}
   },
   UI.LineItem  : [
@@ -166,5 +166,5 @@ annotate service.TestCaseProperties with @(
 
 annotate service.Brokers with {
   ID   @UI.Hidden;
-  name @title: 'Broker';
+  name @title: '{i18n>Broker}';
 };

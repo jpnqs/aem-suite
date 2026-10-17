@@ -6,8 +6,8 @@ using {aem.suite as db} from '../db/schema';
 // Variables app has its own layout (app/variables)
 annotate db.Variables with @(
   UI.HeaderInfo: {
-    TypeName      : 'Variable',
-    TypeNamePlural: 'Variables',
+    TypeName      : '{i18n>Variable}',
+    TypeNamePlural: '{i18n>Variables}',
     Title         : {Value: name}
   },
   UI.LineItem  : [
@@ -18,8 +18,8 @@ annotate db.Variables with @(
 
 annotate db.TestCaseVariables with @(
   UI.HeaderInfo: {
-    TypeName      : 'Variable',
-    TypeNamePlural: 'Variables',
+    TypeName      : '{i18n>Variable}',
+    TypeNamePlural: '{i18n>Variables}',
     Title         : {Value: name}
   },
   UI.LineItem  : [

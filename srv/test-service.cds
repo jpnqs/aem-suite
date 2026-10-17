@@ -103,7 +103,7 @@ service TestService {
         when status = 'FAILED'  then 'FAILED'
         when failedCount > 0    then 'FAILED'
         else 'PASSED'
-      end as outcome : String(10) @title: 'Result',
+      end as outcome : String(10) @title: '{i18n>Result}',
       case status
         when 'DONE'   then (case when failedCount > 0 then 1 else 3 end)
         when 'FAILED' then 1
@@ -116,9 +116,9 @@ service TestService {
     projection on db.RunResults {
       *,
       // run data, so the result list can be filtered and sorted by it
-      @title: 'Run Started At'
+      @title: '{i18n>RunStartedAt}'
       run.createdAt as runStartedAt,
-      @title: 'Started By'
+      @title: '{i18n>StartedBy}'
       run.createdBy as runStartedBy,
       // navigation targets (launchpad intents) for the link columns
       '#AEMSuiteTestCases-manage&/TestCases(ID=' || testCase.ID || ',IsActiveEntity=true)' as testCaseLink : String,

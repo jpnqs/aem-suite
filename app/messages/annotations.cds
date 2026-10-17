@@ -4,8 +4,8 @@ using SubscribeService as service from '../../srv/subscribe-service';
 
 annotate service.ReceivedMessages with @(
   UI.HeaderInfo        : {
-    TypeName      : 'Saved Message',
-    TypeNamePlural: 'Saved Messages',
+    TypeName      : '{i18n>SavedMessage}',
+    TypeNamePlural: '{i18n>SavedMessages}',
     Title         : {Value: topic},
     Description   : {Value: brokerName}
   },
@@ -33,13 +33,13 @@ annotate service.ReceivedMessages with @(
     {
       $Type : 'UI.DataFieldForAction',
       Action: 'SubscribeService.createTestCase',
-      Label : 'Create Test Case'
+      Label : '{i18n>CreateTestCase}'
     }
   ],
   UI.Identification    : [{
     $Type : 'UI.DataFieldForAction',
     Action: 'SubscribeService.createTestCase',
-    Label : 'Create Test Case'
+    Label : '{i18n>CreateTestCase}'
   }],
   UI.FieldGroup #Message: {Data: [
     {Value: brokerName},
@@ -61,13 +61,13 @@ annotate service.ReceivedMessages with @(
       $Type : 'UI.ReferenceFacet',
       ID    : 'Message',
       Target: '@UI.FieldGroup#Message',
-      Label : 'Message'
+      Label : '{i18n>Message}'
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Payload',
       Target: '@UI.FieldGroup#Payload',
-      Label : 'Payload'
+      Label : '{i18n>Payload}'
     }
   ]
 ) {

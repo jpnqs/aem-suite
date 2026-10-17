@@ -4,8 +4,8 @@ using AdminService as service from '../../srv/admin-service';
 
 annotate service.Brokers with @(
   UI.HeaderInfo                : {
-    TypeName      : 'Broker',
-    TypeNamePlural: 'Brokers',
+    TypeName      : '{i18n>Broker}',
+    TypeNamePlural: '{i18n>Brokers}',
     Title         : {Value: name},
     Description   : {Value: description}
   },
@@ -33,20 +33,20 @@ annotate service.Brokers with @(
     {
       $Type : 'UI.DataFieldForAction',
       Action: 'AdminService.testConnection',
-      Label : 'Test Connection'
+      Label : '{i18n>TestConnection}'
     }
   ],
   UI.Identification            : [
     {
       $Type : 'UI.DataFieldForAction',
       Action: 'AdminService.testConnection',
-      Label : 'Test Connection'
+      Label : '{i18n>TestConnection}'
     },
   ],
   UI.HeaderFacets              : [{
     $Type : 'UI.ReferenceFacet',
     Target: '@UI.FieldGroup#Status',
-    Label : 'Last Connection Test'
+    Label : '{i18n>LastConnectionTest}'
   }],
   UI.FieldGroup #Status        : {Data: [
     {
@@ -76,33 +76,33 @@ annotate service.Brokers with @(
     {
       $Type : 'UI.CollectionFacet',
       ID    : 'Connection',
-      Label : 'Connection',
+      Label : '{i18n>Connection}',
       Facets: [
         {
           $Type : 'UI.ReferenceFacet',
           ID    : 'General',
           Target: '@UI.FieldGroup#General',
-          Label : 'General'
+          Label : '{i18n>General}'
         },
         {
           $Type        : 'UI.ReferenceFacet',
           ID           : 'Destination',
           Target       : '@UI.FieldGroup#Destination',
-          Label        : 'BTP Destination',
+          Label        : '{i18n>BTPDestination}',
           ![@UI.Hidden]: (credentialMode <> 'DESTINATION')
         },
         {
           $Type        : 'UI.ReferenceFacet',
           ID           : 'Direct',
           Target       : '@UI.FieldGroup#Direct',
-          Label        : 'Direct Connection',
+          Label        : '{i18n>DirectConnection}',
           ![@UI.Hidden]: (credentialMode <> 'DIRECT')
         },
         {
           $Type : 'UI.ReferenceFacet',
           ID    : 'Advanced',
           Target: '@UI.FieldGroup#Advanced',
-          Label : 'Advanced'
+          Label : '{i18n>Advanced}'
         }
       ]
     },
@@ -110,7 +110,7 @@ annotate service.Brokers with @(
       $Type : 'UI.ReferenceFacet',
       ID    : 'Variables',
       Target: 'variables/@UI.LineItem',
-      Label : 'Broker Variables'
+      Label : '{i18n>BrokerVariables}'
     }
   ]
 ) {
@@ -132,7 +132,7 @@ annotate service.Brokers with @(
                         };
   destinationName       @Common.ValueList: {
                           CollectionPath: 'Destinations',
-                          Label         : 'Destinations',
+                          Label         : '{i18n>Destinations}',
                           Parameters    : [
                             {
                               $Type            : 'Common.ValueListParameterInOut',
@@ -170,8 +170,8 @@ annotate service.Brokers actions {
     'in/lastConnectionMessage',
     'in/connectionCriticality'
   ]}
-  (username @Common.Label: 'Username (only if not maintained on the broker)',
-   password @UI.Masked  @Common.Label: 'Password (direct mode only, not stored)');
+  (username @Common.Label: '{i18n>UsernameOnlyIfNotMaintainedOnTheBroker}',
+   password @UI.Masked  @Common.Label: '{i18n>PasswordDirectModeOnlyNotStored}');
 };
 
 

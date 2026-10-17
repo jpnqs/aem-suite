@@ -4,8 +4,8 @@ using TestService as service from '../../srv/test-service';
 
 annotate service.TestRuns with @(
   UI.HeaderInfo        : {
-    TypeName      : 'Test Run',
-    TypeNamePlural: 'Test Runs',
+    TypeName      : '{i18n>TestRun}',
+    TypeNamePlural: '{i18n>TestRuns}',
     Title         : {Value: summary},
     Description   : {Value: createdAt}
   },
@@ -38,7 +38,7 @@ annotate service.TestRuns with @(
   UI.HeaderFacets      : [{
     $Type : 'UI.ReferenceFacet',
     Target: '@UI.FieldGroup#Summary',
-    Label : 'Summary'
+    Label : '{i18n>Summary}'
   }],
   UI.FieldGroup #Summary: {Data: [
     {
@@ -60,7 +60,7 @@ annotate service.TestRuns with @(
     $Type : 'UI.ReferenceFacet',
     ID    : 'Results',
     Target: 'results/@UI.LineItem#Run',
-    Label : 'Results'
+    Label : '{i18n>Results}'
   }]
 ) {
   createdBy         @UI.HiddenFilter: false;
@@ -70,8 +70,8 @@ annotate service.TestRuns with @(
 
 annotate service.RunResults with @(
   UI.HeaderInfo        : {
-    TypeName      : 'Result',
-    TypeNamePlural: 'Results',
+    TypeName      : '{i18n>Result}',
+    TypeNamePlural: '{i18n>Results}',
     Title         : {Value: testCaseName},
     Description   : {Value: brokerName}
   },
@@ -153,7 +153,7 @@ annotate service.RunResults with @(
   UI.HeaderFacets     : [{
     $Type : 'UI.ReferenceFacet',
     Target: '@UI.FieldGroup#Status',
-    Label : 'Status'
+    Label : '{i18n>Status}'
   }],
   UI.FieldGroup #Status : {Data: [
     {
@@ -191,13 +191,13 @@ annotate service.RunResults with @(
       $Type : 'UI.ReferenceFacet',
       ID    : 'Message',
       Target: '@UI.FieldGroup#Message',
-      Label : 'Message'
+      Label : '{i18n>Message}'
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Payload',
       Target: '@UI.FieldGroup#Payload',
-      Label : 'Resolved Payload'
+      Label : '{i18n>ResolvedPayload}'
     }
   ]
 ) {

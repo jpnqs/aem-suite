@@ -42,11 +42,11 @@ service AdminService {
   @readonly
   @cds.persistence.skip
   entity Destinations {
-    key name           : String(200) @title: 'Destination';
-        url            : String(500) @title: 'URL';
-        msgVpn         : String(100) @title: 'Message VPN';
-        authentication : String(50)  @title: 'Authentication';
-        source         : String(3)   @title: 'Source';
+    key name           : String(200) @title: '{i18n>Destination}';
+        url            : String(500) @title: '{i18n>URL}';
+        msgVpn         : String(100) @title: '{i18n>MessageVPN}';
+        authentication : String(50)  @title: '{i18n>Authentication}';
+        source         : String(3)   @title: '{i18n>Source}';
   }
 
   @odata.draft.enabled
@@ -57,8 +57,8 @@ service AdminService {
   entity NumberRanges as
     projection on db.NumberRanges {
       *,
-      virtual lastNumber : String @title: 'Last Issued',
-      virtual nextNumber : String @title: 'Next Number'
+      virtual lastNumber : String @title: '{i18n>LastIssued}',
+      virtual nextNumber : String @title: '{i18n>NextNumber}'
     }
     actions {
       /**
