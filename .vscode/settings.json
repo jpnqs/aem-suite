@@ -1,4 +1,6 @@
 {
-  "eslint.useFlatConfig": true,
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "typescript.tsdk": "node_modules/typescript/lib",
+  // the user guide's table of contents is kept by hand: a generated one links the H1 and "Contents",
+  // which the help app does not render as headings (test/help.test.ts)
+  "markdown.extension.toc.updateOnSave": false
 }

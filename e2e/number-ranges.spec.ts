@@ -21,7 +21,7 @@ test.describe('Number Ranges', () => {
     await expect(page.getByText('SO-004500').locator('visible=true').first()).toBeVisible()
   })
 
-  test('a test case preview shows the next number without using it up', async ({ page, request }) => {
+  test('a test case preview shows the next number without using it up', async ({ request }) => {
     // its own range, so the test does not depend on the one the other test creates (tests run in parallel)
     const range = await (await request.post('/odata/v4/admin/NumberRanges', { data: { name: 'E2E_PREVIEW', prefix: 'SO-', length: 6, start: 4500 } })).json()
     expect((await request.post(`/odata/v4/admin/NumberRanges(ID=${range.ID},IsActiveEntity=false)/AdminService.draftActivate`, { data: {} })).ok()).toBe(true)
