@@ -2,6 +2,7 @@ import cds from '@sap/cds'
 import { currentJwt } from './lib/credentials/resolve'
 import { detectContentType } from './lib/defaults'
 import { truncate } from './lib/errors'
+import { columnLength } from './lib/model'
 import { createNode } from './lib/nodes'
 import type { NodeData } from './lib/node-validation'
 import { inferPropertyType } from './lib/property-types'
@@ -99,8 +100,8 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
     ID: cds.utils.uuid(),
     kind: 'TEST',
     parent_ID: null,
-    name: truncate(`From ${m.topic}`, 200),
-    description: truncate(`Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`, 1000),
+    name: truncate(`From ${m.topic}`, columnLength('TestCases', 'name')),
+    description: truncate(`Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`, columnLength('TestCases', 'description')),
     topic: m.topic,
     payload,
     contentType: m.contentType || detectContentType(payload),
@@ -117,14 +118,13 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
 const SOURCE_TYPES = ['TOPIC', 'QUEUE_BROWSE', 'QUEUE_CONSUME']
 const MAX_PRESET_TOPICS = 50
 
-/** Name (unique per user), source type and topics of a saved setup. */
+/** Name (unique per user), source type and topics of a saved setup. Column lengths are checked by CAP (OData input). */
 async function validatePreset(req: cds.Request): Promise<void> {
   const d = req.data as { name?: string; sourceType?: string; topics?: string | null; queue?: string | null; username?: string | null; ID?: string }
   const creating = req.event === 'CREATE'
   if (creating || d.name !== undefined) {
     const name = (d.name ?? '').trim()
     if (!name) return req.reject(400, 'Give the setup a name', 'in/name')
-    if (name.length > 100) return req.reject(400, 'The name may have at most 100 characters', 'in/name')
     d.name = name
     const same = (await SELECT.from('aem.suite.SubscriberPresets').columns('ID').where({ name, createdBy: req.user.id })) as { ID: string }[]
     if (same.some((p) => p.ID !== d.ID)) return req.reject(400, `A setup named "${name}" exists already`, 'in/name')
@@ -140,6 +140,4 @@ async function validatePreset(req: cds.Request): Promise<void> {
     if (!Array.isArray(list) || list.length > MAX_PRESET_TOPICS || list.some((t) => typeof t !== 'string' || !t.trim() || t.length > 500))
       return req.reject(400, `topics must be a list of at most ${MAX_PRESET_TOPICS} topic names`, 'in/topics')
   }
-  if (d.queue && d.queue.length > 500) return req.reject(400, 'The queue name may have at most 500 characters', 'in/queue')
-  if (d.username && d.username.length > 100) return req.reject(400, 'The username may have at most 100 characters', 'in/username')
 }

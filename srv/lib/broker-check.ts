@@ -1,5 +1,6 @@
 import { loadBroker, resolveConnection } from './credentials/resolve'
 import { errMsg, truncate } from './errors'
+import { columnLength } from './model'
 import { connect } from './solace/connector'
 
 export interface ConnectionCheck {
@@ -38,7 +39,7 @@ export async function checkConnection(
   const status = {
     lastConnectionStatus: ok ? ('OK' as const) : ('ERROR' as const),
     lastConnectionAt: new Date().toISOString(),
-    lastConnectionMessage: truncate(message, 1000)
+    lastConnectionMessage: truncate(message, columnLength('Brokers', 'lastConnectionMessage'))
   }
   await UPDATE('aem.suite.Brokers', brokerId).with(status)
   return { ok, message, latencyMs: Date.now() - started, ...status }

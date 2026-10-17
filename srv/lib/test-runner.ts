@@ -11,8 +11,8 @@ import { columnLength } from './model'
 
 const LOG = cds.log('aem-runner')
 
-/** length of RunResults.errorMessage */
-const MAX_ERROR = 2000
+/** a text cut to the length of RunResults.errorMessage */
+const errorText = (message: string) => truncate(message, columnLength('RunResults', 'errorMessage'))
 
 const activeRuns = new Map<string, Promise<void>>()
 
@@ -81,7 +81,7 @@ async function pause(ms: number, runId: string): Promise<void> {
 function runSummary(testCaseNames: string[], brokerNames: string[], repetitions = 1): string {
   const list = (names: string[], max: number) =>
     names.length > max ? `${names.slice(0, max).join(', ')} +${names.length - max} more` : names.join(', ')
-  return truncate(`${list(testCaseNames, 3)} → ${list(brokerNames, 3)}${repetitions > 1 ? ` × ${repetitions}` : ''}`, 500)
+  return truncate(`${list(testCaseNames, 3)} → ${list(brokerNames, 3)}${repetitions > 1 ? ` × ${repetitions}` : ''}`, columnLength('TestRuns', 'summary'))
 }
 
 /**
@@ -335,7 +335,7 @@ async function runBroker(brokerId: string, results: PendingResult[], ctx: RunCon
     const entered = ctx.credentials.get(brokerId)
     publisher = await connect(await resolveConnection(broker, ctx.jwt, entered?.password, entered?.username))
   } catch (e) {
-    for (const r of results) await progress.finish(r, 'ERROR', { errorMessage: truncate(errMsg(e), MAX_ERROR) })
+    for (const r of results) await progress.finish(r, 'ERROR', { errorMessage: errorText(errMsg(e)) })
     return
   }
 
@@ -373,7 +373,7 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
   try {
     spec = buildSpec(tc, await withNumbers(tc, scopeFor(tc, broker, ctx.vars), 'consume'))
   } catch (e) {
-    await progress.finish(r, 'ERROR', { errorMessage: truncate(errMsg(e), MAX_ERROR), deliveryMode: tc.deliveryMode })
+    await progress.finish(r, 'ERROR', { errorMessage: errorText(errMsg(e)), deliveryMode: tc.deliveryMode })
     return false
   }
   // variables can make topic and correlation id longer than their columns (HANA would reject the write)
@@ -388,7 +388,7 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
     await progress.finish(r, 'PASSED', { ...sent, ackLatencyMs: res.latencyMs })
     return true
   } catch (e) {
-    await progress.finish(r, e instanceof TemplateError ? 'ERROR' : 'FAILED', { ...sent, errorMessage: truncate(errMsg(e), MAX_ERROR) })
+    await progress.finish(r, e instanceof TemplateError ? 'ERROR' : 'FAILED', { ...sent, errorMessage: errorText(errMsg(e)) })
     return false
   }
 }
@@ -412,7 +412,7 @@ export async function failRuns(where: Record<string, unknown>, reason: string): 
       const runs = (await SELECT.from('aem.suite.TestRuns').columns('ID').where({ ...where, status: 'RUNNING' })) as { ID: string }[]
       for (const { ID } of runs) {
         await UPDATE('aem.suite.RunResults')
-          .with({ status: 'ERROR', errorMessage: truncate(reason, MAX_ERROR), executedAt: new Date().toISOString() })
+          .with({ status: 'ERROR', errorMessage: errorText(reason), executedAt: new Date().toISOString() })
           .where({ run_ID: ID, status: 'PENDING' })
         const results = (await SELECT.from('aem.suite.RunResults').columns('status').where({ run_ID: ID })) as { status: string }[]
         const passed = results.filter((r) => r.status === 'PASSED').length
@@ -443,8 +443,8 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
       status,
       runAt,
       run_ID: runId,
-      brokers: truncate(outcomes.map((o) => o.broker).join(', '), 500),
-      message: bad.length ? truncate(bad.map((o) => `${o.broker}: ${o.error ?? o.status}`).join('; '), 1000) : null
+      brokers: truncate(outcomes.map((o) => o.broker).join(', '), columnLength('TestCaseStats', 'brokers')),
+      message: bad.length ? truncate(bad.map((o) => `${o.broker}: ${o.error ?? o.status}`).join('; '), columnLength('TestCaseStats', 'message')) : null
     }
   })
   try {

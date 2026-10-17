@@ -6,6 +6,7 @@ import { copyNodes } from './lib/copy-nodes'
 import { exportNodes, importNodes } from './lib/export-import'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/node-validation'
 import { selectNodeDeep } from './lib/nodes'
+import { columnLength } from './lib/model'
 import { keyOf } from './lib/request'
 import type { TestCaseRecord } from './lib/test-case-spec'
 import { moveBefore } from './lib/tree'
@@ -32,7 +33,7 @@ export default class TestService extends cds.ApplicationService {
         .columns('name', 'topic', 'kind')
         .where({ ID: d.ID ?? keyOf(req).ID })) as { name?: string | null; topic?: string | null; kind?: string } | undefined
       if (draft?.kind === 'FOLDER') return
-      if (!draft?.name || draft.name === draft.topic) d.name = (d.topic ?? '').slice(0, 200)
+      if (!draft?.name || draft.name === draft.topic) d.name = (d.topic ?? '').slice(0, columnLength('TestCases', 'name'))
     })
 
     // the rules live in lib/node-validation.ts - the AI agent service, the import and the live view apply the same ones:

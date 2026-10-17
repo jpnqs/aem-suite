@@ -1,5 +1,6 @@
 import cds from '@sap/cds'
 import { httpError } from './errors'
+import { columnLength } from './model'
 import { selectNodesDeep, TABLE } from './nodes'
 import { loadTree, renumberSiblings, TreeNode } from './tree'
 
@@ -56,7 +57,7 @@ async function copySubtree(rootId: string, children: Map<string | null, TreeNode
     const row = byId.get(id)
     if (!row) continue // deleted meanwhile
     const isRoot = id === rootId
-    const name = isRoot ? `${row.name ?? ''} (Copy)`.slice(0, 200) : row.name
+    const name = isRoot ? `${row.name ?? ''} (Copy)`.slice(0, columnLength('TestCases', 'name')) : row.name
     if (isRoot) copyName = name!
     await INSERT.into(TABLE).entries({
       ...omit(row, [...MANAGED, 'userProperties', 'variables']),

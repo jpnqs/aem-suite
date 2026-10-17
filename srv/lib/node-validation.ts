@@ -3,7 +3,7 @@ import { httpError } from './errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
 import type { TestCaseRecord } from './test-case-spec'
 import { loadTree } from './tree'
-import { elementOf, enumValues, rangeOf } from './model'
+import { columnLength, elementOf, enumValues, rangeOf } from './model'
 
 /**
  * Rules for creating / changing test cases and folders - shared by the UI service (TestService),
@@ -99,7 +99,7 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
     if (!d.topic?.trim()) reject(400, 'Topic is required', 'in/topic')
   }
   // fill what was left empty
-  const nameLength = elementOf('TestCases', 'name')?.length
+  const nameLength = columnLength('TestCases', 'name')
   if (!d.name && d.topic) d.name = d.topic.slice(0, nameLength)
   if (!d.contentType && d.payload !== undefined) d.contentType = detectContentType(d.payload)
   d.userProperties?.forEach((p) => {
