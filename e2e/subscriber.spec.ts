@@ -48,7 +48,8 @@ test.describe('Live Subscriber', () => {
     // a fresh page: pick the setup and the topics are back
     await openApp(page, apps.subscriber)
     await expectAppOpen(page, apps.subscriber)
-    await page.locator('[id$="preset"]').click()
+    // the Select of Main.view.xml (id "preset", our own id): its accessible combobox is a hidden helper element
+    await page.locator('[id$="--preset"]').click()
     await page.getByRole('option', { name }).click()
     await expect(page.getByText('aem/orders/>', { exact: true })).toBeVisible()
     await expect(page.getByText('aem/events/*', { exact: true })).toBeVisible()

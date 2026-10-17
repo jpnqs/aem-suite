@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { apps, openApp, expectAppOpen } from './launchpad'
+import { apps, openApp, expectAppOpen, PING_ID, testCaseUrl } from './launchpad'
 
 // Every app loads through the launchpad and shows the demo data from test/data
 // (OData goes through the app-relative odata/ path, like in the HTML5 repo).
@@ -14,8 +14,7 @@ test.describe('apps (admin)', () => {
   })
 
   test('Test Cases opens a test case by deep link', async ({ page }) => {
-    // demo test case "Ping" (test/data/aem.suite-TestCases.csv)
-    await page.goto(`/launchpad.html#${apps.testCases.intent}&/TestCases(ID=c1000000-0000-4000-8000-000000000002,IsActiveEntity=true)`)
+    await page.goto(testCaseUrl(PING_ID))
     await expect(page).toHaveTitle('Ping ({{app}}/ping/{{broker.name}}) - Test Case')
     await expect(page.getByText('Valid JSON').first()).toBeVisible()
     await expect(page.getByText('"broker": "{{broker.name}}"').first()).toBeVisible()

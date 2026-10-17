@@ -1,12 +1,10 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
+import { previewTestCase } from './launchpad'
 
 // The demo test cases (test/data) with number ranges and faker test data resolve without errors against the demo broker.
 
 async function preview(request: APIRequestContext, name: string) {
-  const found = await (await request.get('/odata/v4/test/TestCases?$select=ID&$filter=' + encodeURIComponent(`name eq '${name}'`))).json()
-  const brokers = await (await request.get('/odata/v4/test/Brokers?$select=ID&$filter=' + encodeURIComponent("name eq 'local-docker'"))).json()
-  const res = await request.post(`/odata/v4/test/TestCases(ID=${found.value[0].ID},IsActiveEntity=true)/TestService.preview`, { data: { brokerId: brokers.value[0].ID } })
-  const p = await res.json()
+  const p = await previewTestCase(request, name)
   expect(p.valid, p.message).toBe(true)
   return { ...p, payload: JSON.parse(p.payload), properties: JSON.parse(p.userProperties) }
 }

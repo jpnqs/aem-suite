@@ -33,8 +33,10 @@ test.describe('home (tester)', () => {
   test('shows only the apps the tester can open', async ({ page }) => {
     await openApp(page, apps.home)
     await expectAppOpen(page, apps.home)
-    await expect(tile(page, 'Test Cases')).toBeVisible()
-    await expect(page.locator('.aemHomeTile')).toHaveCount(5)
+    // the apps for role Tester and for everyone (app/_shared/Apps.js), without the admin apps
+    const testerApps = ['Test Cases', 'Test Runs', 'Live Subscriber', 'Saved Messages', 'Help']
+    for (const name of testerApps) await expect(tile(page, name)).toBeVisible()
+    await expect(page.locator('.aemHomeTile')).toHaveCount(testerApps.length)
     await expect(tile(page, 'Global Variables')).toHaveCount(0)
   })
 })

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { apps } from './launchpad'
+import { PING_ID, testCaseUrl } from './launchpad'
 
 // The run dialog of the Test Cases app: starts a run and follows it to the end.
 // Runs against the demo broker "local-docker": without the local Solace container the result is an ERROR, with it PASSED -
@@ -8,8 +8,7 @@ import { apps } from './launchpad'
 test('the run dialog runs a test case and shows the outcome', async ({ page }) => {
   const sockets: string[] = []
   page.on('websocket', (ws) => sockets.push(ws.url()))
-  // demo test case "Ping" (test/data/aem.suite-TestCases.csv)
-  await page.goto(`/launchpad.html#${apps.testCases.intent}&/TestCases(ID=c1000000-0000-4000-8000-000000000002,IsActiveEntity=true)`)
+  await page.goto(testCaseUrl(PING_ID))
   await expect(page).toHaveTitle(/^Ping/)
 
   await page.getByRole('button', { name: 'Run…' }).click()
@@ -31,7 +30,7 @@ test('the run dialog runs a test case and shows the outcome', async ({ page }) =
 })
 
 test('the advanced settings repeat the message and show what is about to happen', async ({ page }) => {
-  await page.goto(`/launchpad.html#${apps.testCases.intent}&/TestCases(ID=c1000000-0000-4000-8000-000000000002,IsActiveEntity=true)`)
+  await page.goto(testCaseUrl(PING_ID))
   await expect(page).toHaveTitle(/^Ping/)
   await page.getByRole('button', { name: 'Run…' }).click()
   const dialog = page.getByRole('dialog', { name: /^Run Ping/ })
@@ -39,7 +38,10 @@ test('the advanced settings repeat the message and show what is about to happen'
   await dialog.getByPlaceholder('Password').fill('aemsuite')
 
   await dialog.getByText('Advanced settings').click()
-  const [repetitions, pause] = await dialog.getByRole('spinbutton').all()
+  // all() does not wait: first wait until the panel shows both fields
+  const fields = dialog.getByRole('spinbutton')
+  await expect(fields).toHaveCount(2)
+  const [repetitions, pause] = await fields.all()
   await repetitions.fill('3')
   await repetitions.press('Tab')
   await pause.fill('200')

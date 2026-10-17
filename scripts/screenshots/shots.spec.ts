@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 import path from 'node:path'
+import { PING_ID as PING } from '../../e2e/launchpad'
 
 const out = (name: string) => path.join(__dirname, '..', '..', 'docs', 'images', `${name}.png`)
-const PING = 'c1000000-0000-4000-8000-000000000002'
 const ORDERS = 'f1000000-0000-4000-8000-000000000001'
 
 async function settle(page: Page) {
@@ -39,7 +39,8 @@ test('home', async ({ page }) => {
 test('test cases tree', async ({ page }) => {
   await open(page, 'AEMSuiteTestCases-manage')
   await expect(page.getByText('Orders', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('Ping').first()).toBeVisible({ timeout: 30_000 }).catch(() => undefined)
+  // a missing row would give a wrong picture: fail instead
+  await expect(page.getByText('Ping').first()).toBeVisible({ timeout: 30_000 })
   await page.waitForTimeout(2500)
   // open the first two folders (each click turns the next closed node into an open one)
   for (let i = 0; i < 2; i++) {
@@ -80,7 +81,9 @@ test('run dialog', async ({ page }) => {
   await dialog.getByText('local-docker', { exact: true }).click()
   // the advanced settings open, with a repeated run
   await dialog.getByText('Advanced settings').click()
-  const [repetitions, pause] = await dialog.getByRole('spinbutton').all()
+  const fields = dialog.getByRole('spinbutton')
+  await expect(fields).toHaveCount(2)
+  const [repetitions, pause] = await fields.all()
   await repetitions.fill('10')
   await repetitions.press('Tab')
   await pause.fill('500')

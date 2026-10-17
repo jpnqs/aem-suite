@@ -5,6 +5,6 @@
     "noEmit": true,
     "rootDir": ".."
   },
-  "include": ["./**/*.ts", "../playwright.config.ts", "../playwright.screenshots.config.ts", "../scripts/screenshots/**/*.ts"],
+  "include": ["./**/*.ts", "../playwright.config.ts", "../playwright.base.ts", "../playwright.screenshots.config.ts", "../scripts/screenshots/**/*.ts"],
   "exclude": []
 }

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { apps, openApp, expectAppOpen } from './launchpad'
+import { apps, openApp, expectAppOpen, previewTestCase } from './launchpad'
 import { deleteAfterEach, uniqueName } from './cleanup'
 
 // The Number Ranges app (admin): define a range, see what its numbers look like, use the preview, reset.
@@ -14,7 +14,7 @@ test.describe('Number Ranges', () => {
     await expectAppOpen(page, apps.numberRanges)
     await page.getByRole('button', { name: 'Create' }).click()
 
-    // the object page (the list report's filter bar has a Name field, too)
+    // the object page (the list report's filter bar has a Name field, too) - the id is the route target of the manifest
     const form = page.locator('[id*="NumberRangesObjectPage"]')
     await form.getByLabel('Name', { exact: true }).fill(name)
     await form.getByLabel('Prefix').fill('SO-')
@@ -47,10 +47,7 @@ test.describe('Number Ranges', () => {
 
   test('the demo test case "Order with document numbers" resolves with the demo ranges', async ({ request }) => {
     // test/data: ranges ORDERS, DELIVERIES, INVOICES and the test case in the folder Orders
-    const found = await (await request.get('/odata/v4/test/TestCases?$select=ID&$filter=' + encodeURIComponent("name eq 'Order with document numbers'"))).json()
-    const brokers = await (await request.get('/odata/v4/test/Brokers?$select=ID&$filter=' + encodeURIComponent("name eq 'local-docker'"))).json()
-    const res = await request.post(`/odata/v4/test/TestCases(ID=${found.value[0].ID},IsActiveEntity=true)/TestService.preview`, { data: { brokerId: brokers.value[0].ID } })
-    const preview = await res.json()
+    const preview = await previewTestCase(request, 'Order with document numbers')
     expect(preview.valid).toBe(true)
     const payload = JSON.parse(preview.payload)
     expect(payload.orderNumber).toMatch(/^SO-[0-9]{10}$/)
