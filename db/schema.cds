@@ -87,6 +87,16 @@ type ReceivedDeliveryMode : String(20) enum {
   PERSISTENT;
 }
 
+/** Client username on a broker (Brokers and the saved setups of the live subscriber). */
+type Username : String(200);
+
+/** ROUND: the whole selection N times (a b c a b c), EACH: every test case N times in a row (a a b b c c) */
+@assert.range
+type RunOrder : String(5) enum {
+  ROUND;
+  EACH;
+}
+
 /** A Solace / Advanced Event Mesh broker (message VPN) to test against. */
 entity Brokers : cuid, managed {
   name                   : String(100) @mandatory;
@@ -101,7 +111,7 @@ entity Brokers : cuid, managed {
    * DIRECT mode: the password is never stored - it is entered for each run / connection test / subscription.
    * The username is optional: if empty, it is entered together with the password.
    */
-  username               : String(200);
+  username               : Username;
   clientNamePrefix       : String(60) default 'aem-suite';
   connectTimeoutMs       : Integer default 10000 @assert.range: [1000, 120000];
   active                 : Boolean default true;
@@ -152,7 +162,10 @@ entity TestCases : cuid, managed {
                      on userProperties.testCase = $self;
   variables      : Composition of many TestCaseVariables
                      on variables.testCase = $self;
-  /** outcome of the latest run (kept separately, so runs do not touch modifiedAt) */
+  /**
+   * outcome of the latest run (kept separately, so runs do not touch modifiedAt; not a composition, so a draft
+   * does not copy it). TestService deletes the stats of deleted test cases.
+   */
   lastResult     : Association to one TestCaseStats
                      on lastResult.testCase = $self;
 }
@@ -196,6 +209,8 @@ entity TestRuns : cuid, managed {
   skippedCount : Integer default 0;
   /** advanced run settings (Run dialog): how often each message is sent, the pause between messages, ... */
   repetitions  : Integer default 1;
+  /** the order of the repetitions ("order" is an SQL keyword) */
+  repetitionOrder : RunOrder default 'ROUND';
   delayMs      : Integer default 0;
   stopOnFailure : Boolean default false;
   results     : Composition of many RunResults
@@ -253,13 +268,15 @@ entity SubscriberPresets : cuid, managed {
   /** queue name (QUEUE_BROWSE / QUEUE_CONSUME) */
   queue      : String(500);
   /** only if the user wants it remembered; DIRECT brokers without a maintained username */
-  username   : String(100);
+  username   : Username;
 }
 
 /**
  * Number ranges: issue real-looking identifiers (like SAP number ranges). Used in templates as
  * {{numberRange.<name>}}; every message that uses a range gets the next number. `current` is the last number issued.
  */
+// the name check of AdminService ignores case; the constraint also stops two creates that pass it at the same time
+@assert.unique: {name: [name]}
 entity NumberRanges : cuid, managed {
   /** used in the template: {{numberRange.<name>}} */
   name        : String(50) @mandatory;

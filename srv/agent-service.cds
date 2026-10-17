@@ -114,6 +114,8 @@ service TestAgentService {
       skippedCount,
       /** how often every test case was sent to every broker */
       repetitions,
+      /** ROUND: the whole selection N times, EACH: every test case N times in a row */
+      repetitionOrder,
       delayMs,
       stopOnFailure,
       results

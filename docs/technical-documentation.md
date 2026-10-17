@@ -104,11 +104,11 @@ mta.yaml, xs-security.json    deployment
 | `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`. Compositions `userProperties`, `variables`. Association `lastResult` → `TestCaseStats`. |
 | `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
 | `TestCaseVariables` | Variables of a test case **or a folder** | Folder variables apply to all descendants. |
-| `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases. |
-| `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED (FAILED = aborted), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `delayMs`, `stopOnFailure`. Composition `results`. |
+| `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases (an association, so drafts do not copy it). `TestService` deletes the stats of deleted test cases. |
+| `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED (FAILED = aborted), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `repetitionOrder` (ROUND / EACH), `delayMs`, `stopOnFailure`. Composition `results`. |
 | `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
 | `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
-| `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name, prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
+| `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name (`@assert.unique`; the service also refuses the same name in another case), prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
 | `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
 | `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
 

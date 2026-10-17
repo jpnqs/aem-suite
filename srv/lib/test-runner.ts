@@ -186,6 +186,7 @@ async function createRun(
     failedCount: 0,
     skippedCount: 0,
     repetitions: settings.repetitions,
+    repetitionOrder: settings.order,
     delayMs: settings.delayMs,
     stopOnFailure: settings.stopOnFailure
   })

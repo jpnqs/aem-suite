@@ -48,6 +48,7 @@ annotate service.TestRuns with @(
     {Value: failedCount},
     {Value: skippedCount},
     {Value: repetitions},
+    {Value: repetitionOrder},
     {Value: delayMs},
     {Value: stopOnFailure},
     {Value: startedAt},
@@ -73,6 +74,7 @@ annotate service.TestRuns with @(
   failedCount       @title: 'Failed / Error';
   skippedCount      @title: 'Not Sent'  @Common.QuickInfo: 'Messages that were not sent: the run was stopped, or stop on first failure';
   repetitions       @title: 'Repetitions';
+  repetitionOrder   @title: 'Order'  @Common.QuickInfo: 'Whole selection (a b c, a b c) or each test case in a row (a a, b b, c c)';
   delayMs           @title: 'Pause (ms)'  @Common.QuickInfo: 'Pause between two messages to the same broker';
   stopOnFailure     @title: 'Stop at First Failure';
   statusCriticality @UI.Hidden;

@@ -54,13 +54,15 @@ describe('advanced run settings (repetitions, delay, stop on failure, stop)', ()
     const rows = await results(res.data.runId)
     expect(rows.map((r) => `${r.sequence}:${r.testCaseName}#${r.iteration}`)).toEqual(['1:A#1', '2:B#1', '3:A#2', '4:B#2', '5:A#3', '6:B#3'])
     const { data } = await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)
-    expect(data).toMatchObject({ totalCount: 6, passedCount: 6, repetitions: 3 })
+    expect(data).toMatchObject({ totalCount: 6, passedCount: 6, repetitions: 3, repetitionOrder: 'ROUND' })
     expect(data.summary).toContain('× 3')
 
     res = await run([a.ID, b.ID], { repetitions: 2, order: 'each' })
     await waitForRun(res.data.runId)
     expect(published.map((p) => p.spec.topic)).toEqual(['run/a', 'run/a', 'run/b', 'run/b'])
     expect((await results(res.data.runId)).map((r) => `${r.testCaseName}#${r.iteration}`)).toEqual(['A#1', 'A#2', 'B#1', 'B#2'])
+    // the order is stored with the run, so it can be understood afterwards
+    expect((await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)).data.repetitionOrder).toBe('EACH')
   })
 
   it('pauses between two messages, but not before the first', async () => {

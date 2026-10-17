@@ -46,6 +46,12 @@ export default class TestService extends cds.ApplicationService {
       validateNode(d, req.event, reject)
     })
 
+    // the latest outcome of a test case is an association (not part of the draft): remove the stats of deleted nodes
+    // (a folder deletes everything below it)
+    this.after('DELETE', TestCases, async () => {
+      await DELETE.from('aem.suite.TestCaseStats').where({ testCase_ID: { 'not in': SELECT('ID').from('aem.suite.TestCases') } })
+    })
+
     // drag & drop: place the node before NextSibling (null = at the end)
     this.on('moveBefore', TestCases, async (req) => {
       const nextId = (req.data as { NextSibling?: { ID?: string } | null }).NextSibling?.ID ?? null

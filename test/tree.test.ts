@@ -211,11 +211,16 @@ describe('test case tree (folders)', () => {
     expect(none.status).toBe(400)
   })
 
-  it('deletes a folder including its content', async () => {
+  it('deletes a folder including its content and the last results of its test cases', async () => {
+    // all test cases ran once
+    expect((await runAndWait(POST, { testCaseIds: [orders.ID, ping.ID], brokerIds: [broker.ID] })).status).toBe(200)
+    expect(await SELECT.from('aem.suite.TestCaseStats')).toHaveLength(3)
     const res = await axios.delete(`/odata/v4/test/TestCases(ID=${orders.ID},IsActiveEntity=true)`, tester)
     expect(res.status).toBe(204)
     expect(await SELECT.from('aem.suite.TestCases').where({ ID: { in: [eu.ID, created.ID, cancelled.ID] } })).toHaveLength(0)
     expect(await SELECT.one.from('aem.suite.TestCases', ping.ID)).toBeTruthy() // not inside the folder
+    // no orphaned stats: only the one of ping is left
+    expect((await SELECT.from('aem.suite.TestCaseStats')).map((s: { testCase_ID: string }) => s.testCase_ID)).toEqual([ping.ID])
   })
 })
 
