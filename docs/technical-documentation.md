@@ -423,7 +423,7 @@ Each HTML5 app is deployed on its own, so every app has a **generated copy** in 
 - **Never put `{` `}` into annotation texts** (labels, QuickInfo): Fiori elements interprets them as bindings and sends broken requests. In XML escape as `\{`, in JS controls set texts via setters, not constructor settings.
 - UI5 TypeScript classes: **no getters** in controllers (`ui5-tooling-transpile` converts the class to `Controller.extend({...})` and evaluates getters at definition time).
 - Models in `onInit` of a root view: use `getOwnerComponent().getModel()`.
-- All apps pin `https://ui5.sap.com/1.148.12`.
+- All apps pin `https://ui5.sap.com/1.148.12`. The version is repeated in every `index.html`, every manifest (`minUI5Version`) and the `@sapui5/types` packages; `test/ui5-version.test.ts` fails unless they agree with `@sapui5/types` in the root `package.json`.
 
 ### 8.4 Launchpad
 
