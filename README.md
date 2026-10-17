@@ -229,7 +229,7 @@ On Windows the e2e tests use the installed Edge. Elsewhere install Chromium once
 ### Development workflow
 
 - Run **`npm run verify`** (typecheck, lint, Jest) before you push; CI (`.github/workflows/ci.yml`) runs it and the e2e tests on every pull request.
-- UI code shared by the apps lives in **`app/_shared`**. `app/*/webapp/shared/*` are generated copies: never edit them, change `app/_shared` and run **`npm run sync:ui`** (a test fails when a copy is out of date).
+- UI code shared by the apps lives in **`app/_shared`** - edit it there. The UI5 build and the dev server put the modules an app uses into the app (`scripts/ui5`); there are no copies to keep in sync.
 - After changing CDS, `npm run typer` regenerates the cds-typer models.
 - The UI5 tooling is installed once at the root; the apps' `package.json` files only name the UI5 custom tasks.
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).

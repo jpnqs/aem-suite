@@ -1,6 +1,6 @@
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
-import Actions from "../shared/Actions";
-import LiveSocket from "../shared/LiveSocket";
+import Actions from "com/aem/suite/subscriber/shared/Actions";
+import LiveSocket from "com/aem/suite/subscriber/shared/LiveSocket";
 
 const { invokeAction } = Actions;
 

@@ -67,7 +67,7 @@ app/
   subscriber/                 freestyle UI5 app in TypeScript
   help/ home/                 freestyle UI5 apps: the user guide, the start page
   _shared/                    UI modules all apps share (Apps, Actions, Help, LiveSocket, Navigation, MyEntriesFilter) -
-                              the original; npm run sync:ui copies them to <app>/webapp/shared (generated, committed)
+                              the UI5 build and dev server add them to each app (scripts/ui5, nothing copied or committed)
   router/                     standalone approuter (xs-app.json: MCP, OAuth discovery, everything else from the HTML5 repo)
   <app>/xs-app.json           routes of each app in the HTML5 repo (odata/, ws/ -> destination srv-api)
 db/
@@ -89,7 +89,8 @@ docs/                         user guide (also shown by the Help app), this docu
 local/                        docker-compose for a local Solace broker, terragrunt for its VPN, users and queues
 scripts/build-ui.js           ui5 build of all apps (each writes its HTML5 repo zip into dist/)
 scripts/build-docs.js         copies docs/user-guide.md next to the built server (gen/srv/docs) for the Help app
-scripts/sync-shared-ui.js     copies app/_shared into every app (npm run sync:ui; --check only reports)
+scripts/ui5/                  UI5 build task + dev server middleware that give every app its app/_shared modules
+scripts/set-version.js        one version in mta.yaml, every package.json and manifest
 scripts/screenshots/          Playwright spec that takes the images in docs/images (npm run docs:screenshots)
 mta.yaml, xs-security.json    deployment
 .github/workflows/ci.yml      CI: npm run verify and the e2e tests on every push to main and every pull request
@@ -418,7 +419,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 `Apps.js` (the app catalog: key, launchpad intent, icon and required role of every app – `test/launchpad.test.ts` compares it with the launchpad tiles and the manifests), `Actions.js` (error text, `invokeAction` that destroys the operation binding afterwards), `Help.js` (Help buttons, section per app), `LiveSocket.js` (WebSocket client with reconnect, used by the Run dialog and the Live Subscriber), `Navigation.js` (to another app by its key, inside or outside the launchpad) and `MyEntriesFilter.controller.js` (prefills the "Created by" / "Started by" filter once per app start with `currentUser()`; test cases and runs). TypeScript apps get `.d.ts` files too.
 
-Each HTML5 app is deployed on its own, so every app has a **generated copy** of the modules it uses in `webapp/shared` and loads them under its own namespace (`com/aem/suite/<app>/shared/...`). `scripts/sync-shared-ui.js` finds them in the app's files (`.../shared/Help`, `com.aem.suite.<app>.shared.Help` in a manifest) and adds what those modules load themselves (`./Navigation`); an app that uses none (Help) has no `shared` folder. Edit only `app/_shared`, then run `npm run sync:ui`; `test/shared-ui.test.ts` fails when a copy is out of date.
+Each HTML5 app is deployed on its own, so every app needs the modules it uses under its own namespace (`com/aem/suite/<app>/shared/...`). Nothing is copied into the apps: every `ui5.yaml` has the build task `aem-shared-ui-task` (adds the modules to the build result before the Component-preload is bundled, so they are in the preload and the HTML5 repo zip) and the middleware `aem-shared-ui-middleware` (serves `.../shared/<module>.js` from `app/_shared`, also in `cds watch` through cds-plugin-ui5), both in `scripts/ui5/`. The modules an app gets are the ones its files name (`.../shared/Help`, `com.aem.suite.<app>.shared.Help` in a manifest) plus what those load (`./Navigation`). The TypeScript app imports them as `com/aem/suite/subscriber/shared/...`, which its `tsconfig.json` maps to `app/_shared` (the `.d.ts` files there). `app/*/webapp/shared/` is git-ignored; `test/shared-ui.test.ts` checks the wiring.
 
 ### 8.3 Conventions and pitfalls
 
@@ -490,7 +491,6 @@ npm run watch                 # cds watch (TypeScript, SQLite in memory, demo da
 ```sh
 npm run verify      # before every commit: typecheck + lint + Jest (what CI runs first)
 npm run e2e         # Playwright: UI apps in a browser (e2e:ui, e2e:headed, e2e:trace)
-npm run sync:ui     # after changing app/_shared: regenerate the copies in app/*/webapp/shared
 npm run typer       # regenerate the cds-typer models (@cds-models) - typecheck, test, watch and the e2e server do it first
 npm run build:ui    # ui5 build of all apps, as the MTA build does it
 ```
@@ -502,7 +502,7 @@ npm run build:ui    # ui5 build of all apps, as the MTA build does it
 | `test` | Jest |
 | `verify` | the three above, in this order |
 
-- `app/*/webapp/shared/*` are **generated**: edit `app/_shared`, run `npm run sync:ui`, commit both.
+- Shared UI code: edit `app/_shared` - no copies (section 8.2a).
 - The server code uses the **cds-typer** models (`import { TestRuns } from '#cds-models/aem/suite'`): entities for queries and types for rows and enums instead of hand-written shapes. `@cds-models` is generated and not committed; `npm run typecheck`, `npm test`, `cds watch` and the e2e server generate it first, `cds build` puts it into `gen/srv`. `@singular` in the CDS fixes the class names cds-typer would derive badly (`TestCas`, a code list named like its enum type).
 - The UI5 tooling (`@ui5/cli`, `ui5-task-zipper`, `ui5-tooling-transpile`, `@sapui5/types`) is installed once at the root (`npm install` / `npm ci`); the apps' own `package.json` files only name the custom tasks their `ui5.yaml` uses, which the UI5 CLI needs to find them.
 - Versions: `npm run set-version -- <version>` (`scripts/set-version.js`) sets one version in `mta.yaml`, the root and app `package.json` files and the manifests; `test/version.test.ts` fails when they differ. Changes are listed in `CHANGELOG.md`.
@@ -516,7 +516,7 @@ npm run build:ui    # ui5 build of all apps, as the MTA build does it
 |---|---|---|
 | Unit | template resolver, number ranges, faker, property types, defaults, URLs, node validation, test case spec, the Solace session | no server; the solclientjs session is faked (`test/fakes/solace.ts`) |
 | Service | the OData services, the run engine (`test-runner`, `run-options`), tree, export / import, subscriptions (hub and HTTP), Home, Help, the MCP agent and its OAuth discovery, the dev server | `startServer()` (`cds.test`, SQLite in memory) with `resetDatabase()`; broker connections replaced by `fakeBroker()` / `setSessionFactory()` (`test/helpers.ts`) |
-| Consistency | `mta.test.ts` (apps vs. MTA modules), `launchpad.test.ts` (tiles vs. manifests), `shared-ui.test.ts` (generated copies), `help.test.ts` (help anchors and links of the guide) | read the files of the repository |
+| Consistency | `mta.test.ts` (apps vs. MTA modules), `launchpad.test.ts` (tiles vs. manifests), `shared-ui.test.ts` (shared modules wired into every app), `ui5-version.test.ts`, `version.test.ts`, `help.test.ts` (help anchors and links of the guide) | read the files of the repository |
 
 **End-to-end (`e2e/*.spec.ts`, Playwright).** `playwright.config.ts` starts `cds-tsx serve` with mocked users and the demo data on port 4005 (`E2E_PORT`; an already running server on that port is reused outside CI) and drives the sandbox launchpad in Chromium, locale en-US. Browser: on Windows the installed Edge, elsewhere Playwright's Chromium (`npx playwright install chromium` once); `PW_CHANNEL` overrides it. No broker is needed.
 

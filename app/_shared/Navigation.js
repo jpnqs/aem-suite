@@ -1,7 +1,7 @@
 sap.ui.define(["module", "./Apps"], function (module, Apps) {
   "use strict";
 
-  // namespace of the app this copy belongs to, e.g. "com/aem/suite/brokers" (see scripts/sync-shared-ui.js)
+  // namespace of the app this module is loaded for, e.g. "com/aem/suite/brokers" (see scripts/ui5/shared-ui.js)
   var APP_NAMESPACE = module.id.replace(/\/shared\/[^/]+$/, "");
 
   function inLaunchpad() {
