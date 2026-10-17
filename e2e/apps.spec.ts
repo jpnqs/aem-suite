@@ -13,6 +13,14 @@ test.describe('apps (admin)', () => {
     await expect(page.getByText('{{app}}/ping/{{broker.name}}').first()).toBeVisible()
   })
 
+  test('Test Cases offers a folder or a test case to create (labels from the i18n bundle)', async ({ page }) => {
+    await openApp(page, apps.testCases)
+    await expectAppOpen(page, apps.testCases)
+    await page.getByRole('button', { name: 'Create' }).first().click()
+    await expect(page.getByRole('menuitem', { name: 'Folder' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Test Case' })).toBeVisible()
+  })
+
   test('Test Cases opens a test case by deep link', async ({ page }) => {
     await page.goto(testCaseUrl(PING_ID))
     await expect(page).toHaveTitle('Ping ({{app}}/ping/{{broker.name}}) - Test Case')
