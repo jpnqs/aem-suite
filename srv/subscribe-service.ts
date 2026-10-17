@@ -53,12 +53,12 @@ export default class SubscribeService extends cds.ApplicationService {
       await stopSubscription(subscriptionId, req.user.id)
     })
 
-    // also serves as heartbeat of the subscriber UI (prevents idle timeout)
-    this.on('activeSubscriptions', (req) => {
-      const list = listSubscriptions(req.user.id)
-      list.forEach((s) => touch(s.subscriptionId, req.user.id))
-      return list
+    this.on('heartbeat', (req) => {
+      const { subscriptionId } = req.data as { subscriptionId: string }
+      return { active: touch(subscriptionId, req.user.id) }
     })
+
+    this.on('activeSubscriptions', (req) => listSubscriptions(req.user.id))
 
     this.before('CREATE', ReceivedMessages, async (req) => {
       const d = req.data as { broker_ID?: string; brokerName?: string; receivedAt?: string }

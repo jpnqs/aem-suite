@@ -493,12 +493,13 @@ export default class Main extends Controller {
     (this.byId("page") as DynamicPage | undefined)?.setHeaderExpanded(expanded);
   }
 
+  /** Keeps this page's subscription alive on the server (only this one: a closed tab's subscription times out). */
   private async heartbeat(): Promise<void> {
     const id = this.state.getProperty("/subscriptionId") as string | null;
     if (!id) return;
     try {
-      const list = await this.fetchActive();
-      if (!list.some((s) => s.subscriptionId === id)) this.markStopped("Subscription ended on the server");
+      const { active } = await invokeAction<{ active: boolean }>(this.odata(), "/heartbeat(...)", { subscriptionId: id });
+      if (!active && this.state.getProperty("/subscriptionId") === id) this.markStopped("Subscription ended on the server");
     } catch {
       /* transient - retry on next tick */
     }

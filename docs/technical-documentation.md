@@ -153,10 +153,11 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 |---|---|
 | `start(brokerId, sourceType, topics, queue, password, username)` | Opens a dedicated session. `sourceType`: `TOPIC` (direct subscriptions, wildcards), `QUEUE_BROWSE` (messages stay), `QUEUE_CONSUME` (client ack, messages removed). Returns `subscriptionId`. |
 | `stop(subscriptionId)` | Closes the subscription (owner only). |
-| `activeSubscriptions()` | Own subscriptions; also acts as **heartbeat** (keeps them alive). |
+| `heartbeat(subscriptionId)` | **Heartbeat** of the page that started the subscription: keeps this one subscription alive; `active = false` if it ended on the server. |
+| `activeSubscriptions()` | Own subscriptions (read only). |
 | `NumberRanges` | Draft-enabled, Admin. Virtual `lastNumber` / `nextNumber` (formatted). Bound action `reset(nextNumber)`. `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
 | `SubscriberPresets` | The user's saved subscriber setups. `@restrict` to `createdBy = $user` (a user sees and changes only their own); a `before` handler checks the name (required, unique per user), source type and the topic list. |
-| `ReceivedMessages` | Saved messages (no update). Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
+| `ReceivedMessages` | Saved messages (no update). Testers read all and delete only their own, administrators delete any. Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
 | `Brokers` | Active brokers (incl. `credentialMode`, `username`). |
 
 ### LiveService – WebSocket `/ws/live` (role `Tester`)
@@ -350,7 +351,7 @@ In-memory tree over `TestCases` (`ID`, `parent_ID`, `kind`, `name`, `sortOrder`)
 
 ### 7.8 `solace/subscription-hub.ts`
 
-In-memory registry of live subscriptions (one session each). Limits (configurable, section 10): 5 per user, 100 forwarded messages/s per subscription (excess is counted but not forwarded; THROTTLED/RESUMED events), payloads > 512 KB truncated in the live view. A sweeper closes subscriptions without heartbeat for 5 minutes (the UI calls `activeSubscriptions()` every 60 s) – messages do not count as activity, so subscriptions of closed browser tabs end. All subscriptions are closed on server shutdown.
+In-memory registry of live subscriptions (one session each). Limits (configurable, section 10): 5 per user, 100 forwarded messages/s per subscription (excess is counted but not forwarded; THROTTLED/RESUMED events), payloads > 512 KB truncated in the live view. A sweeper closes subscriptions without heartbeat for 5 minutes (the page that started a subscription calls `heartbeat` for it every 60 s; another open tab does not keep it alive) – messages do not count as activity, so subscriptions of closed browser tabs end. All subscriptions are closed on server shutdown.
 
 > **Single instance:** the hub state lives in one Node.js process. `mta.yaml` pins the backend to `instances: 1`. Scaling out needs sticky sessions plus a shared registry (e.g. Redis), and the websocket plugin's Redis adapter.
 

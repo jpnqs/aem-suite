@@ -1,6 +1,8 @@
 import cds from '@sap/cds'
 import * as testCaseSpec from '../srv/lib/test-case-spec'
 import { failRuns, waitForRun } from '../srv/lib/test-runner'
+import { setSessionFactory, stopAll } from '../srv/lib/solace/subscription-hub'
+import { FakeSubscriberSession } from './fakes/solace'
 import { createActive, fakeBroker, resetDatabase, startServer, users } from './helpers'
 
 const { GET, POST, PATCH, DELETE: DEL } = startServer()
@@ -474,6 +476,29 @@ describe('AEM test suite services', () => {
     expect(noPw.data.error.message).toBe('Password required for broker "dev"')
     const { data } = await GET('/odata/v4/subscribe/activeSubscriptions()', tester)
     expect(data.value).toEqual([])
+  })
+
+  it('starts, keeps alive, lists and stops a live subscription', async () => {
+    setSessionFactory(async () => new FakeSubscriberSession())
+    try {
+      const started = await POST('/odata/v4/subscribe/start', { brokerId: goodBroker.ID, sourceType: 'TOPIC', topics: ['a/>'], password: 'pw' }, tester)
+      expect(started.status).toBe(200)
+      const { subscriptionId } = started.data
+      const heartbeat = async (auth: object) => (await POST('/odata/v4/subscribe/heartbeat', { subscriptionId }, auth)).data.active
+      const active = async (auth: object) => (await GET('/odata/v4/subscribe/activeSubscriptions()', auth)).data.value
+      expect(await active(tester)).toEqual([expect.objectContaining({ subscriptionId, brokerName: 'dev', sourceType: 'TOPIC', source: 'a/>' })])
+      expect(await active(admin)).toEqual([])
+      expect(await heartbeat(tester)).toBe(true)
+      // only the owner keeps it alive
+      expect(await heartbeat(admin)).toBe(false)
+      expect((await POST('/odata/v4/subscribe/stop', { subscriptionId }, admin)).status).toBe(403)
+      expect((await POST('/odata/v4/subscribe/stop', { subscriptionId }, tester)).status).toBeLessThan(300)
+      expect(await heartbeat(tester)).toBe(false)
+      expect(await active(tester)).toEqual([])
+    } finally {
+      await stopAll()
+      setSessionFactory()
+    }
   })
 
   it('lets admins update brokers via draft edit', async () => {

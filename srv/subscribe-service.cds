@@ -70,7 +70,18 @@ service SubscribeService {
 
   action stop(subscriptionId : UUID not null);
 
+  /**
+   * Called regularly by the page that started the subscription: keeps it from being closed by the idle timeout.
+   * Only this one subscription - one left behind by a closed tab still times out. active = false: it ended on the server.
+   */
+  action heartbeat(subscriptionId : UUID not null) returns HeartbeatResult;
+
+  /** The user's subscriptions (read only - does not keep them alive). */
   function activeSubscriptions()        returns many SubscriptionInfo;
+
+  type HeartbeatResult {
+    active : Boolean;
+  }
 
   type SubscriptionRef {
     subscriptionId : UUID;
