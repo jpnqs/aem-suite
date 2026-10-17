@@ -192,7 +192,7 @@ Open http://localhost:4004/launchpad.html (redirects to `/comaemsuitelaunchpad/i
 
 **Local demo setup** (`test/data/`, loaded by `cds watch` only, never deployed):
 
-- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md) (`docker compose up -d`, then `local/terragrunt/tg.ps1 apply`).
+- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md): `docker compose up -d` in the folder `local/`, then `.\tg.ps1 apply` in `local/terragrunt/` (PowerShell).
 - Brokers `local-docker (publisher)` (user `aem-publisher`/`publisher`, may only publish below `aem/`) and `local-docker (subscriber)` (user `aem-subscriber`/`subscriber`, may not publish) – the same broker, to compare ACLs.
 - Broker `local-docker (ask for user)`: the same broker without a username, to try the username prompt.
 - Broker `aem-dev (destination)`: an inactive example for DESTINATION mode.
