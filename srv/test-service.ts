@@ -103,7 +103,7 @@ export default class TestService extends cds.ApplicationService {
 }
 
 async function runFromUi(req: cds.Request, testCaseIds: string[], brokerIds: string[], credentials?: BrokerCredential[], options?: RunOptions) {
-  const runId = await startRun(req, testCaseIds, brokerIds, toCredentials(credentials), options)
+  const run = await startRun(req, testCaseIds, brokerIds, toCredentials(credentials), options)
   req.info(200, 'Test run started - see "Test Runs" for results')
-  return { runId }
+  return run
 }

@@ -1,4 +1,5 @@
 using {aem.suite as db} from '../db/schema';
+using {aem.suite.api as api} from './common';
 
 /** Test case maintenance and execution. */
 @path    : '/odata/v4/test'
@@ -159,13 +160,7 @@ service TestService {
    */
   action exportNodes(ids : many UUID) returns ExportResult;
 
-  type ExportResult {
-    /** suggested file name */
-    filename  : String;
-    content   : LargeString;
-    folders   : Integer;
-    testCases : Integer;
-  }
+  type ExportResult : api.ExportResult;
 
   /**
    * Imports the content of an export file as new test cases and folders below parentId (empty = top level).
@@ -174,22 +169,7 @@ service TestService {
    */
   action importNodes(content : LargeString not null, parentId : UUID, dryRun : Boolean) returns ImportResult;
 
-  type ImportRoot {
-    ID   : UUID;
-    name : String;
-    kind : String;
-  }
-
-  type ImportResult {
-    dryRun         : Boolean;
-    folders        : Integer;
-    testCases      : Integer;
-    userProperties : Integer;
-    variables      : Integer;
-    roots          : many ImportRoot;
-    /** name of the target folder, empty = top level */
-    target         : String;
-  }
+  type ImportResult : api.ImportResult;
 
   /** ID of the logged-in user - used to prefill "Created by" / "Started by" filters. */
   function currentUser() returns String;
@@ -217,26 +197,7 @@ service TestService {
     stopOnFailure : Boolean;
   }
 
-  /**
-   * Password of a DIRECT broker for one run - used in memory only, never stored.
-   * The username is only needed if none is maintained on the broker.
-   */
-  type BrokerCredential {
-    brokerId : UUID;
-    username : String;
-    password : String;
-  }
-
-  type RunRef {
-    runId : UUID;
-  }
-
-  type Preview {
-    topic          : String;
-    payload        : LargeString;
-    correlationId  : String;
-    userProperties : LargeString;
-    valid          : Boolean;
-    message        : String;
-  }
+  type BrokerCredential : api.BrokerCredential;
+  type RunRef : api.RunRef;
+  type Preview : api.Preview;
 }

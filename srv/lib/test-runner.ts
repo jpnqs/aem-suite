@@ -105,11 +105,17 @@ export function toCredentials(credentials?: BrokerCredential[] | null): Credenti
   return m
 }
 
+/** A run that was created: its ID and the number of messages (test cases x brokers x repetitions). */
+export interface RunRef {
+  runId: string
+  total: number
+}
+
 /**
- * Creates a TestRun with one PENDING result per (test case x broker) within the
+ * Creates a TestRun with one PENDING result per (test case x broker x repetition) within the
  * current transaction. Call executeRunInBackground() after the transaction committed.
  */
-export async function createRun(testCaseIds: string[], brokerIds: string[], credentials: Credentials = new Map(), options?: RunOptions | null): Promise<string> {
+export async function createRun(testCaseIds: string[], brokerIds: string[], credentials: Credentials = new Map(), options?: RunOptions | null): Promise<RunRef> {
   const settings = normalizeOptions(options)
   const selected = [...new Set(testCaseIds ?? [])]
   const brIds = [...new Set(brokerIds ?? [])]
@@ -177,7 +183,7 @@ export async function createRun(testCaseIds: string[], brokerIds: string[], cred
     stopOnFailure: settings.stopOnFailure
   })
   await INSERT.into('aem.suite.RunResults').entries(results)
-  return runId
+  return { runId, total: results.length }
 }
 
 /**
@@ -190,11 +196,11 @@ export async function startRun(
   brokerIds: string[],
   credentials: Credentials,
   options?: RunOptions | null
-): Promise<string> {
-  const runId = await createRun(testCaseIds, brokerIds, credentials, options)
+): Promise<RunRef> {
+  const run = await createRun(testCaseIds, brokerIds, credentials, options)
   const jwt = currentJwt()
-  req.on('succeeded', () => void executeRunInBackground(runId, jwt, credentials))
-  return runId
+  req.on('succeeded', () => void executeRunInBackground(run.runId, jwt, credentials))
+  return run
 }
 
 /** Starts execution in the background (do not await in a request). */

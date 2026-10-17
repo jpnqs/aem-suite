@@ -182,8 +182,7 @@ export default class TestAgentService extends cds.ApplicationService {
         return req.reject(429, `You already have ${active.length} runs in progress (limit ${max.maxActiveRuns}). Wait for one to finish (getRunSummary).`)
 
       const entered = max.allowDirectCredentials ? toCredentials(credentials) : toCredentials([])
-      const runId = await startRun(req, testCaseIds, brokerIds, entered)
-      return { runId, total }
+      return startRun(req, testCaseIds, brokerIds, entered)
     })
 
     // ---------------------------------------------------------------- check the result

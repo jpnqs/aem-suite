@@ -1,4 +1,5 @@
 using {aem.suite as db} from '../db/schema';
+using {aem.suite.api as api} from './common';
 
 /**
  * AI agent access to the test suite, served over the Model Context Protocol (endpoint /mcp/agent).
@@ -224,14 +225,7 @@ service TestAgentService {
   /** Copies test cases / folders (folders with everything below them). Copies are named "<name> (Copy)". */
   action copyNodes(ids : many UUID not null) returns many NodeRef;
 
-  type ExportResult {
-    /** suggested file name */
-    filename  : String;
-    /** the JSON file: { format, version, exportedAt, nodes: [ nested folders / test cases without IDs ] } */
-    content   : LargeString;
-    folders   : Integer;
-    testCases : Integer;
-  }
+  type ExportResult : api.ExportResult;
 
   /**
    * Exports test cases / folders (folders with everything below them) as the content of a JSON file; without ids the
@@ -239,21 +233,7 @@ service TestAgentService {
    */
   function exportNodes(ids : many UUID) returns ExportResult;
 
-  type ImportRoot {
-    ID   : UUID;
-    name : String;
-    kind : String;
-  }
-
-  type ImportResult {
-    dryRun         : Boolean;
-    folders        : Integer;
-    testCases      : Integer;
-    userProperties : Integer;
-    variables      : Integer;
-    roots          : many ImportRoot;
-    target         : String;
-  }
+  type ImportResult : api.ImportResult;
 
   /**
    * Creates many folders / test cases at once from the content of an export file (a JSON text, see exportNodes), below
@@ -262,30 +242,15 @@ service TestAgentService {
    */
   action importNodes(content : LargeString not null, parentId : UUID, dryRun : Boolean) returns ImportResult;
 
-  type Preview {
-    valid          : Boolean;
-    message        : String;
-    topic          : String;
-    payload        : LargeString;
-    correlationId  : String;
-    userProperties : LargeString;
-  }
+  type Preview : api.Preview;
 
   /** Shows the message of a test case exactly as it would be sent to a broker (variables resolved). Nothing is sent. */
   function previewTestCase(testCaseId : UUID not null, brokerId : UUID) returns Preview;
 
   // ------------------------------------------------------------ execute and check
 
-  type BrokerCredential {
-    brokerId : UUID;
-    username : String;
-    password : String;
-  }
-
-  type RunRef {
-    runId : UUID;
-    total : Integer;
-  }
+  type BrokerCredential : api.BrokerCredential;
+  type RunRef : api.RunRef;
 
   /**
    * Runs test cases (folders run everything below them) against brokers. The run happens in the background:

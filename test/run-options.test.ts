@@ -44,6 +44,8 @@ describe('advanced run settings (repetitions, delay, stop on failure, stop)', ()
 
   it('repeats the whole selection (ROUND, default) or every test case in a row (EACH)', async () => {
     let res = await run([a.ID, b.ID], { repetitions: 3 })
+    // the number of messages, so the Run dialog can show the progress right away
+    expect(res.data.total).toBe(6)
     await waitForRun(res.data.runId)
     expect(published.map((p) => p.spec.topic)).toEqual(['run/a', 'run/b', 'run/a', 'run/b', 'run/a', 'run/b'])
     const rows = await results(res.data.runId)

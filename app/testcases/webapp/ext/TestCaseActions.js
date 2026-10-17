@@ -313,7 +313,7 @@ sap.ui.define(
               // passwords are not kept in the UI after the run was started
               state.setProperty("/credentials", []);
               var id = result.runId;
-              state.setProperty("/total", testCaseIds.length * brokerIds.length * options.repetitions);
+              state.setProperty("/total", result.total);
               state.setProperty("/runId", id);
               pollTimer = setInterval(function () {
                 poll(id);
