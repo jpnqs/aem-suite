@@ -8,7 +8,8 @@ import { readMessage, SolaceSession, sol } from './session'
 
 const LOG = cds.log('aem-subscribe')
 
-export type SourceType = 'TOPIC' | 'QUEUE_BROWSE' | 'QUEUE_CONSUME'
+export type { SourceType } from '#cds-models/aem/suite'
+import type { SourceType } from '#cds-models/aem/suite'
 
 export interface StartRequest {
   brokerId: string
@@ -47,7 +48,7 @@ export interface SubscriptionInfo {
   subscriptionId: string
   brokerId: string
   brokerName: string
-  sourceType: string
+  sourceType: SourceType
   source: string
   startedAt: string
   messageCount: number

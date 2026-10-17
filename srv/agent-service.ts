@@ -4,7 +4,8 @@ import { copyNodes } from './lib/copy-nodes'
 import { exportNodes, importNodes } from './lib/export-import'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
 import { assertValid, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './lib/node-validation'
-import { createNode, NodeRow, selectNodeDeep, TABLE } from './lib/nodes'
+import { Brokers, RunResults, TestCaseProperties, TestCases, TestCaseVariables, TestRuns, type TestRun } from '#cds-models/aem/suite'
+import { createNode, NodeRow, selectNodeDeep } from './lib/nodes'
 import { TEST_FIELDS as FIELDS } from './lib/test-fields'
 import type { PropertyType } from './lib/property-types'
 import { buildPreview } from './lib/preview'
@@ -112,7 +113,7 @@ export default class TestAgentService extends cds.ApplicationService {
       const current = await loadNode(id)
       if (!current) return req.reject(404, 'Test case or folder not found')
       await assertValid((reject) => validateParent({ parent_ID: parentId ?? null }, id, reject))
-      await UPDATE(TABLE, id).with({ parent_ID: parentId ?? null, sortOrder: await nextSortOrder(parentId) })
+      await UPDATE(TestCases, id).with({ parent_ID: parentId ?? null, sortOrder: await nextSortOrder(parentId) })
       return { ID: id, name: current.name, kind: current.kind }
     })
 
@@ -148,7 +149,7 @@ export default class TestAgentService extends cds.ApplicationService {
       const max = config().agent
 
       // secrets stay out of AI conversations: only brokers whose credentials come from a BTP destination
-      const brokers = (await SELECT.from('aem.suite.Brokers')
+      const brokers = (await SELECT.from(Brokers)
         .columns('ID', 'name', 'credentialMode')
         .where({ ID: { in: [...new Set(brokerIds)] } })) as { ID: string; name: string; credentialMode: string }[]
       const needCredentials = brokers.filter((b) => b.credentialMode !== 'DESTINATION').map((b) => b.name)
@@ -160,7 +161,7 @@ export default class TestAgentService extends cds.ApplicationService {
         )
 
       // limits: parallel runs of this user here, the size of the run (and unknown test cases) in startRun
-      const active = (await SELECT.from('aem.suite.TestRuns').columns('ID').where({ createdBy: req.user.id, status: 'RUNNING' })) as unknown[]
+      const active = await SELECT.from(TestRuns).columns('ID').where({ createdBy: req.user.id, status: 'RUNNING' })
       if (active.length >= max.maxActiveRuns)
         return req.reject(429, `You already have ${active.length} runs in progress (limit ${max.maxActiveRuns}). Wait for one to finish (getRunSummary).`)
 
@@ -172,17 +173,16 @@ export default class TestAgentService extends cds.ApplicationService {
     this.on('getRunSummary', async (req) => {
       const { runId, waitSeconds } = req.data as { runId: string; waitSeconds?: number | null }
       const deadline = Date.now() + Math.min(Math.max(waitSeconds ?? 0, 0), MAX_WAIT_SECONDS) * 1000
-      type Run = { status: string; totalCount: number; passedCount: number; failedCount: number; skippedCount: number | null; summary: string }
-      let run: Run | undefined
+      let run: TestRun | null | undefined
       // short transactions: a long one would hold the database connection the running tests need
       for (;;) {
-        run = (await cds.db.tx(() => SELECT.one.from('aem.suite.TestRuns', runId))) as Run | undefined
+        run = await cds.db.tx(() => SELECT.one.from(TestRuns, runId))
         if (!run) return req.reject(404, 'Run not found')
         if (run.status !== 'RUNNING' || Date.now() >= deadline) break
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
       }
       const failures = (await cds.db.tx(() =>
-        SELECT.from('aem.suite.RunResults')
+        SELECT.from(RunResults)
           .columns('testCaseName', 'brokerName', 'status', 'resolvedTopic', 'errorMessage')
           // in the query, not afterwards: otherwise PENDING / SKIPPED rows would take places of the limit
           .where({ run_ID: runId, status: { in: ['FAILED', 'ERROR'] } })
@@ -216,18 +216,18 @@ async function saveChanges(
   userProperties: PropertyInput[] | undefined,
   variables: VariableInput[] | undefined
 ): Promise<{ ID: string; name: string; kind: string }> {
-  if (Object.keys(changes).length) await UPDATE(TABLE, id).with(changes)
-  else await UPDATE(TABLE, id).with({ modifiedAt: new Date().toISOString() })
+  if (Object.keys(changes).length) await UPDATE(TestCases, id).with(changes)
+  else await UPDATE(TestCases, id).with({ modifiedAt: new Date().toISOString() })
   if (userProperties) {
-    await DELETE.from('aem.suite.TestCaseProperties').where({ testCase_ID: id })
-    if (userProperties.length) await INSERT.into('aem.suite.TestCaseProperties').entries(userProperties.map((p) => ({ ...p, testCase_ID: id })))
+    await DELETE.from(TestCaseProperties).where({ testCase_ID: id })
+    if (userProperties.length) await INSERT.into(TestCaseProperties).entries(userProperties.map((p) => ({ ...p, testCase_ID: id })))
   }
   if (variables) {
-    await DELETE.from('aem.suite.TestCaseVariables').where({ testCase_ID: id })
-    if (variables.length) await INSERT.into('aem.suite.TestCaseVariables').entries(variables.map((v) => ({ ...v, testCase_ID: id })))
+    await DELETE.from(TestCaseVariables).where({ testCase_ID: id })
+    if (variables.length) await INSERT.into(TestCaseVariables).entries(variables.map((v) => ({ ...v, testCase_ID: id })))
   }
-  const row = (await SELECT.one.from(TABLE, id).columns('ID', 'name', 'kind')) as { ID: string; name: string; kind: string }
-  return row
+  const row = await SELECT.one.from(TestCases, id).columns('ID', 'name', 'kind')
+  return { ID: id, name: row?.name ?? '', kind: row?.kind ?? '' }
 }
 
 const loadNode = (id: string): Promise<NodeRow | undefined> => selectNodeDeep(id)

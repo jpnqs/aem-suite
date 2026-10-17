@@ -25,7 +25,8 @@ export function baseConfig(port: number, opts: { reuseExistingServer: boolean; v
       }
     ],
     webServer: {
-      command: 'npx cds-tsx serve all --with-mocks --in-memory',
+      // the server code imports the cds-typer models (@cds-models, generated, not committed)
+      command: 'npx cds-typer "*" && npx cds-tsx serve all --with-mocks --in-memory',
       url: `http://localhost:${port}/`,
       env: { PORT: String(port) },
       reuseExistingServer: opts.reuseExistingServer,

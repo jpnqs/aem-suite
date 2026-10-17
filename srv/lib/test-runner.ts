@@ -1,4 +1,5 @@
 import cds from '@sap/cds'
+import { Brokers, RunResults, TestCaseStats, TestRuns, type ResultStatus, type RunResult, type TestRun } from '#cds-models/aem/suite'
 import { BrokerRecord, currentJwt, loadBroker, needsPassword, needsUsername, resolveConnection } from './credentials/resolve'
 import { errMsg, httpError, truncate } from './errors'
 import type { Publisher } from './solace/session'
@@ -22,12 +23,8 @@ export function waitForRun(runId: string): Promise<void> {
   return activeRuns.get(runId) ?? Promise.resolve()
 }
 
-interface PendingResult {
-  ID: string
-  testCase_ID: string
-  broker_ID: string
-  brokerName: string
-}
+/** A result row before the message is sent. */
+type PendingResult = Required<Pick<RunResult, 'ID'>> & { testCase_ID: string; broker_ID: string; brokerName: string }
 
 /** Advanced settings of a run as the client sends them (all optional). */
 export interface RunOptions {
@@ -65,7 +62,7 @@ const cancelledRuns = new Set<string>()
  * Only possible on the server that executes the run.
  */
 export async function cancelRun(runId: string, user: { id: string; is(role: string): boolean }): Promise<void> {
-  const run = (await SELECT.one.from('aem.suite.TestRuns').columns('status', 'createdBy').where({ ID: runId })) as { status: string; createdBy: string } | undefined
+  const run = await SELECT.one.from(TestRuns).columns('status', 'createdBy').where({ ID: runId })
   if (!run) throw httpError(404, 'Run not found')
   if (run.createdBy !== user.id && !user.is('Admin')) throw httpError(403, 'Only the user who started the run (or an administrator) can stop it')
   if (run.status !== 'RUNNING' || !activeRuns.has(runId)) throw httpError(409, 'The run is not running (any more)')
@@ -135,17 +132,15 @@ async function createRun(
   const tcIds = tree.expandToTests(selected)
   if (!tcIds.length) throw httpError(400, 'The selected folders contain no test cases')
   const testCases = tcIds.map((id) => ({ ID: id, name: tree.byId.get(id)!.name ?? id }))
-  const brokers = (await SELECT.from('aem.suite.Brokers').columns('ID', 'name', 'active', 'credentialMode', 'username').where({
-    ID: { in: brIds }
-  })) as { ID: string; name: string; active: boolean; credentialMode: string; username?: string | null }[]
+  const brokers = await SELECT.from(Brokers).columns('ID', 'name', 'active', 'credentialMode', 'username').where({ ID: { in: brIds } })
   if (brokers.length !== brIds.length) throw httpError(404, 'One or more brokers not found')
   // keep the user's selection order (summary, results)
-  brokers.sort((a, b) => brIds.indexOf(a.ID) - brIds.indexOf(b.ID))
+  brokers.sort((a, b) => brIds.indexOf(a.ID!) - brIds.indexOf(b.ID!))
   const inactive = brokers.filter((b) => b.active === false).map((b) => b.name)
   if (inactive.length) throw httpError(400, `Broker(s) inactive: ${inactive.join(', ')}`)
-  const noUser = brokers.filter((b) => needsUsername(b) && !credentials.get(b.ID)?.username).map((b) => b.name)
+  const noUser = brokers.filter((b) => needsUsername(b) && !credentials.get(b.ID!)?.username).map((b) => b.name)
   if (noUser.length) throw httpError(400, `Username required for broker(s): ${noUser.join(', ')}`)
-  const missing = brokers.filter((b) => needsPassword(b) && !credentials.get(b.ID)?.password).map((b) => b.name)
+  const missing = brokers.filter((b) => needsPassword(b) && !credentials.get(b.ID!)?.password).map((b) => b.name)
   if (missing.length) throw httpError(400, `Password required for broker(s): ${missing.join(', ')}`)
 
   const total = tcIds.length * brokers.length * settings.repetitions
@@ -167,16 +162,16 @@ async function createRun(
       testCaseName: tcById.get(tcId)!.name,
       broker_ID: b.ID,
       brokerName: b.name,
-      status: 'PENDING',
+      status: 'PENDING' as const,
       iteration,
       sequence: i + 1
     }))
   )
-  await INSERT.into('aem.suite.TestRuns').entries({
+  await INSERT.into(TestRuns).entries({
     ID: runId,
     summary: runSummary(
       tcIds.map((id) => tcById.get(id)!.name),
-      brokers.map((b) => b.name),
+      brokers.map((b) => b.name ?? ''),
       settings.repetitions
     ),
     startedAt: new Date().toISOString(),
@@ -190,7 +185,7 @@ async function createRun(
     delayMs: settings.delayMs,
     stopOnFailure: settings.stopOnFailure
   })
-  await INSERT.into('aem.suite.RunResults').entries(results)
+  await INSERT.into(RunResults).entries(results)
   return { runId, total: results.length }
 }
 
@@ -229,7 +224,7 @@ function executeRunInBackground(runId: string, jwt?: string, credentials: Creden
   return p
 }
 
-type Outcome = { status: 'PASSED' | 'FAILED' | 'ERROR'; broker: string; error?: string }
+type Outcome = { status: Extract<ResultStatus, 'PASSED' | 'FAILED' | 'ERROR'>; broker: string; error?: string }
 
 /** Counts of a run, the outcome per test case (for TestCaseStats), and the live progress events. */
 class RunProgress {
@@ -250,7 +245,7 @@ class RunProgress {
     this.counts.done++
     if (status === 'PASSED') this.counts.passed++
     else this.counts.failed++
-    await cds.db.tx(() => UPDATE('aem.suite.RunResults', r.ID).with({ status, executedAt: new Date().toISOString(), ...data }))
+    await cds.db.tx(() => UPDATE(RunResults, r.ID).with({ status, executedAt: new Date().toISOString(), ...data }))
     await this.emit(r.ID)
   }
 
@@ -258,7 +253,7 @@ class RunProgress {
   async skip(r: PendingResult, reason: string): Promise<void> {
     this.counts.done++
     this.counts.skipped++
-    await cds.db.tx(() => UPDATE('aem.suite.RunResults', r.ID).with({ status: 'SKIPPED', executedAt: new Date().toISOString(), errorMessage: reason }))
+    await cds.db.tx(() => UPDATE(RunResults, r.ID).with({ status: 'SKIPPED', executedAt: new Date().toISOString(), errorMessage: reason }))
     await this.emit(r.ID)
   }
 
@@ -266,7 +261,7 @@ class RunProgress {
   async complete(): Promise<void> {
     const { passed, failed, skipped } = this.counts
     await cds.db.tx(() =>
-      UPDATE('aem.suite.TestRuns', this.runId).with({
+      UPDATE(TestRuns, this.runId).with({
         status: 'DONE',
         finishedAt: new Date().toISOString(),
         passedCount: passed,
@@ -297,11 +292,9 @@ interface RunContext {
 
 async function executeRun(runId: string, jwt: string | undefined, credentials: Credentials): Promise<void> {
   const pending = (await cds.db.tx(() =>
-    SELECT.from('aem.suite.RunResults').columns('ID', 'testCase_ID', 'broker_ID', 'brokerName').where({ run_ID: runId }).orderBy('sequence')
+    SELECT.from(RunResults).columns('ID', 'testCase_ID', 'broker_ID', 'brokerName').where({ run_ID: runId }).orderBy('sequence')
   )) as PendingResult[]
-  const run = (await cds.db.tx(() => SELECT.one.from('aem.suite.TestRuns').columns('delayMs', 'stopOnFailure').where({ ID: runId }))) as
-    | { delayMs?: number | null; stopOnFailure?: boolean | null }
-    | undefined
+  const run = await cds.db.tx(() => SELECT.one.from(TestRuns).columns('delayMs', 'stopOnFailure').where({ ID: runId }))
 
   const tcIds = [...new Set(pending.map((p) => p.testCase_ID))]
   const brokerIds = [...new Set(pending.map((p) => p.broker_ID))]
@@ -401,9 +394,9 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
  * RUNNING while in progress, then FAILED if anything failed or the run was aborted, otherwise PASSED.
  * Keep in sync with TestRuns.outcome in srv/test-service.cds.
  */
-export function runOutcome(run: { status: string; failedCount: number }): 'RUNNING' | 'FAILED' | 'PASSED' {
+export function runOutcome(run: Pick<TestRun, 'status' | 'failedCount'>): 'RUNNING' | 'FAILED' | 'PASSED' {
   if (run.status === 'RUNNING') return 'RUNNING'
-  return run.status === 'FAILED' || run.failedCount > 0 ? 'FAILED' : 'PASSED'
+  return run.status === 'FAILED' || (run.failedCount ?? 0) > 0 ? 'FAILED' : 'PASSED'
 }
 
 /**
@@ -413,15 +406,15 @@ export function runOutcome(run: { status: string; failedCount: number }): 'RUNNI
 export async function failRuns(where: Record<string, unknown>, reason: string): Promise<void> {
   try {
     await cds.db.tx(async () => {
-      const runs = (await SELECT.from('aem.suite.TestRuns').columns('ID').where({ ...where, status: 'RUNNING' })) as { ID: string }[]
+      const runs = await SELECT.from(TestRuns).columns('ID').where({ ...where, status: 'RUNNING' })
       for (const { ID } of runs) {
-        await UPDATE('aem.suite.RunResults')
+        await UPDATE(RunResults)
           .with({ status: 'ERROR', errorMessage: errorText(reason), executedAt: new Date().toISOString() })
           .where({ run_ID: ID, status: 'PENDING' })
-        const results = (await SELECT.from('aem.suite.RunResults').columns('status').where({ run_ID: ID })) as { status: string }[]
+        const results = await SELECT.from(RunResults).columns('status').where({ run_ID: ID })
         const passed = results.filter((r) => r.status === 'PASSED').length
         const skipped = results.filter((r) => r.status === 'SKIPPED').length
-        await UPDATE('aem.suite.TestRuns', ID).with({
+        await UPDATE(TestRuns, ID).with({
           status: 'FAILED',
           finishedAt: new Date().toISOString(),
           passedCount: passed,
@@ -441,7 +434,7 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
   const runAt = new Date().toISOString()
   const rows = [...perTestCase].map(([testCaseId, outcomes]) => {
     const bad = outcomes.filter((o) => o.status !== 'PASSED')
-    const status = !bad.length ? 'PASSED' : bad.some((o) => o.status === 'FAILED') ? 'FAILED' : 'ERROR'
+    const status: ResultStatus = !bad.length ? 'PASSED' : bad.some((o) => o.status === 'FAILED') ? 'FAILED' : 'ERROR'
     return {
       testCase_ID: testCaseId,
       status,
@@ -452,7 +445,7 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
     }
   })
   try {
-    await cds.db.tx(() => UPSERT.into('aem.suite.TestCaseStats').entries(rows))
+    await cds.db.tx(() => UPSERT.into(TestCaseStats).entries(rows))
   } catch (e) {
     LOG.warn('Cannot update test case stats', e)
   }

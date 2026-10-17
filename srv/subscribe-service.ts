@@ -1,4 +1,5 @@
 import cds from '@sap/cds'
+import { Brokers, ReceivedMessages as ReceivedMessageRows } from '#cds-models/aem/suite'
 import { currentJwt } from './lib/credentials/resolve'
 import { detectContentType } from './lib/defaults'
 import { truncate } from './lib/errors'
@@ -65,7 +66,7 @@ export default class SubscribeService extends cds.ApplicationService {
     this.before('CREATE', ReceivedMessages, async (req) => {
       const d = req.data as { broker_ID?: string; brokerName?: string; receivedAt?: string }
       if (d.broker_ID && !d.brokerName) {
-        const b = await SELECT.one.from('aem.suite.Brokers').columns('name').where({ ID: d.broker_ID })
+        const b = await SELECT.one.from(Brokers).columns('name').where({ ID: d.broker_ID })
         d.brokerName = (b as { name?: string } | undefined)?.name
       }
       d.receivedAt ??= new Date().toISOString()
@@ -73,7 +74,7 @@ export default class SubscribeService extends cds.ApplicationService {
 
     // same rules and placement as a test case created in the UI or by an agent
     this.on('createTestCase', ReceivedMessages, async (req) => {
-      const m = (await SELECT.one.from('aem.suite.ReceivedMessages', idOf(req))) as ReceivedMessage | null
+      const m = (await SELECT.one.from(ReceivedMessageRows, idOf(req))) as ReceivedMessage | null
       if (!m) return req.reject(404, 'Message not found')
       const { ID } = await createNode(testCaseFrom(m))
       req.info(200, 'Test case created')
@@ -116,7 +117,6 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
   }
 }
 
-const SOURCE_TYPES = ['TOPIC', 'QUEUE_BROWSE', 'QUEUE_CONSUME']
 const MAX_PRESET_TOPICS = 50
 
 /** Name (unique per user), source type and topics of a saved setup. Column lengths are checked by CAP (OData input). */
@@ -129,7 +129,7 @@ async function validatePreset(req: cds.Request): Promise<void> {
     d.name = name
     if (await nameTaken('SubscriberPresets', name, d.ID, { createdBy: req.user.id })) return req.reject(400, `A setup named "${name}" exists already`, 'in/name')
   }
-  if (d.sourceType !== undefined && !SOURCE_TYPES.includes(d.sourceType)) return req.reject(400, `sourceType must be ${SOURCE_TYPES.join(', ')}`, 'in/sourceType')
+  // sourceType: @assert.range in db/schema.cds
   if (d.topics) {
     let list: unknown
     try {

@@ -27,7 +27,8 @@ export interface ConnectionConfig {
   connectTimeoutMs?: number
 }
 
-export type DeliveryMode = 'DIRECT' | 'PERSISTENT'
+export type { DeliveryMode } from '#cds-models/aem/suite'
+import type { DeliveryMode, ReceivedDeliveryMode } from '#cds-models/aem/suite'
 
 export interface UserProperty {
   name: string
@@ -64,7 +65,7 @@ export interface ReceivedMessage {
   contentType: string | null
   userProperties: Record<string, unknown>
   correlationId: string | null
-  deliveryMode: string
+  deliveryMode: ReceivedDeliveryMode
   receivedAt: Date
 }
 

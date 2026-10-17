@@ -1,4 +1,5 @@
 import cds from '@sap/cds'
+import { NumberRanges as NumberRangeRows } from '#cds-models/aem/suite'
 import { checkConnection } from './lib/broker-check'
 import { normalizeBrokerUrl, toSmfUrl } from './lib/broker-url'
 import { config } from './lib/config'
@@ -54,11 +55,12 @@ export default class AdminService extends cds.ApplicationService {
     this.on('reset', NumberRanges, async (req) => {
       const ID = idOf(req)
       const { nextNumber } = req.data as { nextNumber?: number | string | null }
-      const range = (await SELECT.one.from('aem.suite.NumberRanges').where({ ID })) as NumberRangeRow | undefined
+      const range = (await SELECT.one.from(NumberRangeRows).where({ ID })) as NumberRangeRow | undefined
       if (!range) return req.reject(404, 'Number range not found')
       if (nextNumber !== undefined && nextNumber !== null && BigInt(nextNumber) < 0n) return req.reject(400, 'The next number must not be negative')
       // empty: back to the start of the range
       const current = nextNumber === undefined || nextNumber === null ? null : currentForNext(range, nextNumber)
+      // by name: cds-typer types Integer64 as number, `current` is written as text (no precision lost)
       await UPDATE('aem.suite.NumberRanges').set({ current }).where({ ID })
       req.info(200, 'Number range reset')
     })

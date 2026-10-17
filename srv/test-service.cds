@@ -9,6 +9,7 @@ using {aem.suite.api as api} from './common';
 service TestService {
 
   @odata.draft.enabled
+  @singular: 'TestCase' // cds-typer would derive "TestCas" (the annotation of db.TestCases is not inherited)
   entity TestCases as
     projection on db.TestCases {
       *,

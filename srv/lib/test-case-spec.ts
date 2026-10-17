@@ -1,30 +1,27 @@
 import type { BrokerRecord } from './credentials/resolve'
-import type { PublishSpec, DeliveryMode } from './solace/session'
+import { TestCaseVariables, Variables, type TestCase, type TestCaseProperty, type TestCaseVariable } from '#cds-models/aem/suite'
+import type { PublishSpec } from './solace/session'
+import type { TestField } from './test-fields'
 import { TemplateResolver, TemplateScope, jsonError, TemplateError, generatedSlots } from './template/resolve'
 import { allocateNumbers } from './number-ranges'
 import { generateFake } from './fake-data'
 import { config } from './config'
 import { DEFAULT_ACK_TIMEOUT_MS, detectContentType } from './defaults'
 import { NodeRow, selectNodesDeep } from './nodes'
-import { inferPropertyType, PropertyType } from './property-types'
+import { inferPropertyType } from './property-types'
 import { loadTree, Tree } from './tree'
 
-export interface TestCaseRecord {
+/**
+ * A test case (or folder) with its user properties and variables, as runs, previews and the checks use it:
+ * the fields of lib/test-fields.ts typed by the model (cds-typer), with the key and names that are always there.
+ */
+export type TestCaseRecord = Pick<TestCase, TestField | 'kind' | 'parent_ID'> & {
   ID: string
-  kind?: string
-  parent_ID?: string | null
+  /** filled from the topic on save */
   name: string
   topic: string
-  payload?: string | null
-  contentType?: string | null
-  deliveryMode?: DeliveryMode | null
-  timeToLiveMs?: number | null
-  dmqEligible?: boolean | null
-  priority?: number | null
-  correlationId?: string | null
-  ackTimeoutMs?: number | null
-  userProperties?: { name: string; type?: PropertyType | null; value?: string | null }[]
-  variables?: { name: string; value?: string | null }[]
+  userProperties?: (Pick<TestCaseProperty, 'type' | 'value'> & { name: string })[]
+  variables?: (Pick<TestCaseVariable, 'value'> & { name: string })[]
 }
 
 interface VariableRow {
@@ -54,7 +51,7 @@ export interface VariableScopes {
 export async function loadVariableScopes(brokerIds: string[]): Promise<VariableScopes> {
   // variables are few - filter in memory
   const wanted = new Set(brokerIds)
-  const rows = ((await SELECT.from('aem.suite.Variables').columns('name', 'value', 'broker_ID')) as VariableRow[]).filter(
+  const rows = ((await SELECT.from(Variables).columns('name', 'value', 'broker_ID')) as VariableRow[]).filter(
     (r) => !r.broker_ID || wanted.has(r.broker_ID)
   )
   const global: Record<string, string> = {}
@@ -72,7 +69,7 @@ export async function loadVariableScopes(brokerIds: string[]): Promise<VariableS
   const folderIds = [...tree.byId.values()].filter((n) => n.kind === 'FOLDER').map((n) => n.ID)
   const byFolder = new Map<string, Record<string, string>>()
   if (folderIds.length) {
-    const folderVars = (await SELECT.from('aem.suite.TestCaseVariables')
+    const folderVars = (await SELECT.from(TestCaseVariables)
       .columns('testCase_ID', 'name', 'value')
       .where({ testCase_ID: { in: folderIds } })) as { testCase_ID: string; name: string; value?: string | null }[]
     for (const v of folderVars) {

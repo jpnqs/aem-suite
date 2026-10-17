@@ -1,3 +1,4 @@
+import { TestCases } from '#cds-models/aem/suite'
 import { detectContentType, SORT_STEP } from './defaults'
 import { errMsg, httpError } from './errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
@@ -16,7 +17,7 @@ import { columnLength, elementOf, enumValues, rangeOf } from './model'
 /** Reports a validation problem (req.error of the calling service). */
 export type Reject = (status: number, message: string, target?: string) => void
 
-export type NodeData = TestCaseRecord & { description?: string | null; sortOrder?: number | null }
+export type NodeData = TestCaseRecord & { sortOrder?: number | null }
 
 export const VAR_NAME = /^[A-Za-z_][\w.-]*$/
 export const VAR_NAME_RULE = 'Variable names must start with a letter or _ and contain only letters, digits, _ . -'
@@ -53,7 +54,7 @@ export async function validateParent(d: Pick<NodeData, 'parent_ID'>, id: string 
 
 /** Position behind the last sibling of the given parent. */
 export async function nextSortOrder(parentId: string | null | undefined): Promise<number> {
-  const siblings = (await SELECT.from('aem.suite.TestCases')
+  const siblings = (await SELECT.from(TestCases)
     .columns('sortOrder')
     .where({ parent_ID: parentId ?? null })) as { sortOrder: number | null }[]
   return Math.max(0, ...siblings.map((x) => x.sortOrder ?? 0)) + SORT_STEP

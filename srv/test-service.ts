@@ -1,4 +1,5 @@
 import cds from '@sap/cds'
+import { TestCases as TestCaseRows, TestCaseStats } from '#cds-models/aem/suite'
 import { buildPreview } from './lib/preview'
 import { BrokerCredential, cancelRun, RunOptions, startRun, toCredentials } from './lib/test-runner'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
@@ -49,7 +50,7 @@ export default class TestService extends cds.ApplicationService {
     // the latest outcome of a test case is an association (not part of the draft): remove the stats of deleted nodes
     // (a folder deletes everything below it)
     this.after('DELETE', TestCases, async () => {
-      await DELETE.from('aem.suite.TestCaseStats').where({ testCase_ID: { 'not in': SELECT('ID').from('aem.suite.TestCases') } })
+      await DELETE.from(TestCaseStats).where({ testCase_ID: { 'not in': SELECT('ID').from(TestCaseRows) } })
     })
 
     // drag & drop: place the node before NextSibling (null = at the end)

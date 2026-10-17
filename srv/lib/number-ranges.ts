@@ -1,4 +1,5 @@
 import cds from '@sap/cds'
+import { NumberRanges } from '#cds-models/aem/suite'
 import { TemplateError, type GeneratedSlot } from './template/resolve'
 
 /** Name of a number range as used in {{numberRange.<name>}}. */
@@ -84,7 +85,7 @@ export async function allocateNumbers(slots: GeneratedSlot[], mode: 'consume' | 
 }
 
 async function load(name: string): Promise<NumberRange & { ID: string }> {
-  const r = (await SELECT.one.from('aem.suite.NumberRanges').where({ name })) as (NumberRange & { ID: string }) | undefined
+  const r = (await SELECT.one.from(NumberRanges).where({ name })) as (NumberRange & { ID: string }) | undefined
   if (!r) throw new TemplateError(`Unknown number range "${name}" - maintain it in the Number Ranges app`)
   return r
 }
@@ -103,6 +104,7 @@ async function consume(name: string, count: number): Promise<string[]> {
       const r = await load(name)
       const { values, last } = numbersFrom(r, count)
       const where = r.current === null || r.current === undefined ? { ID: r.ID, current: null } : { ID: r.ID, current: r.current }
+      // by name: cds-typer types Integer64 as number, `current` is written as text (no precision lost)
       const changed = await UPDATE('aem.suite.NumberRanges')
         .set({ current: String(last), lastUsedAt: new Date().toISOString() })
         .where(where)

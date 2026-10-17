@@ -6,15 +6,21 @@ using {
   sap.common.CodeList
 } from '@sap/cds/common';
 
-/** Value helps for the enum fields below (initial data in db/data). */
+/**
+ * Value helps for the enum fields below (initial data in db/data).
+ * @singular: the model classes of cds-typer (@cds-models) would otherwise be named like the enum types.
+ */
+@singular: 'CredentialModeCode'
 entity CredentialModes : CodeList {
   key code : CredentialMode;
 }
 
+@singular: 'DeliveryModeCode'
 entity DeliveryModes : CodeList {
   key code : DeliveryMode;
 }
 
+@singular: 'PropertyTypeCode'
 entity PropertyTypes : CodeList {
   key code : PropertyType;
 }
@@ -133,6 +139,7 @@ entity Variables : cuid {
  * Test cases and folders in one tree (Fiori tree table).
  * FOLDER nodes only use name, description, variables and children.
  */
+@singular: 'TestCase' // cds-typer would derive "TestCas"
 entity TestCases : cuid, managed {
   kind           : NodeKind default 'TEST' @mandatory;
   parent         : Association to TestCases;

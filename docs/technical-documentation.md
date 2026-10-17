@@ -489,7 +489,7 @@ npm run watch                 # cds watch (TypeScript, SQLite in memory, demo da
 npm run verify      # before every commit: typecheck + lint + Jest (what CI runs first)
 npm run e2e         # Playwright: UI apps in a browser (e2e:ui, e2e:headed, e2e:trace)
 npm run sync:ui     # after changing app/_shared: regenerate the copies in app/*/webapp/shared
-npm run typer       # regenerate the cds-typer models (@cds-models) after changing CDS
+npm run typer       # regenerate the cds-typer models (@cds-models) - typecheck, test, watch and the e2e server do it first
 npm run build:ui    # ui5 build of all apps, as the MTA build does it
 ```
 
@@ -501,6 +501,7 @@ npm run build:ui    # ui5 build of all apps, as the MTA build does it
 | `verify` | the three above, in this order |
 
 - `app/*/webapp/shared/*` are **generated**: edit `app/_shared`, run `npm run sync:ui`, commit both.
+- The server code uses the **cds-typer** models (`import { TestRuns } from '#cds-models/aem/suite'`): entities for queries and types for rows and enums instead of hand-written shapes. `@cds-models` is generated and not committed; `npm run typecheck`, `npm test`, `cds watch` and the e2e server generate it first, `cds build` puts it into `gen/srv`. `@singular` in the CDS fixes the class names cds-typer would derive badly (`TestCas`, a code list named like its enum type).
 - The UI5 tooling (`@ui5/cli`, `ui5-task-zipper`, `ui5-tooling-transpile`, `@sapui5/types`) is installed once at the root (`npm install` / `npm ci`); the apps' own `package.json` files only name the custom tasks their `ui5.yaml` uses, which the UI5 CLI needs to find them.
 - Line endings are LF (`.gitattributes`, `.editorconfig`).
 - Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
