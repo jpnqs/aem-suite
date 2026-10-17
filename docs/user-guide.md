@@ -476,6 +476,8 @@ The address is `<your app>/mcp/agent` (the same host as the launchpad); you need
    The command asks for the client secret.
 3. Start the assistant and log in: in Claude Code run `/mcp`, choose `aem-suite` and **Authenticate**. A browser window opens with the BTP login; after you sign in, the assistant is connected. The login is renewed automatically; when it has expired, authenticate again the same way.
 
+This needs a space deployed for development and testing (with `dev.mtaext`); productive spaces do not accept the local callback. Ask your administrator if the login fails with a redirect error.
+
 Other assistants work the same way if they support MCP with OAuth: enter the address, client ID, client secret and the callback address `http://localhost:8765/callback`.
 
 The assistant acts as **you**: it sees and may do exactly what your roles allow, and everything it creates is stored under your user.

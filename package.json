@@ -70,6 +70,7 @@
     "build:docs": "node scripts/build-docs.js",
     "build": "mbt build --mtar aem-suite.mtar",
     "deploy": "cf deploy mta_archives/aem-suite.mtar",
+    "deploy:dev": "cf deploy mta_archives/aem-suite.mtar -e dev.mtaext",
     "set-version": "node scripts/set-version.js"
   },
   "imports": {

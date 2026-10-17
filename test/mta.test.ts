@@ -12,7 +12,12 @@ type Module = {
 }
 
 const root = path.join(__dirname, '..')
-const mta = parse(fs.readFileSync(path.join(root, 'mta.yaml'), 'utf8')) as { modules: Module[] }
+type Resource = { name: string; parameters?: { config?: { 'oauth2-configuration'?: { 'redirect-uris'?: string[] } } }; requires?: { name: string }[] }
+
+const mta = parse(fs.readFileSync(path.join(root, 'mta.yaml'), 'utf8')) as { ID: string; modules: Module[]; resources: Resource[] }
+const devExt = parse(fs.readFileSync(path.join(root, 'dev.mtaext'), 'utf8')) as { extends: string; resources: Resource[] }
+const redirectUris = (r?: Resource) => r?.parameters?.config?.['oauth2-configuration']?.['redirect-uris']
+const APPROUTER_ROUTE = '~{app-api/app-protocol}://~{app-api/app-uri}/**'
 const apps = fs
   .readdirSync(path.join(root, 'app'))
   .filter((d) => fs.existsSync(path.join(root, 'app', d, 'ui5.yaml')))
@@ -35,5 +40,28 @@ describe('mta.yaml', () => {
 
   it('has no html5 module without an app', () => {
     expect(html5.map((m) => m.path).filter((p) => !apps.some((a) => p === `app/${a.dir}`))).toEqual([])
+  })
+})
+
+describe('XSUAA redirect URIs (D1)', () => {
+  const auth = mta.resources.find((r) => r.name === 'aem-suite-auth')
+
+  it('allows only the approuter route in mta.yaml', () => {
+    expect(redirectUris(auth)).toEqual([APPROUTER_ROUTE])
+    expect(auth?.requires?.map((r) => r.name)).toContain('app-api')
+    expect(mta.modules.find((m) => m.name === 'aem-suite')).toBeDefined()
+  })
+
+  it('has no wildcard over the default domain and no localhost outside dev.mtaext', () => {
+    const text = fs.readFileSync(path.join(root, 'mta.yaml'), 'utf8')
+    expect(text).not.toMatch(/\*\.\$\{default-domain\}/)
+    expect(redirectUris(auth)!.some((u) => u.includes('localhost'))).toBe(false)
+  })
+
+  it('adds the local MCP callback in dev.mtaext only', () => {
+    expect(devExt.extends).toBe(mta.ID)
+    const uris = redirectUris(devExt.resources.find((r) => r.name === 'aem-suite-auth'))
+    expect(uris).toEqual([APPROUTER_ROUTE, 'http://localhost:8765/**'])
+    expect(uris!.join(' ')).not.toContain('default-domain')
   })
 })

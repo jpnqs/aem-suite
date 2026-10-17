@@ -80,7 +80,7 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | T14 | Fixed | 38e2305, 9b7fbde | no `waitForTimeout` left: settle() waits for network, busy indicators and animations; the silent catch is gone |
 | T15 | Fixed | 7bca07c | comment in the shim |
 | 5.3 | Fixed | 7bca07c, 748b69c, 4eba3ea, 5bd5b1d, c4bfe31, 4a9b982 | all listed gaps have tests now, incl. direct tests of preview, copy-nodes and the import parsing, the LiveService context isolation and the server.ts listeners. The websocket *login* cannot be tested locally (mocked users let anonymous clients in). Found and fixed on the way: emitLive was rejected outside a request (748b69c) |
-| D1 | Open – decision needed | – | ⚖ redirect URIs unchanged; current state documented in the technical docs (§9) |
+| D1 | Fixed | (D1 commit) | redirect URIs: only the approuter's route (`app-api`); `http://localhost:8765/**` only via `dev.mtaext` (`npm run deploy:dev`); test/mta.test.ts keeps the wildcard out |
 | D2 | Open – decision needed | – | ⚖ names unchanged; the collision is documented (§9) |
 | D3 | Fixed | 81786a8 | `app/router/package-lock.json`, `builder: npm-ci` |
 | D4 | Fixed | ffc35e5 | layout, services, model, security, tests per kind, build; the optional mta.test check of the doc table not done |
@@ -659,7 +659,7 @@ README and the technical docs never mention `npm run sync:ui`, `verify`, `lint`,
 | U14, U15, U16, U17, U19 | Open, U14 and U15 grew | §4.3, §4.4 |
 | T3 (order dependence) | Regressed in `number-ranges.test.ts` | T2 |
 | T8 (big `it`s) | Open | T13a |
-| T13 (localhost redirect) | Open ⚖ | D1 |
+| T13 (localhost redirect) | Fixed | D1 |
 | T16 (`:latest` image) | Open | D16 |
 | T18 (real-time wait) | Open, spread | T4 |
 | everything else | Fixed | – |

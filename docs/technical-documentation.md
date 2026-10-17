@@ -288,7 +288,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 
 - `<app>` is the URL the client used: `cds.aemSuite.mcp.publicUrl`, else derived from the approuter's `x-forwarded-proto` / `x-forwarded-host`. The XSUAA URL comes from the bound credentials (`cds.requires.auth.credentials.url`, override `cds.aemSuite.mcp.authorizationServer`). Without XSUAA (local mocked auth) nothing is advertised (404, no header).
 - The approuter forwards `/mcp/*` and `/.well-known/oauth-*` without its own login (`authenticationType: none`); the backend demands a valid **XSUAA JWT** with the `Tester` scope.
-- **No dynamic client registration** (XSUAA has none): clients use the app's own XSUAA client. the MTA creates the service key `aem-suite-auth-key` (module `aem-suite-destination-content`; read it with `cf service-key aem-suite-auth aem-suite-auth-key` → `clientid`, `clientsecret`) and allows the callback `http://localhost:8765/**`. The secret only identifies the client; every user still logs in personally and gets their own roles. If one shared secret is not acceptable, put SAP Cloud Identity Services (public client with PKCE) in front instead.
+- **No dynamic client registration** (XSUAA has none): clients use the app's own XSUAA client. the MTA creates the service key `aem-suite-auth-key` (module `aem-suite-destination-content`; read it with `cf service-key aem-suite-auth aem-suite-auth-key` → `clientid`, `clientsecret`) and allows the callback `http://localhost:8765/**` in spaces deployed with `dev.mtaext` (section 9). The secret only identifies the client; every user still logs in personally and gets their own roles. If one shared secret is not acceptable, put SAP Cloud Identity Services (public client with PKCE) in front instead.
 - Locally: URL `http://localhost:4004/mcp/agent` with HTTP Basic (`tester:tester`).
 
 `cds.mcp.autowire` is **off**: the plugin would otherwise write mock logins into `~/.claude.json` and the OpenCode config whenever `cds watch` starts.
@@ -442,7 +442,7 @@ Each HTML5 app is deployed on its own, so every app needs the modules it uses un
 - Standalone approuter (`app/router/xs-app.json`): `/mcp/*` and `/.well-known/oauth-*` passed through (the backend checks the bearer token and serves the OAuth discovery), everything else from the HTML5 repo (`html5-apps-repo-rt`, `xsuaa`). The apps' own `xs-app.json` (also used by the Work Zone managed approuter): `odata/*` with CSRF, `ws/*` with websockets enabled, static files no-cache, all routes `xsuaa`.
 - Data visibility: all testers share test cases, runs and saved messages (team workspace); the "my entries" filter is a UI default, not an authorization. Subscriptions can only be stopped by their owner.
 - Broker passwords: see 7.3. Destination credentials stay in the BTP destination service.
-- **XSUAA redirect URIs** (`mta.yaml`, `oauth2-configuration.redirect-uris`): `https://*.${default-domain}/**` and `http://localhost:8765/**` in every environment. The localhost entry is the callback of local MCP clients (section 6, "Connecting a client"). Both are deliberate today and listed as an open decision in [maintenance-review.md](maintenance-review.md) (D1).
+- **XSUAA redirect URIs** (`mta.yaml`, `oauth2-configuration.redirect-uris`): only the standalone approuter's own route, `~{app-api/app-protocol}://~{app-api/app-uri}/**` (the `app-api` property of module `aem-suite`, so it follows org/space and custom routes of the module). Work Zone does not need an entry: it logs in with its own XSUAA and exchanges the token (destination `aem-suite-auth`). The callback of local MCP clients, `http://localhost:8765/**` (section 6, "Connecting a client"), is only in the extension descriptor `dev.mtaext`: deploy dev/test spaces with `cf deploy mta_archives/aem-suite.mtar -e dev.mtaext` (`npm run deploy:dev`). Local MCP clients only work against spaces deployed that way. `test/mta.test.ts` keeps wildcards over `${default-domain}` and localhost out of `mta.yaml`.
 - **Role collection names** are fixed (`AEM_Suite_Admin`, `AEM_Suite_Tester` in `xs-security.json`). Role collection names are unique per subaccount, so a second deployment (another space) in the same subaccount collides with the first one (open decision D2).
 - AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
 - Local development uses mocked users (`package.json` → `cds.requires.[development].auth`): `admin/admin` (Admin+Tester), `tester/tester` (Tester). The WebSocket is anonymous locally (plugin behaviour with mocked auth); events are isolated by context IDs.
@@ -530,6 +530,7 @@ The specs cover the launchpad and its tiles, every app opening through its inten
 npm run build      # mbt build (mbt is a devDependency): npm ci → cds build --production → node scripts/build-docs.js,
                    # then ui5 build per html5 module → mta_archives/aem-suite.mtar
 npm run deploy     # cf deploy mta_archives/aem-suite.mtar
+npm run deploy:dev # dev/test spaces: cf deploy mta_archives/aem-suite.mtar -e dev.mtaext (+ local MCP callback, section 9)
 ```
 
 | MTA module / resource | Description |

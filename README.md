@@ -254,7 +254,10 @@ Use one destination per broker:
 ```sh
 npm run build          # mbt build -> mta_archives/aem-suite.mtar
 npm run deploy         # cf deploy mta_archives/aem-suite.mtar
+npm run deploy:dev     # dev/test spaces: cf deploy mta_archives/aem-suite.mtar -e dev.mtaext
 ```
+
+`dev.mtaext` adds the OAuth callback of local AI clients (`http://localhost:8765/**`) to the XSUAA redirect URIs. `mta.yaml` alone allows only the approuter's own route, so **local MCP clients (e.g. Claude Code) can only log in to spaces deployed with `-e dev.mtaext`**.
 
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.
 
