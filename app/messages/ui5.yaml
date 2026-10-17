@@ -8,7 +8,7 @@ customConfiguration:
 builder:
   customTasks:
     - name: aem-shared-ui-task
-      beforeTask: generateComponentPreload
+      beforeTask: minify
     - name: ui5-task-zipper
       afterTask: generateCachebusterInfo
       configuration:

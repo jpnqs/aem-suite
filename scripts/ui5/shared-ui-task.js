@@ -1,6 +1,7 @@
 /**
  * UI5 build task (ui5.yaml of every app): adds the app/_shared modules the app uses to the build result under the
- * app's namespace (resources/com/aem/suite/<app>/shared/...), before the Component-preload is bundled.
+ * app's namespace (resources/com/aem/suite/<app>/shared/...), before minify (so they are minified, with -dbg
+ * sources) and the Component-preload is bundled.
  * See shared-ui.js.
  */
 const { modulesUsedBy, sharedFile } = require('./shared-ui')
