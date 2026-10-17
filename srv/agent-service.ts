@@ -5,6 +5,7 @@ import { exportNodes, importNodes } from './lib/export-import'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
 import { assertValid, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './lib/node-validation'
 import { createNode, NodeRow, selectNodeDeep, TABLE } from './lib/nodes'
+import { TEST_FIELDS as FIELDS } from './lib/test-fields'
 import type { PropertyType } from './lib/property-types'
 import { buildPreview } from './lib/preview'
 import { BrokerCredential, runOutcome, startRun, toCredentials } from './lib/test-runner'
@@ -25,20 +26,8 @@ interface VariableInput {
   value?: string | null
 }
 
-/** Fields of a test case that an agent may set (undefined / null = not given). */
-const TEST_FIELDS = [
-  'name',
-  'topic',
-  'payload',
-  'contentType',
-  'deliveryMode',
-  'timeToLiveMs',
-  'dmqEligible',
-  'priority',
-  'correlationId',
-  'ackTimeoutMs',
-  'description'
-] as const
+/** Fields of a test case that an agent may set (undefined / null = not given) - parameters of createTestCase / updateTestCase. */
+const TEST_FIELDS = Object.keys(FIELDS) as (keyof typeof FIELDS)[]
 
 export default class TestAgentService extends cds.ApplicationService {
   async init() {

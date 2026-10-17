@@ -1,6 +1,7 @@
 import { detectContentType, SORT_STEP } from './defaults'
 import { httpError } from './errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
+import { TEST_FIELDS } from './test-fields'
 import type { TestCaseRecord } from './test-case-spec'
 import { loadTree } from './tree'
 import { columnLength, elementOf, enumValues, rangeOf } from './model'
@@ -78,7 +79,7 @@ function validateLengths(d: NodeData, reject: Reject): void {
     if (limit && typeof value === 'string' && value.length > limit)
       reject(400, `${field} is too long (${value.length} characters, maximum ${limit})`, target)
   }
-  for (const f of ['name', 'description', 'topic', 'contentType', 'correlationId'] as const) max('TestCases', f, d[f], f, `in/${f}`)
+  for (const [f, type] of Object.entries(TEST_FIELDS)) if (type === 'text') max('TestCases', f, d[f as keyof NodeData] as string | null | undefined, f, `in/${f}`)
   d.userProperties?.forEach((p, i) => {
     max('TestCaseProperties', 'name', p.name, 'user property name', `in/userProperties(${i})/name`)
     max('TestCaseProperties', 'value', p.value, `user property "${p.name}" value`, `in/userProperties(${i})/value`)

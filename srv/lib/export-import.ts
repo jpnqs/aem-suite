@@ -3,6 +3,7 @@ import { SORT_STEP } from './defaults'
 import { httpError } from './errors'
 import { collectProblems, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './node-validation'
 import { selectNodesDeep, TABLE } from './nodes'
+import { FOLDER_FIELDS, TEST_FIELDS } from './test-fields'
 import { Tree, TreeNode } from './tree'
 
 /**
@@ -118,12 +119,12 @@ export async function exportNodes(ids?: string[] | null): Promise<ExportResult> 
   const toDoc = (id: string): NodeDoc => {
     const r = byId.get(id)!
     const variables = sorted(r.variables)?.map((v) => compact({ name: v.name, value: v.value ?? '' }) as unknown as VariableDoc)
+    const fields = (names: readonly string[]) => Object.fromEntries(names.map((f) => [f, (r as unknown as Record<string, unknown>)[f]]))
     if (r.kind === 'FOLDER') {
       folders++
       return compact({
         kind: 'FOLDER',
-        name: r.name,
-        description: r.description,
+        ...fields(FOLDER_FIELDS),
         variables: variables?.length ? variables : undefined,
         children: (tree.children.get(id) ?? []).map((c) => toDoc(c.ID))
       }) as unknown as NodeDoc
@@ -132,17 +133,7 @@ export async function exportNodes(ids?: string[] | null): Promise<ExportResult> 
     const props = sorted(r.userProperties)?.map((p) => compact({ name: p.name, type: p.type, value: p.value ?? '' }) as unknown as PropertyDoc)
     return compact({
       kind: 'TEST',
-      name: r.name,
-      description: r.description,
-      topic: r.topic,
-      payload: r.payload,
-      contentType: r.contentType,
-      deliveryMode: r.deliveryMode,
-      timeToLiveMs: r.timeToLiveMs,
-      dmqEligible: r.dmqEligible,
-      priority: r.priority,
-      correlationId: r.correlationId,
-      ackTimeoutMs: r.ackTimeoutMs,
+      ...fields(Object.keys(TEST_FIELDS)),
       userProperties: props?.length ? props : undefined,
       variables: variables?.length ? variables : undefined
     }) as unknown as NodeDoc
@@ -258,17 +249,14 @@ function nodeData(n: Record<string, unknown>, kind: 'FOLDER' | 'TEST', where: st
     if (typeof n[k] === 'number' && Number.isInteger(n[k])) d[k] = n[k]
     else problems.push(`${where}: ${k} must be a whole number`)
   }
-  text('name')
-  text('description')
-  if (kind === 'TEST') {
-    for (const k of ['topic', 'payload', 'contentType', 'deliveryMode', 'correlationId']) text(k)
-    for (const k of ['timeToLiveMs', 'priority', 'ackTimeoutMs']) whole(k)
-    if (n.dmqEligible !== undefined && n.dmqEligible !== null) {
-      if (typeof n.dmqEligible === 'boolean') d.dmqEligible = n.dmqEligible
-      else problems.push(`${where}: dmqEligible must be true or false`)
-    }
-    d.userProperties = listOf(n.userProperties, 'userProperties', where, problems, ['name', 'type', 'value'])
+  const bool = (k: string) => {
+    if (n[k] === undefined || n[k] === null) return
+    if (typeof n[k] === 'boolean') d[k] = n[k]
+    else problems.push(`${where}: ${k} must be true or false`)
   }
+  const read = { text, int: whole, bool }
+  for (const [k, type] of Object.entries(TEST_FIELDS)) if (kind === 'TEST' || FOLDER_FIELDS.includes(k as keyof typeof TEST_FIELDS)) read[type](k)
+  if (kind === 'TEST') d.userProperties = listOf(n.userProperties, 'userProperties', where, problems, ['name', 'type', 'value'])
   d.variables = listOf(n.variables, 'variables', where, problems, ['name', 'value'])
   return d as unknown as Flat['d']
 }
