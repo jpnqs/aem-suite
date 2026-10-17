@@ -37,49 +37,66 @@ const { GET, POST, PATCH } = startServer()
 const { admin, tester } = users
 const ADMIN = '/odata/v4/admin'
 
+// every test is self-contained: the shared range ORDERS is set back to "nothing issued" before each one
 describe('number ranges (service and runs)', () => {
   const { published } = fakeBroker()
   let broker: { ID: string }
+  /** the range ORDERS: SO-000100, SO-000101, ... */
+  let orders: { ID: string }
+  /** a test case with ORDERS in topic and payload */
   let testCase: { ID: string }
 
   const rangeUrl = (id: string) => `${ADMIN}/NumberRanges(ID=${id},IsActiveEntity=true)`
   const create = (data: object) => createActive(POST, 'admin', 'NumberRanges', data, admin)
   const current = async (id: string) => (await GET(rangeUrl(id), admin)).data
+  const run = async (testCaseId: string) => {
+    const res = await POST('/odata/v4/test/runTests', { testCaseIds: [testCaseId], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'pw' }] }, tester)
+    expect(res.status).toBe(200)
+    await waitForRun(res.data.runId)
+    return res.data.runId as string
+  }
 
   beforeAll(async () => {
     await resetDatabase()
-    await DELETE.from('aem.suite.NumberRanges')
     broker = await createActive(POST, 'admin', 'Brokers', { name: 'dev', credentialMode: 'DIRECT', url: 'dev.example', msgVpn: 'vpn', username: 'u' }, admin)
+    orders = await create({ name: 'ORDERS', prefix: 'SO-', length: 6, start: 100 })
+    testCase = await createActive(POST, 'test', 'TestCases', { name: 'order', topic: 'o/{{numberRange.ORDERS}}', payload: '{"id":"{{numberRange.ORDERS}}"}', deliveryMode: 'PERSISTENT' })
+  })
+
+  beforeEach(async () => {
+    published.length = 0
+    await UPDATE('aem.suite.NumberRanges').set({ current: null }).where({ ID: orders.ID })
   })
 
   it('creates a range and shows what the next number looks like', async () => {
-    const r = await create({ name: 'ORDERS', prefix: 'SO-', length: 6, start: 100 })
-    const data = await current(r.ID)
-    expect(data).toMatchObject({ name: 'ORDERS', nextNumber: 'SO-000100', lastNumber: '' })
+    const r = await create({ name: 'SHOWN', prefix: 'SO-', length: 6, start: 100 })
+    expect(await current(r.ID)).toMatchObject({ name: 'SHOWN', nextNumber: 'SO-000100', lastNumber: '' })
   })
 
   it('checks name, uniqueness and sizes', async () => {
-    const bad = async (data: object) => (await POST(`${ADMIN}/NumberRanges`, data, admin)).status
     const draftOf = async (data: object) => {
       const { data: d } = await POST(`${ADMIN}/NumberRanges`, data, admin)
       return POST(`${ADMIN}/NumberRanges(ID=${d.ID},IsActiveEntity=false)/AdminService.draftActivate`, {}, admin)
     }
-    expect(await bad({ name: 'x' })).toBe(201) // drafts are saved as they are, the checks run on save
-    const results = await Promise.all([
-      draftOf({ name: '9bad' }),
-      draftOf({ name: 'orders' }), // same name, other case
-      draftOf({ name: 'LONG', length: 30 }),
-      draftOf({ name: 'STEP', step: 0 }),
-      draftOf({ name: 'MAX', start: 10, maximum: 5 }),
-      draftOf({ name: 'PRE', prefix: '{{x}}' })
-    ])
-    expect(results.map((r) => r.status)).toEqual([400, 400, 400, 400, 400, 400])
+    // drafts are saved as they are, the checks run on save
+    expect((await POST(`${ADMIN}/NumberRanges`, { name: 'x' }, admin)).status).toBe(201)
+    const cases: [object, RegExp][] = [
+      [{ name: '9bad' }, /must start with a letter/],
+      [{ name: 'orders' }, /"orders" exists already/], // the name of ORDERS in another case
+      [{ name: 'LONG', length: 30 }, /length must be between 0 and/],
+      [{ name: 'STEP', step: 0 }, /step must be at least 1/],
+      [{ name: 'MAX', start: 10, maximum: 5 }, /maximum must not be below the start/],
+      [{ name: 'PRE', prefix: '{{x}}' }, /plain text, no variables/]
+    ]
+    const results = await Promise.all(cases.map(([data]) => draftOf(data)))
+    results.forEach((r, i) => {
+      expect(r.status).toBe(400)
+      expect(r.data.error.message).toMatch(cases[i][1])
+    })
   })
 
   it('the preview shows the next number and does not use it up', async () => {
-    const tc = await createActive(POST, 'test', 'TestCases', { name: 'order', topic: 'o/{{numberRange.ORDERS}}', payload: '{"id":"{{numberRange.ORDERS}}"}', deliveryMode: 'PERSISTENT' })
-    testCase = tc
-    const url = `/odata/v4/test/TestCases(ID=${tc.ID},IsActiveEntity=true)/TestService.preview`
+    const url = `/odata/v4/test/TestCases(ID=${testCase.ID},IsActiveEntity=true)/TestService.preview`
     for (let i = 0; i < 2; i++) {
       const { data } = await POST(url, {}, tester)
       expect(data.valid).toBe(true)
@@ -89,66 +106,51 @@ describe('number ranges (service and runs)', () => {
   })
 
   it('a run takes the next number per message, the same one everywhere in the message', async () => {
-    published.length = 0
-    for (let i = 0; i < 2; i++) {
-      const res = await POST('/odata/v4/test/runTests', { testCaseIds: [testCase.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'pw' }] }, tester)
-      expect(res.status).toBe(200)
-      await waitForRun(res.data.runId)
-    }
+    await run(testCase.ID)
+    await run(testCase.ID)
     expect(published.map((p) => p.spec.topic)).toEqual(['o/SO-000100', 'o/SO-000101'])
     expect(JSON.parse(published[1].spec.payload)).toEqual({ id: 'SO-000101' })
-    const [range] = (await GET(`${ADMIN}/NumberRanges?$filter=name eq 'ORDERS'`, admin)).data.value
-    expect(range).toMatchObject({ lastNumber: 'SO-000101', nextNumber: 'SO-000102' })
+    expect(await current(orders.ID)).toMatchObject({ lastNumber: 'SO-000101', nextNumber: 'SO-000102' })
   })
 
   it('temporary variables reuse one number, a second alias takes another', async () => {
-    published.length = 0
     const tc = await createActive(POST, 'test', 'TestCases', {
       name: 'aliases',
       topic: 'a/{{orderNo}}',
       payload: '{"order":"{{numberRange.ORDERS as orderNo}}","again":"{{orderNo}}","other":"{{numberRange.ORDERS as second}}"}',
       deliveryMode: 'PERSISTENT'
     })
-    const res = await POST('/odata/v4/test/runTests', { testCaseIds: [tc.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'pw' }] }, tester)
-    await waitForRun(res.data.runId)
-    expect(published[0].spec.topic).toMatch(/^a\/SO-00010[23]$/)
+    await run(tc.ID)
     const payload = JSON.parse(published[0].spec.payload)
+    expect(published[0].spec.topic).toBe(`a/${payload.order}`)
     expect(payload.order).toBe(payload.again)
-    expect(payload.other).not.toBe(payload.order)
-    expect([payload.order, payload.other].sort()).toEqual(['SO-000102', 'SO-000103'])
+    expect([payload.order, payload.other].sort()).toEqual(['SO-000100', 'SO-000101'])
   })
 
   it('parallel runs never get the same number', async () => {
-    published.length = 0
-    const runs = await Promise.all(
-      Array.from({ length: 4 }, () => POST('/odata/v4/test/runTests', { testCaseIds: [testCase.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'pw' }] }, tester))
-    )
-    for (const r of runs) await waitForRun(r.data.runId)
-    const topics = published.map((p) => p.spec.topic)
-    expect(new Set(topics).size).toBe(4)
+    await Promise.all(Array.from({ length: 4 }, () => run(testCase.ID)))
+    expect(published.map((p) => p.spec.topic).sort()).toEqual(['o/SO-000100', 'o/SO-000101', 'o/SO-000102', 'o/SO-000103'])
   })
 
   it('reset sets the next number (empty = start)', async () => {
-    const [{ ID }] = (await GET(`${ADMIN}/NumberRanges?$filter=name eq 'ORDERS'`, admin)).data.value
-    let res = await POST(`${rangeUrl(ID)}/AdminService.reset`, { nextNumber: 500 }, admin)
+    await run(testCase.ID)
+    let res = await POST(`${rangeUrl(orders.ID)}/AdminService.reset`, { nextNumber: 500 }, admin)
     expect(res.status).toBeLessThan(300)
-    expect(await current(ID)).toMatchObject({ nextNumber: 'SO-000500', lastNumber: 'SO-000499' })
-    res = await POST(`${rangeUrl(ID)}/AdminService.reset`, {}, admin)
+    expect(await current(orders.ID)).toMatchObject({ nextNumber: 'SO-000500', lastNumber: 'SO-000499' })
+    res = await POST(`${rangeUrl(orders.ID)}/AdminService.reset`, {}, admin)
     expect(res.status).toBeLessThan(300)
-    expect(await current(ID)).toMatchObject({ nextNumber: 'SO-000100', lastNumber: '' })
+    expect(await current(orders.ID)).toMatchObject({ nextNumber: 'SO-000100', lastNumber: '' })
   })
 
   it('saving a range that was open in a draft does not set the counter back', async () => {
-    const [{ ID }] = (await GET(`${ADMIN}/NumberRanges?$filter=name eq 'ORDERS'`, admin)).data.value
-    await POST(`${rangeUrl(ID)}/AdminService.draftEdit`, { PreserveChanges: true }, admin)
+    await POST(`${rangeUrl(orders.ID)}/AdminService.draftEdit`, { PreserveChanges: true }, admin)
     // meanwhile a run takes numbers
-    const res = await POST('/odata/v4/test/runTests', { testCaseIds: [testCase.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'pw' }] }, tester)
-    await waitForRun(res.data.runId)
-    const draft = `${ADMIN}/NumberRanges(ID=${ID},IsActiveEntity=false)`
+    await run(testCase.ID)
+    const draft = `${ADMIN}/NumberRanges(ID=${orders.ID},IsActiveEntity=false)`
     await PATCH(draft, { description: 'edited' }, admin)
     const save = await POST(`${draft}/AdminService.draftActivate`, {}, admin)
     expect(save.status).toBeLessThan(300)
-    expect(await current(ID)).toMatchObject({ description: 'edited', lastNumber: 'SO-000100', nextNumber: 'SO-000101' })
+    expect(await current(orders.ID)).toMatchObject({ description: 'edited', lastNumber: 'SO-000100', nextNumber: 'SO-000101' })
   })
 
   it('stops with an error when the range is exhausted', async () => {
@@ -161,9 +163,8 @@ describe('number ranges (service and runs)', () => {
     expect(await current(small.ID)).toMatchObject({ lastNumber: '99' })
 
     const tc = await createActive(POST, 'test', 'TestCases', { name: 'small', topic: 's/{{numberRange.SMALL}}', payload: '{}', deliveryMode: 'PERSISTENT' })
-    const res = await POST('/odata/v4/test/runTests', { testCaseIds: [tc.ID], brokerIds: [broker.ID], credentials: [{ brokerId: broker.ID, password: 'pw' }] }, tester)
-    await waitForRun(res.data.runId)
-    const { data } = await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${res.data.runId}`, tester)
+    const runId = await run(tc.ID)
+    const { data } = await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${runId}`, tester)
     expect(data.value[0]).toMatchObject({ status: 'ERROR' })
     expect(data.value[0].errorMessage).toMatch(/exhausted/)
   })

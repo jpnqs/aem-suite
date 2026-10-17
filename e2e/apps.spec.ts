@@ -21,10 +21,11 @@ test.describe('apps (admin)', () => {
     await expect(page.getByText('"broker": "{{broker.name}}"').first()).toBeVisible()
   })
 
-  test('Test Runs opens (no runs yet)', async ({ page }) => {
+  test('Test Runs opens', async ({ page }) => {
+    // not "no runs yet": the run dialog specs start runs on the same server in parallel
     await openApp(page, apps.runs)
     await expectAppOpen(page, apps.runs)
-    await expect(page.getByText('No results found').first()).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Test Cases → Brokers' }).first()).toBeVisible()
   })
 
   test('Saved Messages opens', async ({ page }) => {
