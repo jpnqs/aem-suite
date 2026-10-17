@@ -85,7 +85,7 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | D3 | Fixed | 81786a8 | `app/router/package-lock.json`, `builder: npm-ci` |
 | D4 | Fixed | ffc35e5 | layout, services, model, security, tests per kind, build; the optional mta.test check of the doc table not done |
 | D5 | Fixed | ffc35e5 | "Development workflow" in README and technical docs |
-| D6 | Open – decision needed | – | ⚖ engines/.nvmrc unchanged (CI uses Node 22 per engines) |
+| D6 | Fixed | (D6 commit) | Node 24 pinned: engines `^24` (root and router), `.nvmrc`, `@types/node` ^24, CI on 24; docs keep the CAP 10 minimum (22+) |
 | D7 | Fixed | 32819a0 | archived with a note, links adjusted |
 | D8 | Fixed | 32819a0 | .env*, coverage/, *.tgz; Terraform lock no longer ignored (not committed: stack not applied here) |
 | D9 | Partly fixed | ffc35e5, ab1f95e | documented; the per-app devDependencies stay - the UI5 CLI only finds custom tasks declared in the app's package.json (verified), npm workspaces would not remove that |

@@ -19,7 +19,7 @@ A test result passes when the broker **acknowledges** the message (guaranteed me
 
 | Layer | Technology |
 |---|---|
-| Backend | SAP CAP **@sap/cds 10** (Node.js ≥ 22, **TypeScript**), `cds-tsx` for development, `tsc` via `cds build` for production |
+| Backend | SAP CAP **@sap/cds 10** (Node.js 24; CAP 10 needs ≥ 22, **TypeScript**), `cds-tsx` for development, `tsc` via `cds build` for production |
 | Persistence | SAP HANA Cloud (HDI) in production; SQLite in memory for development and tests |
 | Broker access | `solclientjs` 10.x (Solace JS API, SMF over `ws(s)://` or `tcp(s)://`) |
 | Live push | `@cap-js-community/websocket` (plain WebSocket, CAP service `LiveService`) |
@@ -472,7 +472,7 @@ Broker-level settings: `clientNamePrefix` (client name = prefix + random suffix)
 
 ## 11. Local development
 
-Prerequisites: **Node.js 22.12+** (the MCP plugin needs `require` of ES modules), npm, optionally Docker (local broker).
+Prerequisites: **Node.js 24** (`engines` `^24` in `package.json` and `app/router/package.json`, `.nvmrc`; CAP 10 needs 22+, the MCP plugin 22.12+ for `require` of ES modules), npm, optionally Docker (local broker).
 
 ```sh
 npm install
@@ -508,7 +508,7 @@ npm run build:ui    # ui5 build of all apps, as the MTA build does it
 - Versions: `npm run set-version -- <version>` (`scripts/set-version.js`) sets one version in `mta.yaml`, the root and app `package.json` files and the manifests; `test/version.test.ts` fails when they differ. Changes are listed in `CHANGELOG.md`.
 - Line endings are LF (`.gitattributes`, `.editorconfig`).
 - Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
-- CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run verify` and `npm run e2e` on Node 22 for every pull request and every push to `main`; the Playwright report is attached when it fails.
+- CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run verify` and `npm run e2e` on Node 24 for every pull request and every push to `main`; the Playwright report is attached when it fails.
 
 **Jest (`test/*.test.ts`)**, by kind – the file names say which module they cover:
 

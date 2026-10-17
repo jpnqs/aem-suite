@@ -76,7 +76,7 @@ The user guide is rendered from Markdown with navigation, search and links to ev
 
 ## Quick start
 
-Requires **Node.js 22.12 or newer**.
+Requires **Node.js 24** (`.nvmrc`).
 
 ```sh
 npm install
@@ -181,7 +181,7 @@ Placeholders work outside JSON strings too, for example `"qty": {{qty}}`. The JS
 
 ## Local development
 
-Requires **Node.js 22.12+** (CAP 10; the MCP plugin needs `require` of ES modules).
+Requires **Node.js 24** (`engines` `^24`, `.nvmrc`; CAP 10 itself needs 22+, the MCP plugin 22.12+ for `require` of ES modules).
 
 ```sh
 npm install
