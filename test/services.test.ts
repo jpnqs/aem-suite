@@ -3,7 +3,7 @@ import * as testCaseSpec from '../srv/lib/test-case-spec'
 import { failRuns, waitForRun } from '../srv/lib/test-runner'
 import { createActive, fakeBroker, resetDatabase, startServer, users } from './helpers'
 
-const { GET, POST, PATCH } = startServer()
+const { GET, POST, PATCH, DELETE: DEL } = startServer()
 const { admin, tester } = users
 
 describe('AEM test suite services', () => {
@@ -417,6 +417,25 @@ describe('AEM test suite services', () => {
     // placed behind the existing top-level nodes, like a test case created in the UI
     const top = (await SELECT.from('aem.suite.TestCases').columns('ID', 'sortOrder').where({ parent_ID: null })) as { ID: string; sortOrder: number }[]
     expect(Math.max(...top.map((t) => t.sortOrder))).toBe(top.find((t) => t.ID === data.ID)!.sortOrder)
+  })
+
+  it('lets testers delete only their own saved messages, and nobody change one', async () => {
+    const save = async (auth: object) =>
+      (await POST('/odata/v4/subscribe/ReceivedMessages', { broker_ID: goodBroker.ID, source: 'a/>', sourceType: 'TOPIC', topic: 'a/b', payload: '{}' }, auth)).data
+    const ofAdmin = await save(admin)
+    const ofTester = await save(tester)
+    const url = (id: string) => `/odata/v4/subscribe/ReceivedMessages(${id})`
+    // everybody sees all saved messages and can make a test case of any
+    expect((await GET(url(ofAdmin.ID), tester)).status).toBe(200)
+    expect((await POST(`${url(ofAdmin.ID)}/SubscribeService.createTestCase`, {}, tester)).status).toBe(200)
+    expect((await PATCH(url(ofTester.ID), { topic: 'changed' }, tester)).status).toBe(405)
+    expect((await PATCH(url(ofTester.ID), { topic: 'changed' }, admin)).status).toBe(405)
+    expect((await DEL(url(ofAdmin.ID), tester)).status).toBe(403)
+    expect((await DEL(url(ofTester.ID), tester)).status).toBe(204)
+    // administrators clean up any
+    const another = await save(tester)
+    expect((await DEL(url(another.ID), admin)).status).toBe(204)
+    expect(await SELECT.one.from('aem.suite.ReceivedMessages', ofAdmin.ID)).toMatchObject({ topic: 'a/b' })
   })
 
   it('applies the test case rules to messages saved from a queue', async () => {

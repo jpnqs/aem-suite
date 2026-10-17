@@ -17,6 +17,26 @@ service SubscribeService {
     }
     where active = true;
 
+  /**
+   * Saved messages: every tester sees all of them and can turn any into a test case, but only deletes their own.
+   * Created by the live view's "Save"; never changed afterwards.
+   */
+  @restrict: [
+    {
+      grant: ['READ', 'CREATE', 'createTestCase'],
+      to   : 'Tester'
+    },
+    {
+      grant: 'DELETE',
+      to   : 'Tester',
+      where: 'createdBy = $user'
+    },
+    {
+      grant: 'DELETE',
+      to   : 'Admin'
+    }
+  ]
+  @Capabilities.UpdateRestrictions.Updatable: false
   entity ReceivedMessages as projection on db.ReceivedMessages
     actions {
       /** Creates a new test case from this message (topic, payload, user properties). */

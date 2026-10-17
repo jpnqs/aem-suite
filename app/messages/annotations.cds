@@ -84,7 +84,5 @@ annotate service.ReceivedMessages with @(
 };
 
 // messages are created by the subscriber app only - hide "Create" in the list report
-annotate service.ReceivedMessages with @(
-  UI.CreateHidden                          : true,
-  Capabilities.UpdateRestrictions.Updatable: false
-);
+// (not updatable: srv/subscribe-service.cds)
+annotate service.ReceivedMessages with @(UI.CreateHidden: true);
