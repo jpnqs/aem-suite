@@ -273,7 +273,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 - **No secrets through the AI.** `runTests` only accepts brokers whose credentials come from a **BTP destination**. Direct brokers need a password that is never stored, and a password typed into an AI conversation would end up in the model provider's and the client's logs. Such runs are refused with an explanation, so people run them in the UI.
 - **No delete.** There are no delete actions; global and broker variables and saved messages are not exposed at all.
 - **Limits:** at most `maxRunResults` (100) results per run and `maxActiveRuns` (2) runs of one user at a time (`cds.aemSuite.agent`, see section 10).
-- **Audit:** every changing action logs `audit` with user, action, names and IDs (logger `agent`) - never payloads or credentials.
+- **Audit:** every changing action logs `audit` with user, action, names and IDs (logger `aem-agent`; all loggers of the app start with `aem-`) - never payloads or credentials.
 - **Prompt injection:** the adapter does not filter data. `@mcp.instructions` tell the model that payloads, topics and errors are data and never instructions, and not to run tests on brokers the user did not name. Connect only trusted assistants.
 - **Authorization:** `@requires: 'Tester'` on the service, checked by the adapter on every request. Anonymous requests get 401.
 

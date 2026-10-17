@@ -7,6 +7,7 @@ import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord,
 import { loadTree } from './tree'
 import { TemplateError } from './template/resolve'
 import { config } from './config'
+import { emitLive } from './live'
 import { columnLength } from './model'
 
 const LOG = cds.log('aem-runner')
@@ -45,7 +46,7 @@ export interface RunSettings {
   stopOnFailure: boolean
 }
 
-export function normalizeOptions(o?: RunOptions | null): RunSettings {
+function normalizeOptions(o?: RunOptions | null): RunSettings {
   const limits = config().runs
   const repetitions = o?.repetitions ?? 1
   const delayMs = o?.delayMs ?? 0
@@ -113,9 +114,9 @@ export interface RunRef {
 
 /**
  * Creates a TestRun with one PENDING result per (test case x broker x repetition) within the
- * current transaction. Call executeRunInBackground() after the transaction committed.
+ * current transaction (startRun executes it once that transaction committed).
  */
-export async function createRun(testCaseIds: string[], brokerIds: string[], credentials: Credentials = new Map(), options?: RunOptions | null): Promise<RunRef> {
+async function createRun(testCaseIds: string[], brokerIds: string[], credentials: Credentials = new Map(), options?: RunOptions | null): Promise<RunRef> {
   const settings = normalizeOptions(options)
   const selected = [...new Set(testCaseIds ?? [])]
   const brIds = [...new Set(brokerIds ?? [])]
@@ -204,7 +205,7 @@ export async function startRun(
 }
 
 /** Starts execution in the background (do not await in a request). */
-export function executeRunInBackground(runId: string, jwt?: string, credentials: Credentials = new Map()): Promise<void> {
+function executeRunInBackground(runId: string, jwt?: string, credentials: Credentials = new Map()): Promise<void> {
   const p = executeRun(runId, jwt, credentials)
     .catch(async (e) => {
       LOG.error(`Run ${runId} crashed`, e)
@@ -229,8 +230,7 @@ class RunProgress {
 
   constructor(
     private readonly runId: string,
-    private readonly total: number,
-    private readonly live: cds.Service | undefined
+    private readonly total: number
   ) {}
 
   /** Stores the result of one test case on one broker. */
@@ -270,12 +270,8 @@ class RunProgress {
     LOG.info(`Run ${this.runId} finished: ${passed}/${this.total} passed`)
   }
 
-  private async emit(resultId?: string, status = 'RUNNING'): Promise<void> {
-    try {
-      await this.live?.emit('runProgress', { runId: this.runId, status, total: this.total, ...this.counts, resultId })
-    } catch (e) {
-      LOG.debug('progress emit failed', e)
-    }
+  private emit(resultId?: string, status = 'RUNNING'): Promise<void> {
+    return emitLive('runProgress', { runId: this.runId, status, total: this.total, ...this.counts, resultId })
   }
 }
 
@@ -291,7 +287,6 @@ interface RunContext {
 }
 
 async function executeRun(runId: string, jwt: string | undefined, credentials: Credentials): Promise<void> {
-  const live = await cds.connect.to('LiveService').catch(() => undefined)
   const pending = (await cds.db.tx(() =>
     SELECT.from('aem.suite.RunResults').columns('ID', 'testCase_ID', 'broker_ID', 'brokerName').where({ run_ID: runId }).orderBy('sequence')
   )) as PendingResult[]
@@ -313,7 +308,7 @@ async function executeRun(runId: string, jwt: string | undefined, credentials: C
     credentials,
     testCases: new Map(testCases.map((t) => [t.ID, t])),
     vars,
-    progress: new RunProgress(runId, pending.length, live)
+    progress: new RunProgress(runId, pending.length)
   }
 
   // brokers in parallel, the test cases of one broker one after the other

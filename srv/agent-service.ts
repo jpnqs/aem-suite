@@ -11,7 +11,7 @@ import { buildPreview } from './lib/preview'
 import { BrokerCredential, runOutcome, startRun, toCredentials } from './lib/test-runner'
 import { loadTree } from './lib/tree'
 
-const LOG = cds.log('agent')
+const LOG = cds.log('aem-agent')
 const MAX_WAIT_SECONDS = 30
 const MAX_FAILURES = 25
 const POLL_INTERVAL_MS = 500

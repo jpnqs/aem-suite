@@ -39,7 +39,7 @@ export function nextExample(r: NumberRange): string {
   return formatNumber(r, lastOf(r) + stepOf(r))
 }
 
-/** Why the next `count` numbers cannot be issued (exhausted range), or undefined. */
+/** Why the number `last` cannot be issued (exhausted range), or undefined. */
 function overflow(r: NumberRange, last: bigint): string | undefined {
   const max = big(r.maximum)
   if (max !== null && last > max) return `Number range "${r.name}" is exhausted (maximum ${max}). Reset it or raise the maximum.`

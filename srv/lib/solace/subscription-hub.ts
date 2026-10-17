@@ -3,6 +3,7 @@ import type solace from 'solclientjs'
 import { config } from '../config'
 import { BrokerConnection, loadBroker, resolveConnection } from '../credentials/resolve'
 import { errMsg, httpError } from '../errors'
+import { emitLive } from '../live'
 import { readMessage, SolaceSession, sol } from './session'
 
 const LOG = cds.log('aem-subscribe')
@@ -233,7 +234,7 @@ function forward(sub: Subscription, m: solace.Message) {
     // cut at the byte limit; a multi-byte character split there becomes U+FFFD, so drop it
     payload = Buffer.from(payload).subarray(0, maxPayloadBytes).toString('utf8').replace(/�$/, '') + '\n... [truncated]'
 
-  void emit('message', {
+  void emitLive('message', {
     subscriptionId: sub.id,
     brokerId: sub.brokerId,
     topic: msg.topic,
@@ -265,16 +266,7 @@ async function close(sub: Subscription, state: string, message: string) {
 }
 
 function status(sub: Subscription, state: string, message: string) {
-  return emit('subscriptionStatus', { subscriptionId: sub.id, status: state, message })
-}
-
-async function emit(event: string, data: Record<string, unknown>) {
-  try {
-    const live = await cds.connect.to('LiveService')
-    await live.emit(event, data)
-  } catch (e) {
-    LOG.debug(`emit ${event} failed`, e)
-  }
+  return emitLive('subscriptionStatus', { subscriptionId: sub.id, status: state, message })
 }
 
 function ensureSweeper() {
