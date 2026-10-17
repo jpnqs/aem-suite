@@ -1,5 +1,7 @@
 using TestService as service from '../../srv/test-service';
 
+// field titles: db/schema.cds - here only the layout of the Test Cases app
+
 annotate service.TestCases with @(
   UI.HeaderInfo        : {
     TypeName      : 'Test Case',
@@ -33,7 +35,7 @@ annotate service.TestCases with @(
     },
     {
       Value: lastResult.runAt,
-      Label: 'Last Run'
+      Label: 'Last Run At'
     },
     {Value: deliveryMode},
     {Value: modifiedAt}
@@ -47,21 +49,11 @@ annotate service.TestCases with @(
   UI.FieldGroup #LastResult: {Data: [
     {
       Value      : lastResult.status,
-      Criticality: lastResult.criticality,
-      Label      : 'Status'
+      Criticality: lastResult.criticality
     },
-    {
-      Value: lastResult.runAt,
-      Label: 'Run At'
-    },
-    {
-      Value: lastResult.brokers,
-      Label: 'Brokers'
-    },
-    {
-      Value: lastResult.message,
-      Label: 'Problems'
-    }
+    {Value: lastResult.runAt},
+    {Value: lastResult.brokers},
+    {Value: lastResult.message}
   ]},
   UI.FieldGroup #Advanced: {Data: [
     {Value: description},
@@ -103,22 +95,17 @@ annotate service.TestCases with @(
     }
   ]
 ) {
-  name          @title: 'Name'  @Common.QuickInfo: 'Test cases: empty = topic';
-  kind          @title: 'Type'  @Core.Immutable
-                @Common.Text: {
+  kind          @Common.Text: {
                   $value                : kindText,
                   ![@UI.TextArrangement]: #TextOnly
                 };
   kindText      @UI.Hidden;
   sortOrder     @UI.Hidden;
   parent        @UI.Hidden;
-  description   @title: 'Description'  @UI.MultiLineText;
-  topic         @title: 'Topic'  @UI.MultiLineText
-                @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. variable region or built-in uuid';
-  payload       @title: 'Payload'  @UI.Hidden;
-  contentType   @title: 'Content Type'  @Common.QuickInfo: 'Default application/json - empty = detected on save (JSON or text/plain)';
-  deliveryMode  @title: 'Delivery Mode'
-                @Common.ValueListWithFixedValues
+  description   @UI.MultiLineText;
+  topic         @UI.MultiLineText;
+  payload       @UI.Hidden;
+  deliveryMode  @Common.ValueListWithFixedValues
                 @Common.ValueList: {
                   CollectionPath: 'DeliveryModes',
                   Parameters    : [
@@ -133,14 +120,7 @@ annotate service.TestCases with @(
                     }
                   ]
                 };
-  timeToLiveMs  @title: 'Time to Live (ms)'  @Common.QuickInfo: 'Empty or 0 = no expiry';
-  dmqEligible   @title: 'DMQ Eligible'  @Common.QuickInfo: 'Empty = broker default';
-  priority      @title: 'Priority (0-255)'  @Common.QuickInfo: 'Empty = broker default';
-  correlationId @title: 'Correlation ID'  @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. built-in uuid';
-  ackTimeoutMs  @title: 'ACK Timeout (ms)';
-  modifiedAt    @title: 'Changed At';
-  createdBy     @title: 'Created By'  @UI.HiddenFilter: false;
-  modifiedBy    @title: 'Changed By';
+  createdBy     @UI.HiddenFilter: false;
 };
 
 // name follows the topic until it is changed by the user
@@ -165,11 +145,7 @@ annotate service.TestCaseProperties with @(
     {Value: value}
   ]
 ) {
-  name  @title: 'Name';
-  value @title: 'Value'  @Common.QuickInfo: 'Supports template variables in double curly braces';
-  type  @title: 'Type'
-        @Common.QuickInfo: 'Empty = detected on save (42 = Integer, true = Boolean, else String)'
-        @Common.ValueListWithFixedValues
+  type  @Common.ValueListWithFixedValues
         @Common.ValueList: {
           CollectionPath: 'PropertyTypes',
           Parameters    : [
@@ -186,20 +162,7 @@ annotate service.TestCaseProperties with @(
         };
 };
 
-annotate service.TestCaseVariables with @(
-  UI.HeaderInfo: {
-    TypeName      : 'Variable',
-    TypeNamePlural: 'Variables',
-    Title         : {Value: name}
-  },
-  UI.LineItem  : [
-    {Value: name},
-    {Value: value}
-  ]
-) {
-  name  @title: 'Name';
-  value @title: 'Value';
-};
+// TestCaseVariables: the layout of all variables lists, app/common.cds
 
 annotate service.Brokers with {
   ID   @UI.Hidden;

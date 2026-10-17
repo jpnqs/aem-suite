@@ -423,6 +423,7 @@ Each HTML5 app is deployed on its own, so every app needs the modules it uses un
 
 ### 8.3 Conventions and pitfalls
 
+- **Where annotations go:** field titles and tooltips (`@title`, `@Common.QuickInfo`) on the entities in `db/schema.cds` (end of the file) - CAP passes them on to every projection, so all apps and the agent see the same words; timestamps are worded "<what> At". Titles of elements a service adds (e.g. `outcome`, `runStartedAt`, `nextNumber`) next to them in `srv/*.cds`. Service semantics (`@readonly`, `@Core.Immutable`, `@Capabilities…`, `@assert…`, `@restrict`) in `srv/*.cds` or `db/schema.cds`. UI only (layout, `@UI…`, value lists, side effects, action parameter labels) in `app/<app>/annotations.cds`; layout several apps share (the variables lists) in `app/common.cds`.
 - **Never put `{` `}` into annotation texts** (labels, QuickInfo): Fiori elements interprets them as bindings and sends broken requests. In XML escape as `\{`, in JS controls set texts via setters, not constructor settings.
 - UI5 TypeScript classes: **no getters** in controllers (`ui5-tooling-transpile` converts the class to `Controller.extend({...})` and evaluates getters at definition time).
 - Models in `onInit` of a root view: use `getOwnerComponent().getModel()`.

@@ -301,3 +301,124 @@ entity NumberRanges : cuid, managed {
   current     : Integer64;
   lastUsedAt  : Timestamp;
 }
+
+// ---------------------------------------------------------------------------------------------- field titles
+// Titles and tooltips of the fields, for every app and service (CAP passes them on to the projections).
+// The apps (app/*/annotations.cds) only add their layout. Timestamps are worded "<what> At".
+
+annotate Brokers with {
+  name                  @title: 'Name';
+  description           @title: 'Description';
+  credentialMode        @title: 'Credentials';
+  destinationName       @title: 'Destination'
+                        @Common.QuickInfo: 'BTP destination: URL = wss:// endpoint, additional property msgVpn';
+  url                   @title: 'URL'
+                        @Common.QuickInfo: 'Host is enough, e.g. mr-xyz.messaging.solace.cloud - completed to wss://host:443 (port 55443 gives tcps, 55555 gives tcp)';
+  msgVpn                @title: 'Message VPN';
+  username              @title: 'Username'
+                        @Common.QuickInfo: 'Optional. If empty, the username is asked for together with the password when running tests, testing the connection or subscribing. The password is never stored';
+  clientNamePrefix      @title: 'Client Name Prefix';
+  connectTimeoutMs      @title: 'Connect Timeout (ms)';
+  active                @title: 'Active';
+  lastConnectionStatus  @title: 'Status';
+  lastConnectionAt      @title: 'Tested At';
+  lastConnectionMessage @title: 'Message';
+};
+
+annotate Variables with {
+  name  @title: 'Name'  @Common.QuickInfo: 'Reference it in double curly braces in topics, payloads, correlation ids and user properties';
+  value @title: 'Value';
+};
+
+annotate TestCases with {
+  name          @title: 'Name'  @Common.QuickInfo: 'Test cases: empty = topic';
+  kind          @title: 'Type';
+  description   @title: 'Description';
+  topic         @title: 'Topic'  @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. variable region or built-in uuid';
+  payload       @title: 'Payload';
+  contentType   @title: 'Content Type'  @Common.QuickInfo: 'Default application/json - empty = detected on save (JSON or text/plain)';
+  deliveryMode  @title: 'Delivery Mode';
+  timeToLiveMs  @title: 'Time to Live (ms)'  @Common.QuickInfo: 'Empty or 0 = no expiry';
+  dmqEligible   @title: 'DMQ Eligible'  @Common.QuickInfo: 'Empty = broker default';
+  priority      @title: 'Priority (0-255)'  @Common.QuickInfo: 'Empty = broker default';
+  correlationId @title: 'Correlation ID'  @Common.QuickInfo: 'Supports template variables in double curly braces, e.g. built-in uuid';
+  ackTimeoutMs  @title: 'ACK Timeout (ms)';
+  createdBy     @title: 'Created By';
+  modifiedAt    @title: 'Changed At';
+  modifiedBy    @title: 'Changed By';
+};
+
+annotate TestCaseProperties with {
+  name  @title: 'Name';
+  value @title: 'Value'  @Common.QuickInfo: 'Supports template variables in double curly braces';
+  type  @title: 'Type'  @Common.QuickInfo: 'Empty = detected on save (42 = Integer, true = Boolean, else String)';
+};
+
+annotate TestCaseVariables with {
+  name  @title: 'Name';
+  value @title: 'Value';
+};
+
+annotate TestCaseStats with {
+  status  @title: 'Status';
+  runAt   @title: 'Run At';
+  brokers @title: 'Brokers';
+  message @title: 'Problems';
+};
+
+annotate TestRuns with {
+  createdAt       @title: 'Started At';
+  createdBy       @title: 'Started By';
+  summary         @title: 'Test Cases → Brokers';
+  startedAt       @title: 'Started At';
+  finishedAt      @title: 'Finished At';
+  status          @title: 'Run Status';
+  totalCount      @title: 'Total';
+  passedCount     @title: 'Passed';
+  failedCount     @title: 'Failed / Error';
+  skippedCount    @title: 'Not Sent'  @Common.QuickInfo: 'Messages that were not sent: the run was stopped, or stop on first failure';
+  repetitions     @title: 'Repetitions';
+  repetitionOrder @title: 'Order'  @Common.QuickInfo: 'Whole selection (a b c, a b c) or each test case in a row (a a, b b, c c)';
+  delayMs         @title: 'Pause (ms)'  @Common.QuickInfo: 'Pause between two messages to the same broker';
+  stopOnFailure   @title: 'Stop at First Failure';
+};
+
+annotate RunResults with {
+  testCaseName    @title: 'Test Case';
+  brokerName      @title: 'Broker';
+  status          @title: 'Status';
+  iteration       @title: 'Repetition'  @Common.QuickInfo: 'Which repetition of the test case this is (1 = the first)';
+  deliveryMode    @title: 'Delivery Mode';
+  resolvedTopic   @title: 'Topic';
+  resolvedPayload @title: 'Payload';
+  correlationId   @title: 'Correlation ID';
+  ackLatencyMs    @title: 'ACK Latency (ms)';
+  errorMessage    @title: 'Error';
+  executedAt      @title: 'Executed At';
+};
+
+annotate ReceivedMessages with {
+  brokerName     @title: 'Broker';
+  source         @title: 'Subscription / Queue';
+  sourceType     @title: 'Source Type';
+  topic          @title: 'Topic';
+  payload        @title: 'Payload';
+  contentType    @title: 'Content Type';
+  userProperties @title: 'User Properties';
+  correlationId  @title: 'Correlation ID';
+  deliveryMode   @title: 'Delivery Mode';
+  receivedAt     @title: 'Received At';
+  createdBy      @title: 'Saved By';
+};
+
+annotate NumberRanges with {
+  name        @title: 'Name'  @Common.QuickInfo: 'Use it in topics, payloads, correlation ids and user properties as {{numberRange.<name>}}';
+  description @title: 'Description';
+  prefix      @title: 'Prefix'  @Common.QuickInfo: 'Text in front of the number, e.g. SO-';
+  suffix      @title: 'Suffix'  @Common.QuickInfo: 'Text after the number, e.g. -EU';
+  length      @title: 'Digits'  @Common.QuickInfo: 'Length of the number, filled with leading zeros (0 = no leading zeros)';
+  start       @title: 'First Number';
+  step        @title: 'Step'  @Common.QuickInfo: 'Increment between two numbers';
+  maximum     @title: 'Last Allowed Number'  @Common.QuickInfo: 'Empty = until the number no longer fits into the digits';
+  lastUsedAt  @title: 'Last Used At'  @Common.QuickInfo: 'When a run took a number last';
+};

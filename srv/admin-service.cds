@@ -6,10 +6,6 @@ using {aem.suite as db} from '../db/schema';
 service AdminService {
 
   @odata.draft.enabled
-  @Common.SideEffects #connection: {
-    SourceEntities  : ['/AdminService.EntityContainer/Brokers'],
-    TargetProperties: ['lastConnectionStatus', 'lastConnectionAt', 'lastConnectionMessage']
-  }
   entity Brokers as
     projection on db.Brokers {
       *,
@@ -27,16 +23,15 @@ service AdminService {
        * The username is only needed if none is maintained on the broker.
        */
       @Core.OperationAvailable: in.IsActiveEntity
-      @Common.SideEffects     : {TargetProperties: [
-        'in/lastConnectionStatus',
-        'in/lastConnectionAt',
-        'in/lastConnectionMessage',
-        'in/connectionCriticality'
-      ]}
-      action testConnection(username : String @Common.Label: 'Username (only if not maintained on the broker)',
-                            password : String @UI.Masked
-                                              @Common.Label: 'Password (direct mode only, not stored)') returns ConnectionResult;
+      action testConnection(username : String, password : String) returns ConnectionResult;
     };
+
+  // written by the connection test only
+  annotate Brokers with {
+    lastConnectionStatus  @readonly;
+    lastConnectionAt      @readonly;
+    lastConnectionMessage @readonly;
+  };
 
   entity BrokerVariables as projection on db.Variables;
 
@@ -62,20 +57,15 @@ service AdminService {
   entity NumberRanges as
     projection on db.NumberRanges {
       *,
-      virtual lastNumber : String,
-      virtual nextNumber : String
+      virtual lastNumber : String @title: 'Last Issued',
+      virtual nextNumber : String @title: 'Next Number'
     }
     actions {
       /**
        * Sets the range back (or forward): the number given is the next one issued. Empty = the start of the range.
        */
       @Core.OperationAvailable: in.IsActiveEntity
-      @Common.SideEffects     : {TargetProperties: [
-        'in/current',
-        'in/lastNumber',
-        'in/nextNumber'
-      ]}
-      action reset(nextNumber : Integer64 @Common.Label: 'Next number (empty = start of the range)');
+      action reset(nextNumber : Integer64);
     };
 
   type ConnectionResult {

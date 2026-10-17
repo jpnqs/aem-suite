@@ -1,5 +1,7 @@
 using AdminService as service from '../../srv/admin-service';
 
+// field titles: db/schema.cds - here only the layout of the Brokers app
+
 annotate service.Brokers with @(
   UI.HeaderInfo                : {
     TypeName      : 'Broker',
@@ -112,10 +114,8 @@ annotate service.Brokers with @(
     }
   ]
 ) {
-  name                  @title: 'Name';
-  description           @title: 'Description'  @UI.MultiLineText;
-  credentialMode        @title: 'Credentials'
-                        @Common.ValueListWithFixedValues
+  description           @UI.MultiLineText;
+  credentialMode        @Common.ValueListWithFixedValues
                         @Common.ValueList: {
                           CollectionPath: 'CredentialModes',
                           Parameters    : [
@@ -130,9 +130,7 @@ annotate service.Brokers with @(
                             }
                           ]
                         };
-  destinationName       @title: 'Destination'
-                        @Common.QuickInfo: 'BTP destination: URL = wss:// endpoint, additional property msgVpn'
-                        @Common.ValueList: {
+  destinationName       @Common.ValueList: {
                           CollectionPath: 'Destinations',
                           Label         : 'Destinations',
                           Parameters    : [
@@ -155,32 +153,26 @@ annotate service.Brokers with @(
                             }
                           ]
                         };
-  url                   @title: 'URL'
-                        @Common.QuickInfo: 'Host is enough, e.g. mr-xyz.messaging.solace.cloud - completed to wss://host:443 (port 55443 gives tcps, 55555 gives tcp)';
-  msgVpn                @title: 'Message VPN';
-  username              @title: 'Username'
-                        @Common.QuickInfo: 'Optional. If empty, the username is asked for together with the password when running tests, testing the connection or subscribing. The password is never stored';
-  clientNamePrefix      @title: 'Client Name Prefix';
-  connectTimeoutMs      @title: 'Connect Timeout (ms)';
-  active                @title: 'Active';
-  lastConnectionStatus  @title: 'Status'  @readonly;
-  lastConnectionAt      @title: 'Tested At'  @readonly;
-  lastConnectionMessage @title: 'Message'  @readonly  @UI.MultiLineText;
+  lastConnectionMessage @UI.MultiLineText;
   connectionCriticality @UI.Hidden;
 }
 
-
-annotate service.BrokerVariables with @(
-  UI.HeaderInfo: {
-    TypeName      : 'Variable',
-    TypeNamePlural: 'Variables',
-    Title         : {Value: name}
-  },
-  UI.LineItem  : [
-    {Value: name},
-    {Value: value}
-  ]
-) {
-  name  @title: 'Name';
-  value @title: 'Value';
+// refresh the connection fields after a save (the automatic test) and after "Test Connection"
+annotate service.Brokers with @Common.SideEffects #connection: {
+  SourceEntities  : ['/AdminService.EntityContainer/Brokers'],
+  TargetProperties: ['lastConnectionStatus', 'lastConnectionAt', 'lastConnectionMessage']
 };
+
+annotate service.Brokers actions {
+  testConnection @Common.SideEffects: {TargetProperties: [
+    'in/lastConnectionStatus',
+    'in/lastConnectionAt',
+    'in/lastConnectionMessage',
+    'in/connectionCriticality'
+  ]}
+  (username @Common.Label: 'Username (only if not maintained on the broker)',
+   password @UI.Masked  @Common.Label: 'Password (direct mode only, not stored)');
+};
+
+
+// BrokerVariables: the layout of all variables lists, app/common.cds

@@ -1,5 +1,7 @@
 using AdminService as service from '../../srv/admin-service';
 
+// field titles: db/schema.cds - here only the layout
+
 annotate service.GlobalVariables with @(
   UI.HeaderInfo     : {
     TypeName      : 'Global Variable',
@@ -23,7 +25,6 @@ annotate service.GlobalVariables with @(
     Label : 'Variable'
   }]
 ) {
-  name   @title: 'Name'  @Common.QuickInfo: 'Reference it in double curly braces in topics, payloads, correlation ids and user properties';
-  value  @title: 'Value'  @UI.MultiLineText;
+  value  @UI.MultiLineText;
   broker @UI.Hidden;
 };

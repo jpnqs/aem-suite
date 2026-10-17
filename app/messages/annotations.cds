@@ -1,5 +1,7 @@
 using SubscribeService as service from '../../srv/subscribe-service';
 
+// field titles: db/schema.cds - here only the layout
+
 annotate service.ReceivedMessages with @(
   UI.HeaderInfo        : {
     TypeName      : 'Saved Message',
@@ -69,17 +71,9 @@ annotate service.ReceivedMessages with @(
     }
   ]
 ) {
-  brokerName     @title: 'Broker';
-  topic          @title: 'Topic'  @UI.MultiLineText;
-  source         @title: 'Subscription / Queue';
-  sourceType     @title: 'Source Type';
-  payload        @title: 'Payload'  @UI.MultiLineText;
-  contentType    @title: 'Content Type';
-  userProperties @title: 'User Properties'  @UI.MultiLineText;
-  correlationId  @title: 'Correlation ID';
-  deliveryMode   @title: 'Delivery Mode';
-  receivedAt     @title: 'Received At';
-  createdBy      @title: 'Saved By';
+  topic          @UI.MultiLineText;
+  payload        @UI.MultiLineText;
+  userProperties @UI.MultiLineText;
   broker         @UI.Hidden;
 };
 
