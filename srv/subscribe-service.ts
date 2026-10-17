@@ -6,7 +6,8 @@ import { columnLength } from './lib/model'
 import { createNode } from './lib/nodes'
 import type { NodeData } from './lib/node-validation'
 import { inferPropertyType } from './lib/property-types'
-import { keyOf } from './lib/request'
+import { idOf } from './lib/request'
+import { nameTaken } from './lib/unique-name'
 import { listSubscriptions, SourceType, startSubscription, stopSubscription, touch } from './lib/solace/subscription-hub'
 
 interface ReceivedMessage {
@@ -72,7 +73,7 @@ export default class SubscribeService extends cds.ApplicationService {
 
     // same rules and placement as a test case created in the UI or by an agent
     this.on('createTestCase', ReceivedMessages, async (req) => {
-      const m = (await SELECT.one.from('aem.suite.ReceivedMessages', keyOf(req).ID)) as ReceivedMessage | null
+      const m = (await SELECT.one.from('aem.suite.ReceivedMessages', idOf(req))) as ReceivedMessage | null
       if (!m) return req.reject(404, 'Message not found')
       const { ID } = await createNode(testCaseFrom(m))
       req.info(200, 'Test case created')
@@ -126,8 +127,7 @@ async function validatePreset(req: cds.Request): Promise<void> {
     const name = (d.name ?? '').trim()
     if (!name) return req.reject(400, 'Give the setup a name', 'in/name')
     d.name = name
-    const same = (await SELECT.from('aem.suite.SubscriberPresets').columns('ID').where({ name, createdBy: req.user.id })) as { ID: string }[]
-    if (same.some((p) => p.ID !== d.ID)) return req.reject(400, `A setup named "${name}" exists already`, 'in/name')
+    if (await nameTaken('SubscriberPresets', name, d.ID, { createdBy: req.user.id })) return req.reject(400, `A setup named "${name}" exists already`, 'in/name')
   }
   if (d.sourceType !== undefined && !SOURCE_TYPES.includes(d.sourceType)) return req.reject(400, `sourceType must be ${SOURCE_TYPES.join(', ')}`, 'in/sourceType')
   if (d.topics) {

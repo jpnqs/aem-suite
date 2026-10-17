@@ -7,7 +7,7 @@ import { exportNodes, importNodes } from './lib/export-import'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/node-validation'
 import { selectNodeDeep } from './lib/nodes'
 import { columnLength } from './lib/model'
-import { keyOf } from './lib/request'
+import { idOf, keyOf } from './lib/request'
 import type { TestCaseRecord } from './lib/test-case-spec'
 import { moveBefore } from './lib/tree'
 
@@ -49,12 +49,12 @@ export default class TestService extends cds.ApplicationService {
     // drag & drop: place the node before NextSibling (null = at the end)
     this.on('moveBefore', TestCases, async (req) => {
       const nextId = (req.data as { NextSibling?: { ID?: string } | null }).NextSibling?.ID ?? null
-      await moveBefore(keyOf(req).ID, nextId)
+      await moveBefore(idOf(req), nextId)
     })
 
     this.on('runTest', TestCases, async (req) => {
       const { brokerIds, credentials, options } = req.data as { brokerIds: string[]; credentials?: BrokerCredential[]; options?: RunOptions }
-      return runFromUi(req, [keyOf(req).ID], brokerIds, credentials, options)
+      return runFromUi(req, [idOf(req)], brokerIds, credentials, options)
     })
 
     this.on('currentUser', (req) => req.user.id)
@@ -77,16 +77,16 @@ export default class TestService extends cds.ApplicationService {
 
     // preview works on saved test cases and on drafts (lean draft routes draft calls to TestCases.drafts)
     this.on('preview', [TestCases, TestCases.drafts!], async (req) => {
-      const { ID, IsActiveEntity } = keyOf(req)
+      const { IsActiveEntity } = keyOf(req)
       const { brokerId } = req.data as { brokerId?: string }
-      const tc = await selectNodeDeep(ID, IsActiveEntity === false ? TestCases.drafts! : TestCases)
+      const tc = await selectNodeDeep(idOf(req), IsActiveEntity === false ? TestCases.drafts! : TestCases)
       if (!tc) return req.reject(404, 'Test case not found')
       return buildPreview(tc, brokerId)
     })
 
     // copy of a test case or a folder (with everything below it), placed right after the original
     this.on('duplicate', TestCases, async (req) => {
-      const [copy] = await copyNodes([keyOf(req).ID])
+      const [copy] = await copyNodes([idOf(req)])
       return SELECT.one.from(TestCases, copy.ID)
     })
 

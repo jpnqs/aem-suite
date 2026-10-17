@@ -168,6 +168,8 @@ describe('AEM test suite services', () => {
     const duplicate = await draft.save(POST, 'admin', 'GlobalVariables', { name: 'tenant', value: 'x' }, admin)
     expect(duplicate.status).toBe(409)
     expect(duplicate.data.error.message).toBe('Global variable "tenant" already exists')
+    // names are unique regardless of case, as number ranges and subscriber setups
+    expect((await draft.save(POST, 'admin', 'GlobalVariables', { name: 'Tenant', value: 'x' }, admin)).status).toBe(409)
     const invalid = await draft.save(POST, 'admin', 'GlobalVariables', { name: 'my tenant', value: 'x' }, admin)
     expect(invalid.status).toBe(400)
     expect(invalid.data.error).toMatchObject({ message: expect.stringMatching(/^Variable names must start with a letter/), target: 'in/name' })
@@ -563,6 +565,9 @@ describe('AEM test suite services', () => {
         ])
         const { data: search } = await GET('/odata/v4/admin/Destinations?$search=nothing', admin)
         expect(search.value).toEqual([])
+        // one by its key (the value help reads the selected destination)
+        const { data: one } = await GET("/odata/v4/admin/Destinations('aem-dev')", admin)
+        expect(one).toMatchObject({ name: 'aem-dev', msgVpn: 'dev' })
       }
     ))
 })

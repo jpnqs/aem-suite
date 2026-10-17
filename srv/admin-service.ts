@@ -5,7 +5,8 @@ import { config } from './lib/config'
 import { listDestinations } from './lib/credentials/destinations'
 import { currentJwt, needsPassword } from './lib/credentials/resolve'
 import { validateVariables, VAR_NAME, VAR_NAME_RULE } from './lib/node-validation'
-import { keyOf } from './lib/request'
+import { idOf, keyOf, keyValue } from './lib/request'
+import { nameTaken } from './lib/unique-name'
 import { currentForNext, formatNumber, MAX_LENGTH, nextExample, RANGE_NAME } from './lib/number-ranges'
 import { errMsg } from './lib/errors'
 
@@ -51,7 +52,7 @@ export default class AdminService extends cds.ApplicationService {
     })
 
     this.on('reset', NumberRanges, async (req) => {
-      const { ID } = keyOf(req) as { ID: string }
+      const ID = idOf(req)
       const { nextNumber } = req.data as { nextNumber?: number | string | null }
       const range = (await SELECT.one.from('aem.suite.NumberRanges').where({ ID })) as NumberRangeRow | undefined
       if (!range) return req.reject(404, 'Number range not found')
@@ -99,7 +100,7 @@ export default class AdminService extends cds.ApplicationService {
       const data = { ...(req.data as BrokerData), ...result }
       if (!config().autoTestConnection || data.active === false || needsPassword(data)) return
 
-      const id = data.ID ?? keyOf(req).ID
+      const id = data.ID ?? idOf(req)
       const check = await checkConnection(id, { jwt: currentJwt(), maxTimeoutMs: AUTO_CHECK_TIMEOUT_MS })
       if (result && typeof result === 'object') {
         result.lastConnectionStatus = check.lastConnectionStatus
@@ -118,17 +119,14 @@ export default class AdminService extends cds.ApplicationService {
       d.broker_ID = null
       if (d.name !== undefined) {
         if (!VAR_NAME.test(d.name ?? '')) return req.error(400, VAR_NAME_RULE, 'in/name')
-        const dup = await SELECT.one
-          .from('aem.suite.Variables')
-          .where({ name: d.name, broker_ID: null, ID: { '!=': d.ID ?? keyOf(req).ID ?? '' } })
-        if (dup) req.error(409, `Global variable "${d.name}" already exists`, 'in/name')
+        if (await nameTaken('Variables', d.name, d.ID ?? keyOf(req).ID, { broker_ID: null })) req.error(409, `Global variable "${d.name}" already exists`, 'in/name')
       }
     })
 
     // ---------------------------------------------------------------- actions
     this.on('testConnection', Brokers, async (req) => {
       const { password, username } = req.data as { password?: string; username?: string }
-      const check = await checkConnection(keyOf(req).ID, {
+      const check = await checkConnection(idOf(req), {
         jwt: currentJwt(),
         password: password || undefined,
         username: username || undefined
@@ -145,11 +143,8 @@ export default class AdminService extends cds.ApplicationService {
         .replace(/"/g, '')
       let list = await listDestinations(currentJwt())
       if (search) list = list.filter((d) => `${d.name} ${d.url} ${d.msgVpn}`.toLowerCase().includes(search))
-      const key = (req.params?.[0] as { name?: string } | string | undefined) ?? undefined
-      if (key) {
-        const name = typeof key === 'string' ? key : key.name
-        return list.find((d) => d.name === name)
-      }
+      const name = keyValue(req, 'name')
+      if (name) return list.find((d) => d.name === name)
       return Object.assign(list, { $count: list.length })
     })
 
@@ -184,8 +179,7 @@ async function validateNumberRange(req: cds.Request): Promise<void> {
     const name = (d.name ?? '').trim()
     if (!RANGE_NAME.test(name)) return req.reject(400, 'The name must start with a letter and may contain letters, digits, _ and - (it is used as {{numberRange.<name>}})', 'in/name')
     d.name = name
-    const same = (await SELECT.from('aem.suite.NumberRanges').columns('ID', 'name')) as { ID: string; name: string }[]
-    if (same.some((r) => r.name.toLowerCase() === name.toLowerCase() && r.ID !== d.ID)) return req.reject(400, `A number range named "${name}" exists already`, 'in/name')
+    if (await nameTaken('NumberRanges', name, d.ID)) return req.reject(400, `A number range named "${name}" exists already`, 'in/name')
   }
   if (d.length != null && (d.length < 0 || d.length > MAX_LENGTH)) return req.reject(400, `The length must be between 0 and ${MAX_LENGTH} digits (0 = no leading zeros)`, 'in/length')
   if (d.step != null && d.step < 1) return req.reject(400, 'The step must be at least 1', 'in/step')

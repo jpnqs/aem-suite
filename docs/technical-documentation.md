@@ -136,7 +136,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `Brokers` (draft) | Broker maintenance. Handlers: URL completion while editing and on save, validation, **automatic connection test on save for DESTINATION brokers** (max. 5 s). |
 | `Brokers.testConnection(username, password)` | Opens/closes a session, stores the outcome. `password` is required for DIRECT brokers and never stored; `username` only if none is maintained on the broker. |
 | `BrokerVariables` | Broker variables (composition of `Brokers`); the same name rules as test case variables (a name a template can reference, each once). |
-| `GlobalVariables` (draft) | Projection on `Variables` without broker; unique names. |
+| `GlobalVariables` (draft) | Projection on `Variables` without broker; names unique regardless of case (like number ranges and subscriber setups, `srv/lib/unique-name.ts`). |
 | `NumberRanges` (draft) | Virtual `lastNumber` / `nextNumber` (formatted). Bound action `reset(nextNumber)`. `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
 | `Destinations` | Read-only value help (`@cds.persistence.skip`) – destinations from the bound destination service and from env `destinations`, filtered to broker URLs. |
 | `CredentialModes` | Code list. |
