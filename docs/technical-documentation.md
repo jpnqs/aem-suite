@@ -24,7 +24,7 @@ A test result passes when the broker **acknowledges** the message (guaranteed me
 | Broker access | `solclientjs` 10.x (Solace JS API, SMF over `ws(s)://` or `tcp(s)://`) |
 | Live push | `@cap-js-community/websocket` (plain WebSocket, CAP service `LiveService`) |
 | Destinations | `@sap-cloud-sdk/connectivity` 4.x |
-| UI | SAPUI5 **1.148 (LTS)** from CDN: Fiori elements V4 (List Report / Object Page, tree table) and one freestyle UI5 app in TypeScript |
+| UI | SAPUI5 **1.148 (LTS)** from CDN: Fiori elements V4 (List Report / Object Page, tree table) and freestyle UI5 apps; the Live Subscriber and the Test Cases extensions are TypeScript (`ui5-tooling-transpile`) |
 | UI tooling | `cds-plugin-ui5` (serves the apps inside `cds watch`), `@ui5/cli` 4, `ui5-tooling-transpile` |
 | Security | XSUAA, standalone approuter (`@sap/approuter` 23) |
 | Tests | Jest 30 + ts-jest, `@cap-js/cds-test`; Playwright (UI, e2e) |
@@ -401,18 +401,18 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `help` | Freestyle UI5 | The user guide from `docs/user-guide.md`, see HelpService in section 6. |
 | `home` | Freestyle UI5 | Start page: figures, the apps of the user's roles, latest runs – see HomeService in section 6. |
 
-### 8.2 Test case app extensions (`app/testcases/webapp/ext`)
+### 8.2 Test case app extensions (`app/testcases/webapp/ext`, TypeScript)
 
 | File | Role |
 |---|---|
-| `TestCaseActions.js` | The handlers of the custom actions in the manifest: *Run…*, *Copy*, *Export*, *Import* (list and object page) and the *Preview* dialog. |
-| `RunDialog.js` | The Run dialog: broker selection, password fields for DIRECT brokers, advanced settings, live progress via WebSocket (plus a poll), problem list, *Stop run*. |
-| `FileIO.js` | Export / import as a JSON file: save and pick the file in the browser, dry run, confirmation, import. |
+| `TestCaseActions.ts` | The handlers of the custom actions in the manifest: *Run…*, *Copy*, *Export*, *Import* (list and object page) and the *Preview* dialog. |
+| `RunDialog.ts` | The Run dialog: broker selection, password fields for DIRECT brokers, advanced settings, live progress via WebSocket (plus a poll), problem list, *Stop run*. |
+| `FileIO.ts` | Export / import as a JSON file: save and pick the file in the browser, dry run, confirmation, import. |
 | `RunDialog.fragment.xml`, `PreviewDialog.fragment.xml` | Dialogs. |
 | `TypeColumn.fragment.xml` | Custom "Type" column of the tree table: a small folder / test case icon (name as tooltip) instead of the type text. Defined under `columns` in the manifest, so `kind` is not part of the `@UI.LineItem`. |
-| `MessageSection.*`, `PayloadSection.*`, `JsonTemplate.js` | Custom sections; JSON handling that tolerates `{{…}}` outside strings. |
-| `ObjectPageExt.controller.js` | Hides test-case-only parts for folders (manifest `visible` expressions are evaluated before data is loaded). |
-| `TreeRules.js` | Tree hooks: create and drop only in folders/root. Preloaded in `Component.js` because FE resolves hooks synchronously. |
+| `MessageSection.*`, `PayloadSection.*`, `JsonTemplate.ts` | Custom sections; JSON handling that tolerates `{{…}}` outside strings. |
+| `ObjectPageExt.controller.ts` | Hides test-case-only parts for folders (manifest `visible` expressions are evaluated before data is loaded). |
+| `TreeRules.ts` | Tree hooks: create and drop only in folders/root. Preloaded in `Component.js` because FE resolves hooks synchronously. |
 | `Prefs.js` | Browser-local preferences (last brokers, run settings). |
 
 ### 8.2a Shared UI modules (`app/_shared`)
