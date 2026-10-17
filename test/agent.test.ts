@@ -373,7 +373,7 @@ describe('AI agent service (MCP)', () => {
     it('limits the size of a run and the number of parallel runs', () =>
       withAemSuiteConfig({ agent: { maxRunResults: 1, maxActiveRuns: 1 } }, async () => {
         const big = await call('runTests', { testCaseIds: [folder.ID], brokerIds: [dest.ID] })
-        expect(big.error).toMatch(/at most 1 results .* would have 2/)
+        expect(big.error).toMatch(/at most 1 messages .* would have 2/)
 
         const id = cds.utils.uuid()
         await INSERT.into('aem.suite.TestRuns').entries({ ID: id, summary: 'x', status: 'RUNNING', totalCount: 1, createdBy: 'tester' })

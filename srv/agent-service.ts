@@ -159,19 +159,13 @@ export default class TestAgentService extends cds.ApplicationService {
             'Agents can only run tests on brokers that use a BTP destination - run these tests in the UI, or use another broker.'
         )
 
-      // limits: size of one run and parallel runs of this user
-      const tree = await loadTree()
-      const unknown = testCaseIds.filter((id) => !tree.byId.has(id))
-      if (unknown.length) return req.reject(404, 'One or more test cases not found')
-      const total = tree.expandToTests(testCaseIds).length * new Set(brokerIds).size
-      if (total > max.maxRunResults)
-        return req.reject(400, `A run may have at most ${max.maxRunResults} results (test cases x brokers) - this one would have ${total}. Run fewer test cases or brokers.`)
+      // limits: parallel runs of this user here, the size of the run (and unknown test cases) in startRun
       const active = (await SELECT.from('aem.suite.TestRuns').columns('ID').where({ createdBy: req.user.id, status: 'RUNNING' })) as unknown[]
       if (active.length >= max.maxActiveRuns)
         return req.reject(429, `You already have ${active.length} runs in progress (limit ${max.maxActiveRuns}). Wait for one to finish (getRunSummary).`)
 
       const entered = max.allowDirectCredentials ? toCredentials(credentials) : toCredentials([])
-      return startRun(req, testCaseIds, brokerIds, entered)
+      return startRun(req, testCaseIds, brokerIds, entered, null, max.maxRunResults)
     })
 
     // ---------------------------------------------------------------- check the result

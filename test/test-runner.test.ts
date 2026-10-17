@@ -1,5 +1,6 @@
 import cds from '@sap/cds'
 import * as testCaseSpec from '../srv/lib/test-case-spec'
+import { runOutcome } from '../srv/lib/test-runner'
 import { createActive, fakeBroker, resetDatabase, runAndWait, startServer, users } from './helpers'
 
 const { GET, POST } = startServer()
@@ -103,6 +104,21 @@ describe('test runner', () => {
       ])
     } finally {
       emit.mockRestore()
+    }
+  })
+
+  it('the outcome in TestService.TestRuns (CDS) is the same as runOutcome() for every status', async () => {
+    const cases = ['RUNNING', 'DONE', 'FAILED'].flatMap((status) => [0, 2].map((failedCount) => ({ ID: cds.utils.uuid(), status, failedCount, summary: 'outcome', totalCount: 2 })))
+    await INSERT.into('aem.suite.TestRuns').entries(cases)
+    try {
+      for (const c of cases) {
+        const { data } = await GET(`/odata/v4/test/TestRuns(${c.ID})?$select=outcome,statusCriticality`, tester)
+        // the criticality follows the outcome: PASSED 3, FAILED 1, RUNNING 2
+        const criticality = { PASSED: 3, FAILED: 1, RUNNING: 2 }[runOutcome(c)]
+        expect({ ...c, outcome: data.outcome, criticality: data.statusCriticality }).toEqual({ ...c, outcome: runOutcome(c), criticality })
+      }
+    } finally {
+      await DELETE.from('aem.suite.TestRuns').where({ summary: 'outcome' })
     }
   })
 })

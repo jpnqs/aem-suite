@@ -116,7 +116,13 @@ export interface RunRef {
  * Creates a TestRun with one PENDING result per (test case x broker x repetition) within the
  * current transaction (startRun executes it once that transaction committed).
  */
-async function createRun(testCaseIds: string[], brokerIds: string[], credentials: Credentials = new Map(), options?: RunOptions | null): Promise<RunRef> {
+async function createRun(
+  testCaseIds: string[],
+  brokerIds: string[],
+  credentials: Credentials,
+  options: RunOptions | null | undefined,
+  maxMessages: number
+): Promise<RunRef> {
   const settings = normalizeOptions(options)
   const selected = [...new Set(testCaseIds ?? [])]
   const brIds = [...new Set(brokerIds ?? [])]
@@ -143,7 +149,7 @@ async function createRun(testCaseIds: string[], brokerIds: string[], credentials
   if (missing.length) throw httpError(400, `Password required for broker(s): ${missing.join(', ')}`)
 
   const total = tcIds.length * brokers.length * settings.repetitions
-  if (total > config().runs.maxResults) throw httpError(400, `A run may have at most ${config().runs.maxResults} messages (test cases x brokers x repetitions) - this one would have ${total}`)
+  if (total > maxMessages) throw httpError(400, `A run may have at most ${maxMessages} messages (test cases x brokers x repetitions) - this one would have ${total}`)
 
   const runId = cds.utils.uuid()
   const tcById = new Map(testCases.map((t) => [t.ID, t]))
@@ -190,15 +196,17 @@ async function createRun(testCaseIds: string[], brokerIds: string[], credentials
 /**
  * Creates a run for the request and executes it once the request's transaction is committed.
  * Passwords (and entered usernames) stay in memory of this run only - never persisted or logged.
+ * maxMessages: a lower limit than cds.aemSuite.runs.maxResults (runs started by an AI agent).
  */
 export async function startRun(
   req: cds.Request,
   testCaseIds: string[],
   brokerIds: string[],
   credentials: Credentials,
-  options?: RunOptions | null
+  options?: RunOptions | null,
+  maxMessages = config().runs.maxResults
 ): Promise<RunRef> {
-  const run = await createRun(testCaseIds, brokerIds, credentials, options)
+  const run = await createRun(testCaseIds, brokerIds, credentials, options, Math.min(maxMessages, config().runs.maxResults))
   const jwt = currentJwt()
   req.on('succeeded', () => void executeRunInBackground(run.runId, jwt, credentials))
   return run
