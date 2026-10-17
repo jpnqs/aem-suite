@@ -2,4 +2,4 @@
 .plugin-cache/
 .terragrunt-cache/
 .terraform/
-.terraform.lock.hcl
+# .terraform.lock.hcl is committed (pins the provider versions) once the stack has been applied

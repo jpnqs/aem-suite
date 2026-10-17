@@ -6,7 +6,7 @@
 | **Base** | `5d99648` (main), reviewed on branch `chore/maintenance-review` |
 | **Scope** | Whole repository: `srv/`, `db/`, `app/`, `test/`, `e2e/`, `scripts/`, `local/`, build and deployment config, docs (~22,000 lines in 297 tracked files) |
 | **Method** | Read-through of all source files, split into four areas (backend, UI, tests, build/deploy/docs). Every finding has a file:line reference, and the High ones were re-checked by hand. `npm run verify` and `npm run sync:ui -- --check` were run as a baseline. |
-| **Previous review** | [clean-code-review.md](clean-code-review.md) (2026-10-15, commit `3c4d9d2`). Most of its findings are fixed. The ones still open are carried over here (section 7), so this document is the single list to work from. |
+| **Previous review** | [archive/clean-code-review-2026-10-15.md](archive/clean-code-review-2026-10-15.md) (2026-10-15, commit `3c4d9d2`). Most of its findings are fixed. The ones still open are carried over here (section 7), so this document is the single list to work from. |
 
 Severity: **High** = bug, security issue or a broken quality gate · **Medium** = maintenance cost that grows with the code · **Low** = local cleanup.
 
