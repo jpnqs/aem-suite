@@ -3,7 +3,7 @@ import { BrokerRecord, currentJwt, loadBroker, needsPassword, needsUsername, res
 import { errMsg, httpError, truncate } from './errors'
 import type { Publisher } from './solace/session'
 import { connect } from './solace/connector'
-import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord, withNumbers } from './test-case-spec'
+import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord, withGenerated } from './test-case-spec'
 import { loadTree } from './tree'
 import { TemplateError } from './template/resolve'
 import { config } from './config'
@@ -366,7 +366,7 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
   }
   let spec
   try {
-    spec = buildSpec(tc, await withNumbers(tc, scopeFor(tc, broker, ctx.vars), 'consume'))
+    spec = buildSpec(tc, await withGenerated(tc, scopeFor(tc, broker, ctx.vars), 'consume'))
   } catch (e) {
     await progress.finish(r, 'ERROR', { errorMessage: errorText(errMsg(e)), deliveryMode: tc.deliveryMode })
     return false

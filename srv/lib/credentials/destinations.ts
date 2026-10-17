@@ -1,6 +1,7 @@
 import cds from '@sap/cds'
 import { getAllDestinationsFromDestinationService, getServiceBinding } from '@sap-cloud-sdk/connectivity'
 import { isBrokerUrl, readBrokerProps } from '../broker-url'
+import { errMsg } from '../errors'
 
 const LOG = cds.log('aem-destinations')
 
@@ -35,7 +36,7 @@ export async function listDestinations(jwt?: string): Promise<DestinationInfo[]>
         })
       }
     } catch (e) {
-      LOG.warn('Cannot read destinations from destination service', (e as Error).message)
+      LOG.warn('Cannot read destinations from destination service', errMsg(e))
     }
   }
 

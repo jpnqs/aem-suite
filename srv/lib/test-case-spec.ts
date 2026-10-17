@@ -1,6 +1,6 @@
 import type { BrokerRecord } from './credentials/resolve'
 import type { PublishSpec, DeliveryMode } from './solace/session'
-import { TemplateResolver, TemplateScope, jsonError, TemplateError, numberSlots } from './template/resolve'
+import { TemplateResolver, TemplateScope, jsonError, TemplateError, generatedSlots } from './template/resolve'
 import { allocateNumbers } from './number-ranges'
 import { generateFake } from './fake-data'
 import { config } from './config'
@@ -106,14 +106,14 @@ export function scopeFor(
  * (a run), 'peek' only shows what the next ones would be (Preview). Throws TemplateError for an unknown or
  * exhausted range.
  */
-export async function withNumbers(tc: TestCaseRecord, scope: TemplateScope, mode: 'consume' | 'peek'): Promise<TemplateScope> {
+export async function withGenerated(tc: TestCaseRecord, scope: TemplateScope, mode: 'consume' | 'peek'): Promise<TemplateScope> {
   const templates = [tc.topic, tc.payload, tc.correlationId, ...(tc.userProperties ?? []).map((p) => p.value)]
-  const slots = numberSlots(templates, scope)
+  const slots = generatedSlots(templates, scope)
   if (!slots.length) return scope
-  const numbers = await allocateNumbers(slots.filter((s) => !s.faker), mode)
+  const generated = await allocateNumbers(slots.filter((s) => !s.faker), mode)
   // test data of faker.js: new values every time, also in the Preview
-  for (const s of slots) if (s.faker) numbers[s.key] = generateFake(s.faker.name, s.faker.args, config().faker.locale)
-  return { ...scope, numbers }
+  for (const s of slots) if (s.faker) generated[s.key] = generateFake(s.faker.name, s.faker.args, config().faker.locale)
+  return { ...scope, generated }
 }
 
 /**

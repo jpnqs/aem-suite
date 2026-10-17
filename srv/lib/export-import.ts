@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import { SORT_STEP } from './defaults'
-import { httpError } from './errors'
+import { errMsg, httpError } from './errors'
 import { collectProblems, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './node-validation'
 import { selectNodesDeep, TABLE } from './nodes'
 import { FOLDER_FIELDS, TEST_FIELDS } from './test-fields'
@@ -194,7 +194,7 @@ function parseDocument(content: string): ExportDocument {
   try {
     doc = JSON.parse(content)
   } catch (e) {
-    throw httpError(400, `Nothing was imported: the file is not valid JSON (${(e as Error).message})`)
+    throw httpError(400, `Nothing was imported: the file is not valid JSON (${errMsg(e)})`)
   }
   const file = doc as Partial<ExportDocument> | null
   if (!file || typeof file !== 'object' || file.format !== FORMAT)

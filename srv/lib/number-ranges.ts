@@ -1,5 +1,5 @@
 import cds from '@sap/cds'
-import { TemplateError, type NumberSlot } from './template/resolve'
+import { TemplateError, type GeneratedSlot } from './template/resolve'
 
 /** Name of a number range as used in {{numberRange.<name>}}. */
 export const RANGE_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/
@@ -71,8 +71,8 @@ const MAX_ATTEMPTS = 8
  *   peek:    the numbers the message would get now; nothing changes (Preview)
  * Returns slot key -> formatted number.
  */
-export async function allocateNumbers(slots: NumberSlot[], mode: 'consume' | 'peek'): Promise<Record<string, string>> {
-  const byRange = new Map<string, NumberSlot[]>()
+export async function allocateNumbers(slots: GeneratedSlot[], mode: 'consume' | 'peek'): Promise<Record<string, string>> {
+  const byRange = new Map<string, GeneratedSlot[]>()
   for (const s of slots) byRange.set(s.range, [...(byRange.get(s.range) ?? []), s])
 
   const out: Record<string, string> = {}

@@ -1,5 +1,5 @@
 import { generateFake } from '../srv/lib/fake-data'
-import { TemplateError, TemplateResolver, fakerKey, numberSlots } from '../srv/lib/template/resolve'
+import { TemplateError, TemplateResolver, fakerKey, generatedSlots } from '../srv/lib/template/resolve'
 
 // faker test data without a server: generation, refusals and the template side (previews and runs: fake-data.test.ts).
 
@@ -21,6 +21,10 @@ describe('faker test data (templates)', () => {
     expect(generateFake('faker.string.alpha', '5')).toMatch(/^[A-Za-z]{5}$/)
     expect(generateFake('faker.person.firstName', "'female'").length).toBeGreaterThan(0)
     expect(Number(generateFake('faker.finance.amount', '5,6'))).toBeGreaterThanOrEqual(5)
+  })
+
+  it('keeps a comma inside a quoted argument', () => {
+    expect(generateFake('faker.string.fromCharacters', "'a,b', 12")).toMatch(/^[a,b]{12}$/)
   })
 
   it('writes dates as ISO text', () => {
@@ -53,7 +57,7 @@ describe('faker test data (templates)', () => {
   })
 
   it('finds the faker slots of a message: the same expression once, aliases of their own, also in variables', () => {
-    const slots = numberSlots(['{{faker.person.fullName}} {{faker.person.fullName}} {{faker.number.int(1, 5)}}', '{{faker.person.fullName as a}} {{a}} {{inner}}'], {
+    const slots = generatedSlots(['{{faker.person.fullName}} {{faker.person.fullName}} {{faker.number.int(1, 5)}}', '{{faker.person.fullName as a}} {{a}} {{inner}}'], {
       global: { inner: '{{faker.internet.email}}', unused: '{{faker.company.name}}' }
     })
     expect(slots.map((s) => s.key).sort()).toEqual(['as:a', 'faker.internet.email', 'faker.number.int(1,5)', 'faker.person.fullName'])
@@ -62,7 +66,7 @@ describe('faker test data (templates)', () => {
   })
 
   it('inserts the generated values: the same value for the same expression, an alias for reuse', () => {
-    const r = new TemplateResolver({ numbers: { 'faker.person.fullName': 'Ada Lovelace', 'faker.number.int(1,5)': '4', 'as:buyer': 'Grace Hopper' } })
+    const r = new TemplateResolver({ generated: { 'faker.person.fullName': 'Ada Lovelace', 'faker.number.int(1,5)': '4', 'as:buyer': 'Grace Hopper' } })
     expect(r.resolve('{{faker.person.fullName}}, {{faker.person.fullName}}, {{faker.number.int(1, 5)}}')).toBe('Ada Lovelace, Ada Lovelace, 4')
     expect(r.resolve('{{buyer}} / {{faker.person.fullName as buyer}} / {{buyer}}')).toBe('Grace Hopper / Grace Hopper / Grace Hopper')
     expect(() => new TemplateResolver().resolve('{{faker.person.fullName}}')).toThrow(/Unknown variable/)

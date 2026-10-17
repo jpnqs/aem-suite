@@ -149,7 +149,7 @@ export class SolaceSession implements Publisher {
         session.connect()
       } catch (e) {
         clearTimeout(guard)
-        fail(`Connect failed: ${(e as Error).message}`)
+        fail(`Connect failed: ${errMsg(e)}`)
       }
     })
   }
@@ -173,7 +173,7 @@ export class SolaceSession implements Publisher {
       try {
         this.session.send(msg)
       } catch (e) {
-        return Promise.reject(new Error(`Send failed: ${(e as Error).message}`))
+        return Promise.reject(new Error(`Send failed: ${errMsg(e)}`))
       }
       return Promise.resolve({ latencyMs: Date.now() - started })
     }
@@ -192,7 +192,7 @@ export class SolaceSession implements Publisher {
       } catch (e) {
         clearTimeout(timer)
         this.pending.delete(key)
-        reject(new Error(`Send failed: ${(e as Error).message}`))
+        reject(new Error(`Send failed: ${errMsg(e)}`))
       }
     })
   }
@@ -221,7 +221,7 @@ export class SolaceSession implements Publisher {
       } catch (e) {
         clearTimeout(timer)
         this.pendingSubscriptions.delete(key)
-        reject(new Error(`Subscribe failed: ${(e as Error).message}`))
+        reject(new Error(`Subscribe failed: ${errMsg(e)}`))
       }
     })
   }

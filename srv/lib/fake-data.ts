@@ -1,5 +1,6 @@
 import { allFakers, type Faker } from '@faker-js/faker'
-import { TemplateError } from './template/resolve'
+import { FAKER_PREFIX, TemplateError } from './template/resolve'
+import { errMsg } from './errors'
 
 /**
  * Test data from faker.js for templates: {{faker.<module>.<method>}} or {{faker.<module>.<method>(args)}}, e.g.
@@ -8,7 +9,6 @@ import { TemplateError } from './template/resolve'
  * Only the data modules below are reachable (not faker.helpers, faker.seed, ...), only plain methods, and the
  * arguments are plain numbers, true / false or text - a template cannot run code.
  */
-const FAKER_PREFIX = 'faker.'
 
 const MODULES = [
   'airline',
@@ -43,10 +43,29 @@ function fakerFor(locale: string): Faker {
   return all[locale] ?? all[locale.replace('-', '_')] ?? all.en
 }
 
+/** Splits at the commas that are not inside 'quotes' or "quotes": lorem.sentence('a, b') is one argument. */
+function splitArgs(args: string): string[] {
+  const parts: string[] = []
+  let current = ''
+  let quote: string | null = null
+  for (const c of args) {
+    if (quote) {
+      if (c === quote) quote = null
+    } else if (c === "'" || c === '"') quote = c
+    else if (c === ',') {
+      parts.push(current)
+      current = ''
+      continue
+    }
+    current += c
+  }
+  return [...parts, current]
+}
+
 /** Arguments as written in the template: numbers, true / false, 'text' or "text" or bare text. */
 function parseArgs(args: string | undefined): unknown[] {
   if (args === undefined || !args.trim()) return []
-  return args.split(',').map((a) => {
+  return splitArgs(args).map((a) => {
     const s = a.trim()
     if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s)
     if (s === 'true') return true
@@ -82,6 +101,6 @@ export function generateFake(name: string, args: string | undefined, locale = 'e
   try {
     return text((fn as (...a: unknown[]) => unknown).apply((fakerFor(locale) as unknown as Record<string, unknown>)[m[1]], toFakerArgs(path, parseArgs(args))))
   } catch (e) {
-    throw new TemplateError(`faker expression "${name}${args === undefined ? '' : `(${args})`}" failed: ${(e as Error).message}`)
+    throw new TemplateError(`faker expression "${name}${args === undefined ? '' : `(${args})`}" failed: ${errMsg(e)}`)
   }
 }

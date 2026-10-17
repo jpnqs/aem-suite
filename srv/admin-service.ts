@@ -7,6 +7,7 @@ import { currentJwt, needsPassword } from './lib/credentials/resolve'
 import { validateVariables, VAR_NAME, VAR_NAME_RULE } from './lib/node-validation'
 import { keyOf } from './lib/request'
 import { currentForNext, formatNumber, MAX_LENGTH, nextExample, RANGE_NAME } from './lib/number-ranges'
+import { errMsg } from './lib/errors'
 
 /** Connection check on save is capped so saving never blocks long. */
 const AUTO_CHECK_TIMEOUT_MS = 5000
@@ -83,7 +84,7 @@ export default class AdminService extends cds.ApplicationService {
         try {
           toSmfUrl(d.url)
         } catch (e) {
-          req.error(400, (e as Error).message, 'in/url')
+          req.error(400, errMsg(e), 'in/url')
         }
       }
       // connectTimeoutMs and credentialMode: @assert.range in db/schema.cds

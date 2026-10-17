@@ -1,5 +1,5 @@
 import { detectContentType, SORT_STEP } from './defaults'
-import { httpError } from './errors'
+import { errMsg, httpError } from './errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
 import { TEST_FIELDS } from './test-fields'
 import type { TestCaseRecord } from './test-case-spec'
@@ -114,7 +114,7 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
       try {
         JSON.parse(probe)
       } catch (e) {
-        reject(400, `Payload is not valid JSON: ${(e as Error).message}`, 'in/payload')
+        reject(400, `Payload is not valid JSON: ${errMsg(e)}`, 'in/payload')
       }
     }
   }

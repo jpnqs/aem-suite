@@ -73,7 +73,7 @@ export default class SubscribeService extends cds.ApplicationService {
     // same rules and placement as a test case created in the UI or by an agent
     this.on('createTestCase', ReceivedMessages, async (req) => {
       const m = (await SELECT.one.from('aem.suite.ReceivedMessages', keyOf(req).ID)) as ReceivedMessage | null
-      if (!m) return req.error(404, 'Message not found')
+      if (!m) return req.reject(404, 'Message not found')
       const { ID } = await createNode(testCaseFrom(m))
       req.info(200, 'Test case created')
       return { ID }

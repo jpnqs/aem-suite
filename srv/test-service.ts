@@ -80,7 +80,7 @@ export default class TestService extends cds.ApplicationService {
       const { ID, IsActiveEntity } = keyOf(req)
       const { brokerId } = req.data as { brokerId?: string }
       const tc = await selectNodeDeep(ID, IsActiveEntity === false ? TestCases.drafts! : TestCases)
-      if (!tc) return req.error(404, 'Test case not found')
+      if (!tc) return req.reject(404, 'Test case not found')
       return buildPreview(tc, brokerId)
     })
 

@@ -340,14 +340,14 @@ Syntax `{{name}}` or `{{fn(args)}}`. Lookup order (first match wins):
 
 Variables may reference other variables (depth 5, cycle detection). Unknown names raise `TemplateError` listing all of them → result `ERROR`. After resolution the payload is validated as JSON when the content type is JSON.
 
-**Number ranges.** `{{numberRange.NAME}}` and `{{numberRange.NAME as alias}}` (temporary variable `{{alias}}`, also usable before its definition) are not computed by the resolver: it is synchronous and only inserts `scope.numbers`. The numbers are handed out beforehand, once per message:
+**Number ranges.** `{{numberRange.NAME}}` and `{{numberRange.NAME as alias}}` (temporary variable `{{alias}}`, also usable before its definition) are not computed by the resolver: it is synchronous and only inserts `scope.generated`. The numbers are handed out beforehand, once per message:
 
-1. `numberSlots(templates, scope)` lists what the message needs: one slot per plain range name (the same number everywhere in the message) and one per alias, also in variables the templates use. Unused variables are not followed, so they never use up numbers.
-2. `withNumbers(tc, scope, mode)` in `test-case-spec.ts` calls `allocateNumbers(slots, mode)` from `number-ranges.ts` and puts the result into the scope.
+1. `generatedSlots(templates, scope)` lists what the message needs: one slot per plain range name (the same number everywhere in the message) and one per alias, also in variables the templates use. Unused variables are not followed, so they never use up numbers.
+2. `withGenerated(tc, scope, mode)` in `test-case-spec.ts` calls `allocateNumbers(slots, mode)` from `number-ranges.ts` and puts the result into the scope.
 3. `consume` (runs) takes the numbers with a compare-and-set `UPDATE` of `NumberRanges.current` in a transaction of its own that commits at once, retried a few times, so parallel runs never get the same number and a number is not reissued if the message fails later. `peek` (Preview, MCP preview) only computes the next numbers.
 4. An exhausted range (`maximum` or digits exceeded) or an unknown range is a `TemplateError`, so the result is `ERROR` and `current` does not move.
 
-**Faker.** `{{faker.<module>.<method>[(args)]}}` (`fake-data.ts`, [`@faker-js/faker`](https://fakerjs.dev), v9 because it ships CommonJS, which Jest needs) uses the same mechanism as number ranges: `numberSlots` lists the expressions (one slot per distinct expression, one per `as` alias), `withNumbers` calls `generateFake` for them (also in `peek` mode) and the resolver inserts the values. Safety: only the data modules in `MODULES` are reachable (not `helpers`, `seed`, `constructor`, ...), the method must be a function of that module, and the arguments are parsed as numbers, booleans or text - a template cannot run code. `number.int/float`, `finance.amount` take (min,max), `date.between` (from,to). Dates are written as ISO text. The language is `cds.aemSuite.faker.locale`; an unknown locale falls back to English. `test/fake-data.test.ts` pins the refusals.
+**Faker.** `{{faker.<module>.<method>[(args)]}}` (`fake-data.ts`, [`@faker-js/faker`](https://fakerjs.dev), v9 because it ships CommonJS, which Jest needs) uses the same mechanism as number ranges: `generatedSlots` lists the expressions (one slot per distinct expression, one per `as` alias), `withGenerated` calls `generateFake` for them (also in `peek` mode) and the resolver inserts the values. Safety: only the data modules in `MODULES` are reachable (not `helpers`, `seed`, `constructor`, ...), the method must be a function of that module, and the arguments are parsed as numbers, booleans or text - a template cannot run code. `number.int/float`, `finance.amount` take (min,max), `date.between` (from,to). Dates are written as ISO text. The language is `cds.aemSuite.faker.locale`; an unknown locale falls back to English. `test/fake-data.test.ts` pins the refusals.
 
 ### 7.5 `test-case-spec.ts`
 
@@ -560,7 +560,7 @@ The live views (Test Cases run progress, Live Subscriber) use WebSockets through
 |---|---|
 | Change or add help text | edit `docs/user-guide.md` - nothing else. Keep headings stable (apps link to them, see the Help buttons above); a new `## ` heading becomes a new section automatically |
 | New agent capability (MCP) | an unbound action / function in `srv/agent-service.cds` + handler in `srv/agent-service.ts`; reuse the checks in `srv/lib/node-validation.ts`; list it in `test/agent.test.ts` (the test pins the exact set of entities and actions) |
-| New built-in template function | `TemplateResolver.callFunction` / `fixed` in `srv/lib/template/resolve.ts` (+ `isBuiltin`, help list in `PayloadSection.js`) |
+| New built-in template function | `TemplateResolver.callFunction` / `fixed` in `srv/lib/template/resolve.ts` (+ the help list in `PayloadSection.js`) |
 | Payload assertions / round-trip checks | `test-runner.ts`: subscribe before publishing (use `SolaceSession.subscribe`/`onMessage`), new result fields in `RunResults` |
 | Other protocols (MQTT, AMQP, REST) | implement the `Publisher` interface and route in `solace/connector.ts` per broker setting |
 | Scaling beyond one instance | replace `subscription-hub` state with a shared store, enable the websocket Redis adapter |
