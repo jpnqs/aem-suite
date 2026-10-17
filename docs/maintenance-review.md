@@ -8,6 +8,96 @@
 | **Method** | Read-through of all source files, split into four areas (backend, UI, tests, build/deploy/docs). Every finding has a file:line reference, and the High ones were re-checked by hand. `npm run verify` and `npm run sync:ui -- --check` were run as a baseline. |
 | **Previous review** | [archive/clean-code-review-2026-10-15.md](archive/clean-code-review-2026-10-15.md) (2026-10-15, commit `3c4d9d2`). Most of its findings are fixed. The ones still open are carried over here (section 7), so this document is the single list to work from. |
 
+
+## Status
+
+State of branch `chore/maintenance-review` after working through sections 2–7 (2026-10-17). `npm run verify` and `npm run e2e` pass. Commit = where the change is. The IDs of the previous review in section 7 (B28, U13, T3, T8, T13, T16, T18, ...) are covered by the new IDs they map to. Totals: 60 Fixed, 9 Partly fixed, 5 Open – decision needed, 8 Open – not done, 0 Skipped.
+
+| ID | Status | Commit | Note |
+|---|---|---|---|
+| G1 | Fixed | 496b982 | TOC self-links removed, "Advanced settings" added, TOC update on save off for the workspace, unused `page` argument removed |
+| G2 | Fixed | ebb9c34 | `.github/workflows/ci.yml` (Node 22, verify, Playwright e2e with CI=true, report artifact). Not run on GitHub yet; no `mbt build` smoke step |
+| G3 | Fixed | ebb9c34, 496b982 | `defineConfig`, no Jest globals for Playwright specs, `no-restricted-syntax` rule against `.only`/`fdescribe`/`fit` (no new plugin), screenshots config/spec type-checked, `eslint.useFlatConfig` removed |
+| B1 | Fixed | a8baccb | first rejected broker loop is rethrown so `failRuns` runs; topic/correlation id cut to their columns. The optional per-result ERROR fallback is not done |
+| B2 | Fixed | 9161236 | `@assert.range` on all enum types and on ackTimeoutMs/priority/connectTimeoutMs; node-validation reads the limits from the model |
+| B3 | Fixed | 9161236 | `validateVariables` also for broker variables |
+| B4 | Fixed | b233ecf | `@restrict` on ReceivedMessages (read/save/createTestCase for testers, delete own; admins delete any); not updatable in the service |
+| B5 | Fixed | c4bfe31 | 404 for unknown broker, 400 for inactive broker and failed connect (400 rather than 502: CAP hides 5xx texts in production) |
+| B6 | Fixed | 71fc969 | descriptor in `srv/lib/test-fields.ts` (not `lib/nodes.ts`: circular import), guarded by `test/test-fields.test.ts` incl. the agent CDS signatures |
+| B7 | Fixed | 4d7b60d | `srv/common.cds` (namespace `aem.suite.api`); RunRef has `total` in both services |
+| B8 | Fixed | 33f262f | skippedCount/repetitions/iteration/sequence exposed, `skipped` in the summary, failures filtered in the query |
+| B9 | Fixed | 474e687, a8baccb | `lib/model.ts#columnLength` for every cut; redundant preset length checks removed |
+| B10 | Fixed | 5bd5b1d | separate `disposed` flag; `bindFlow` timeout guard |
+| B11 | Open – decision needed | – | ⚖ not changed: a stopped run still ends DONE/PASSED |
+| B12 | Fixed | 135ddca, 33f262f | comments fixed, `@mcp.instructions` extended, createRun/executeRunInBackground/normalizeOptions no longer exported |
+| B13 | Fixed | 35c5ed0 | enum unions come from the cds-typer models; preset SOURCE_TYPES check replaced by `@assert.range` |
+| B14 | Fixed | 135ddca | `lib/live.ts#emitLive`; all loggers `aem-` (audit logger is now `aem-agent`) |
+| B15 | Fixed | df0a3cb | `errMsg` everywhere, `req.reject` in on-handlers (before-handlers keep collecting with `req.error`) |
+| B16 | Fixed | df0a3cb | one FAKER_PREFIX, `generatedSlots`/`TemplateScope.generated`/`withGenerated`, `referencedNames`+`isBuiltin` removed, quote-aware faker arguments |
+| B17 | Fixed | 35c5ed0 | cds-typer entities and row types in tree, nodes, test-runner, home, agent, copy, export/import, number ranges, credentials; `@singular` fixes; typecheck/test/e2e server generate the models. Two `NumberRanges.current` updates stay by name (typer types Integer64 as number) |
+| B17a | Fixed | 8b33008 | `keyOf` returns a Partial key, `idOf` rejects without ID, `keyValue` for Destinations and Help |
+| B18 | Fixed | 8b33008 | `lib/unique-name.ts#nameTaken`, case-insensitive for global variables, number ranges and setups |
+| B19 | Fixed | 4a9b982 | agent relies on startRun/createRun (with its own message limit); its refusal text now says "messages" |
+| B20 | Fixed | 4a9b982 | test compares CDS outcome/criticality with `runOutcome` for every status combination |
+| B21 | Fixed | 5cca662 | stats of deleted test cases are deleted in TestService (association kept: as a composition drafts would copy stats) |
+| B22 | Fixed | 5cca662 | `type Username : String(200)` |
+| B23 | Fixed | 5cca662 | stored as `repetitionOrder` (`order` is an SQL keyword), shown on the run page and to the agent |
+| B24 | Fixed | 5cca662 | `@assert.unique` on NumberRanges.name |
+| B25 | Open – not done | – | titles still in the UI annotations (belongs to U7) |
+| B26 | Open – not done | – | row-by-row writes and per-message tx/emit not throttled or batched |
+| B27 | Open – decision needed | – | ⚖ not changed |
+| U1 | Fixed | 32819a0 | `app/router/resources/` deleted |
+| U2 | Fixed | 4eba3ea | `heartbeat(subscriptionId)` action; `activeSubscriptions` read-only |
+| U3 | Fixed | b88f001 | early return when only drafts are selected |
+| U4 | Fixed | b88f001, 4d7b60d | total from the run/RunRef, honest strip text, label from saved node, selection bound to the message, bindings destroyed/reset, "… and N more", launchpad frame options, sap.ui.layout |
+| U5 | Fixed | 522167b | `app/_shared/Apps.js`, Navigation takes the app key; launchpad test compares tiles (incl. icons) and manifests. Backend link strings remain (U8); e2e intents stay test data |
+| U6 | Fixed | 28db6fb | `test/ui5-version.test.ts` |
+| U7 | Open – not done | – | annotation consolidation (@title on the schema, one timestamp wording) not done |
+| U8 | Open – not done | – | not straightforward: intent-based navigation into object pages of draft-enabled entities needs key-parameter handling in the target apps, and standalone the links would disappear; needs browser verification |
+| U9 | Partly fixed | 27432a8, 70144cc | each app gets only the modules it uses, LF copies; copies are still committed (generation in the UI5 build open) |
+| U14 | Fixed | a1423e6 | `ext/RunDialog.js`, `ext/FileIO.js` (flat import chain); new e2e spec for export/import |
+| U15 | Fixed | 4e9c8b1 | `util/SubscriptionSession.ts`, `util/MessageBuffer.ts`, `util/TopicList.ts` (+ Jest test). Start/stop/heartbeat not e2e-tested (needs a broker); controller still ~700 lines |
+| U16 | Open – not done | – | optional TS migration of testcases/ext not started |
+| U17 | Partly fixed | b4fe91f | run dialog finds its broker list via its own events; PayloadSection still walks the tree; the preview action stays id-toggled (a manifest `visible` binding on `kind` was tried and did not hide it - e2e added) |
+| U18 | Fixed | b4fe91f | Prefs in `app/_shared`, used by the subscriber (same storage key) |
+| U19 | Open – not done | – | optional i18n not started |
+| U20 | Fixed | b4fe91f | one `status(text)`, one popover per view |
+| U21 | Partly fixed | b4fe91f | TypeColumn uses `kindText`; the create menu labels stay in the manifest |
+| U22 | Fixed | b4fe91f | Help.d.ts complete, unused ids handled, `catch (e)`, `Actions.errorText`, braces, real plurals |
+| T1 | Fixed | 8d7e8c3, aba536d | checks that the app opens, not "no runs" |
+| T2 | Fixed | 8d7e8c3 | fixtures in beforeAll, range reset before each test |
+| T3 | Fixed | 8d7e8c3 | unique names and cleanup after each test (`e2e/cleanup.ts`) |
+| T4 | Fixed | 7bca07c | timestamps instead of wall clock, bounded `waitFor`, fake timers in the session tests |
+| T5 | Fixed | 7bca07c | messages asserted, noRole 403, own-run stop, stats before/after, language check |
+| T6 | Partly fixed | 38e2305 | `.all()` after `toHaveCount`, tile list instead of bare count; FE filter-field ids, `.ace_editor` and the OP route id remain (no accessible handle) |
+| T7 | Fixed | 7bca07c | `runAndWait` in helpers.ts |
+| T8 | Fixed | 7bca07c | `withDestinations`/`useDestinations`, restore instead of delete |
+| T9 | Fixed | 7bca07c, 38e2305 | `draft.*`, `mcpRpc`, `MCP_HEADERS`; e2e `PING_ID`, `previewTestCase`, `testCaseUrl` |
+| T10a | Fixed | 7bca07c, 8d7e8c3 | finally, resetDatabase(), redundant deletes removed |
+| T11 | Fixed | 38e2305 | `playwright.base.ts` |
+| T12 | Fixed | 4bc4754 | `*-unit.test.ts` for tree, number ranges, fake data |
+| T13a | Partly fixed | 4bc4754 | shadowed `test` renamed, help.test cleaned; the big `it`s are not split |
+| T14 | Partly fixed | 38e2305 | `:42` catch removed; the `waitForTimeout`s stay (docs tool) |
+| T15 | Fixed | 7bca07c | comment in the shim |
+| 5.3 | Partly fixed | 7bca07c, 4eba3ea, 5bd5b1d, c4bfe31, 4a9b982 | covered: admin messages/warning, GlobalVariables name, reset 404/negative, DESTINATION branches + currentJwt, session subscribe/guards/close/TEXT, hub failure modes, runner deleted/unresolvable/progress, number range retry/busy, subscribe-service HTTP, demo data previews. Not: direct unit tests of preview/copy-nodes/export-import, LiveService websocket auth, server.ts served/shutdown wiring |
+| D1 | Open – decision needed | – | ⚖ redirect URIs unchanged; current state documented in the technical docs (§9) |
+| D2 | Open – decision needed | – | ⚖ names unchanged; the collision is documented (§9) |
+| D3 | Fixed | 81786a8 | `app/router/package-lock.json`, `builder: npm-ci` |
+| D4 | Fixed | ffc35e5 | layout, services, model, security, tests per kind, build; the optional mta.test check of the doc table not done |
+| D5 | Fixed | ffc35e5 | "Development workflow" in README and technical docs |
+| D6 | Open – decision needed | – | ⚖ engines/.nvmrc unchanged (CI uses Node 22 per engines) |
+| D7 | Fixed | 32819a0 | archived with a note, links adjusted |
+| D8 | Fixed | 32819a0 | .env*, coverage/, *.tgz; Terraform lock no longer ignored (not committed: stack not applied here) |
+| D9 | Partly fixed | ffc35e5 | documented; the per-app devDependencies are kept - the UI5 CLI only finds custom tasks declared in the app's package.json (verified: build fails without) |
+| D10 | Fixed | 70144cc | `.gitattributes`, `.editorconfig`, LF sync script; `--renormalize` changed nothing in the index (already LF), working copy re-checked out |
+| D11 | Partly fixed | 81786a8 | `repository` field, fixed mtar name `aem-suite.mtar` in the docs; no set-version script/CHANGELOG |
+| D12 | Fixed | 81786a8 | caret ranges with tested minimum, `npm dedupe`; the second @sap/cds is bundled in cds-dk and cannot be deduped |
+| D13 | Fixed | 81786a8 | health check `/health`, disk quota srv, memory/disk db-deployer |
+| D14 | Open – not done | – | caching vs. cachebuster needs a choice; not changed |
+| D15 | Fixed | 81786a8 | `mbt` devDependency, `npm run build` / `npm run deploy` |
+| D16 | Fixed | 2a5769a | local README, root README, image pinned to 10.26.0, `${SOLACE_ADMIN_PASSWORD:-admin}` |
+| D17 | Open – not done | – | optional LICENSE/CONTRIBUTING not added |
+
 Severity: **High** = bug, security issue or a broken quality gate · **Medium** = maintenance cost that grows with the code · **Low** = local cleanup.
 
 Items marked **⚖ Decision** need a decision from the owner (security policy, deployment landscape, product behaviour) before anyone changes them.
