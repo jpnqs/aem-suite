@@ -7,9 +7,9 @@
     width="100%">
     <OverflowToolbar style="Clear">
       <ObjectStatus
-        text="{path: 'payload', formatter: 'handler.statusText'}"
-        state="{path: 'payload', formatter: 'handler.statusState'}"
-        icon="{path: 'payload', formatter: 'handler.statusIcon'}" />
+        text="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusText'}"
+        state="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusState'}"
+        icon="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusIcon'}" />
       <ToolbarSpacer />
       <Button
         icon="sap-icon://sys-help"
@@ -23,6 +23,7 @@
         press="handler.onFormat" />
     </OverflowToolbar>
     <ce:CodeEditor
+      id="payloadEditor"
       type="json"
       value="{payload}"
       editable="{ui>/isEditable}"

@@ -80,23 +80,6 @@ sap.ui.define(
     return helpPopover;
   }
 
-  function partsOf(control) {
-    // control is the editor or the format button; both live in the section's VBox
-    var vbox = control.getParent();
-    while (vbox && !vbox.isA("sap.m.VBox")) {
-      vbox = vbox.getParent();
-    }
-    var find = function (type) {
-      return vbox.findAggregatedObjects(true, function (c) {
-        return c.isA(type);
-      })[0];
-    };
-    return {
-      editor: find("sap.ui.codeeditor.CodeEditor"),
-      status: find("sap.m.ObjectStatus")
-    };
-  }
-
   /** What the status line says about a payload: { text, state, icon } - decided once, for the bindings and while typing. */
   function status(text) {
     var err = JsonTemplate.validate(text);
@@ -107,45 +90,47 @@ sap.ui.define(
     };
   }
 
-  /** While typing the payload binding is not updated yet, so the status control is set directly. */
-  function show(control, text) {
-    var s = status(text);
-    control.setText(s.text);
-    control.setState(s.state);
-    control.setIcon(s.icon);
+  /**
+   * The payload the status is about: what is being typed (aem>/typedPayload, set while typing - the payload binding
+   * is only updated when the editor loses the focus), else the bound payload.
+   */
+  function current(bound, typed) {
+    return typed !== null && typed !== undefined ? typed : bound;
   }
 
   return {
-    statusText: function (text) {
-      return status(text).text;
+    // formatters of the status line: parts [payload, aem>/typedPayload]
+    statusText: function (bound, typed) {
+      return status(current(bound, typed)).text;
     },
 
-    statusState: function (text) {
-      return status(text).state;
+    statusState: function (bound, typed) {
+      return status(current(bound, typed)).state;
     },
 
-    statusIcon: function (text) {
-      return status(text).icon;
+    statusIcon: function (bound, typed) {
+      return status(current(bound, typed)).icon;
     },
 
     onLiveChange: function (event) {
-      show(partsOf(event.getSource()).status, event.getParameter("value"));
+      event.getSource().getModel("aem").setProperty("/typedPayload", event.getParameter("value"));
     },
 
     onHelp: function (event) {
       getHelpPopover(event.getSource()).openBy(event.getSource());
     },
 
+    /** Formats the payload in the binding context of the page (the editor follows the binding). */
     onFormat: function (event) {
-      var parts = partsOf(event.getSource());
-      var ctx = parts.editor.getBindingContext();
+      var button = event.getSource();
+      var ctx = button.getBindingContext();
+      var aem = button.getModel("aem");
       try {
-        var formatted = JsonTemplate.format(parts.editor.getValue());
-        parts.editor.setValue(formatted);
+        var formatted = JsonTemplate.format(current(ctx && ctx.getProperty("payload"), aem.getProperty("/typedPayload")) || "");
         if (ctx) {
           ctx.setProperty("payload", formatted);
         }
-        show(parts.status, formatted);
+        aem.setProperty("/typedPayload", formatted);
       } catch (e) {
         MessageToast.show("Cannot format - invalid JSON: " + e.message);
       }

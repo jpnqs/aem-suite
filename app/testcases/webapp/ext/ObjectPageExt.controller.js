@@ -10,7 +10,8 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension", "sap/ui/model/json/JSONMod
   return ControllerExtension.extend("com.aem.suite.testcases.ext.ObjectPageExt", {
     override: {
       onInit: function () {
-        this.base.getView().setModel(new JSONModel({ isFolder: false }), "aem");
+        // typedPayload: the payload being typed (PayloadSection.js), null = the bound one
+        this.base.getView().setModel(new JSONModel({ isFolder: false, typedPayload: null }), "aem");
       },
       routing: {
         onAfterBinding: function (context) {
@@ -18,6 +19,8 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension", "sap/ui/model/json/JSONMod
             return;
           }
           var that = this;
+          // another object (or the draft of this one): nothing typed yet
+          this.base.getView().getModel("aem").setProperty("/typedPayload", null);
           context.requestProperty("kind").then(function (kind) {
             var isFolder = kind === "FOLDER";
             var view = that.base.getView();
