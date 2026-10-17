@@ -12,7 +12,7 @@
       <VBox width="20rem" height="100%" class="aemHelpNav">
         <VBox class="aemHelpSearch">
           <SearchField
-            placeholder="Search the help"
+            placeholder="{i18n>view.searchTheHelp}"
             value="{doc>/query}"
             liveChange=".onSearch"
             search=".onSearch"

@@ -14,6 +14,11 @@ sap.ui.define(
     }
 
     return Controller.extend("com.aem.suite.help.controller.Main", {
+      /** A text of the app's bundle (i18n/i18n.properties); args fill {0}, {1} ... */
+      _text: function (key, args) {
+        return this.getOwnerComponent().getModel("i18n").getResourceBundle().getText(key, args);
+      },
+
       onInit: function () {
         this._doc = new JSONModel({
           ready: false,
@@ -79,7 +84,7 @@ sap.ui.define(
           .catch(
             function (e) {
               this._doc.setProperty("/ready", true);
-              this._doc.setProperty("/error", "The help could not be loaded: " + Actions.errorText(e));
+              this._doc.setProperty("/error", this._text("error.notLoaded", [Actions.errorText(e)]));
             }.bind(this)
           );
       },
@@ -121,8 +126,8 @@ sap.ui.define(
           "/matches",
           query
             ? visible.length
-              ? visible.length + " of " + total + " sections mention \"" + query + "\""
-              : "Nothing found for \"" + query + "\""
+              ? this._text("search.matches", [visible.length, total, query])
+              : this._text("search.nothing", [query])
             : ""
         );
       },

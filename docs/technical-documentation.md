@@ -413,7 +413,6 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | `MessageSection.*`, `PayloadSection.*`, `JsonTemplate.ts` | Custom sections; JSON handling that tolerates `{{…}}` outside strings. |
 | `ObjectPageExt.controller.ts` | Hides test-case-only parts for folders (manifest `visible` expressions are evaluated before data is loaded). |
 | `TreeRules.ts` | Tree hooks: create and drop only in folders/root. Preloaded in `Component.js` because FE resolves hooks synchronously. |
-| `Prefs.js` | Browser-local preferences (last brokers, run settings). |
 
 ### 8.2a Shared UI modules (`app/_shared`)
 
@@ -569,7 +568,7 @@ The live views (Test Cases run progress, Live Subscriber) use WebSockets through
 | Payload assertions / round-trip checks | `test-runner.ts`: subscribe before publishing (use `SolaceSession.subscribe`/`onMessage`), new result fields in `RunResults` |
 | Other protocols (MQTT, AMQP, REST) | implement the `Publisher` interface and route in `solace/connector.ts` per broker setting |
 | Scaling beyond one instance | replace `subscription-hub` state with a shared store, enable the websocket Redis adapter |
-| Translations | i18n bundles in the apps; annotation texts are English literals today |
+| Translations | Add `i18n_<lang>.properties` next to each bundle: `_i18n/i18n.properties` (CDS field titles, annotations - CAP serves them in the `$metadata` of the request's language) and `app/<app>/webapp/i18n/i18n.properties` (views, fragments, code, `{{…}}` in the manifests). Not translatable yet: the launchpad tiles (`app/launchpad/webapp/index.html`, they repeat the apps' titles - `test/launchpad.test.ts` checks that), the computed `kindText` and the server's messages |
 
 ## 14. Troubleshooting
 

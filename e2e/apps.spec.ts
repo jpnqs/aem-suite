@@ -69,5 +69,8 @@ test.describe('apps (admin)', () => {
     await expect(page.getByText('AEM Test Suite – User Guide').first()).toBeVisible()
     await page.getByText('11. Use an AI assistant (MCP)', { exact: true }).first().click()
     await expect(page.getByText('claude mcp add', { exact: false }).first()).toBeVisible()
+    // the search says how many sections mention the text (a text of the app's i18n bundle)
+    await page.getByPlaceholder('Search the help').fill('faker')
+    await expect(page.getByText(/^\d+ of \d+ sections mention "faker"$/)).toBeVisible()
   })
 })
