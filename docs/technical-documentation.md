@@ -505,6 +505,7 @@ npm run build:ui    # ui5 build of all apps, as the MTA build does it
 - `app/*/webapp/shared/*` are **generated**: edit `app/_shared`, run `npm run sync:ui`, commit both.
 - The server code uses the **cds-typer** models (`import { TestRuns } from '#cds-models/aem/suite'`): entities for queries and types for rows and enums instead of hand-written shapes. `@cds-models` is generated and not committed; `npm run typecheck`, `npm test`, `cds watch` and the e2e server generate it first, `cds build` puts it into `gen/srv`. `@singular` in the CDS fixes the class names cds-typer would derive badly (`TestCas`, a code list named like its enum type).
 - The UI5 tooling (`@ui5/cli`, `ui5-task-zipper`, `ui5-tooling-transpile`, `@sapui5/types`) is installed once at the root (`npm install` / `npm ci`); the apps' own `package.json` files only name the custom tasks their `ui5.yaml` uses, which the UI5 CLI needs to find them.
+- Versions: `npm run set-version -- <version>` (`scripts/set-version.js`) sets one version in `mta.yaml`, the root and app `package.json` files and the manifests; `test/version.test.ts` fails when they differ. Changes are listed in `CHANGELOG.md`.
 - Line endings are LF (`.gitattributes`, `.editorconfig`).
 - Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
 - CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run verify` and `npm run e2e` on Node 22 for every pull request and every push to `main`; the Playwright report is attached when it fails.

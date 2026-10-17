@@ -68,7 +68,8 @@
     "build:ui": "node scripts/sync-shared-ui.js && node scripts/build-ui.js",
     "build:docs": "node scripts/build-docs.js",
     "build": "mbt build --mtar aem-suite.mtar",
-    "deploy": "cf deploy mta_archives/aem-suite.mtar"
+    "deploy": "cf deploy mta_archives/aem-suite.mtar",
+    "set-version": "node scripts/set-version.js"
   },
   "imports": {
     "#cds-models/*": "./@cds-models/*/index.js"

@@ -233,6 +233,7 @@ On Windows the e2e tests use the installed Edge. Elsewhere install Chromium once
 - After changing CDS, `npm run typer` regenerates the cds-typer models.
 - The UI5 tooling is installed once at the root; the apps' `package.json` files only name the UI5 custom tasks.
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
+- A release: `npm run set-version -- 1.1.0` writes the version into `mta.yaml`, every `package.json` and every manifest (a test checks they agree); add its entries to [CHANGELOG.md](CHANGELOG.md).
 
 More in the [technical documentation](docs/technical-documentation.md#development-workflow).
 
