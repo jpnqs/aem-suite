@@ -61,7 +61,8 @@
         "sap.m": {},
         "sap.ui.core": {},
         "sap.fe.templates": {},
-        "sap.ui.codeeditor": {}
+        "sap.ui.codeeditor": {},
+        "sap.ui.layout": {}
       }
     },
     "contentDensities": {

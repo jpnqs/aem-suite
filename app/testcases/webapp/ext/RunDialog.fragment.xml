@@ -87,7 +87,7 @@
       <VBox class="sapUiSmallMargin" visible="{= !!${run>/runId} }">
         <MessageStrip
           visible="{= ${run>/connectionLost} &amp;&amp; !${run>/finished} }"
-          text="Live progress connection lost - reconnecting. The result is checked every few seconds meanwhile."
+          text="Live progress connection lost - reconnecting. Meanwhile the dialog checks every few seconds whether the run has finished."
           type="Warning"
           showIcon="true"
           class="sapUiSmallMarginBottom" />
@@ -127,6 +127,10 @@
             infoState="Error"
             wrapping="true" />
         </List>
+        <Text
+          visible="{= ${run>/moreProblems} > 0 }"
+          text="… and {run>/moreProblems} more - see all of them with Open Results."
+          class="sapUiTinyMarginTop" />
       </VBox>
     </content>
     <beginButton>

@@ -53,6 +53,8 @@ sap.ui.define(
         done: 0,
         passed: 0,
         failed: 0,
+        /** failures beyond MAX_PROBLEMS (not listed in the dialog) */
+        moreProblems: 0,
         finished: false,
         aborted: false,
         connectionLost: false
@@ -88,13 +90,17 @@ sap.ui.define(
 
       /**
        * Reads the run itself: catches up if it finished before the live context was entered, and ends the wait
-       * when no progress arrives (connection lost, or the run was aborted on the server).
+       * when no progress arrives (connection lost, or the run was aborted on the server). The run's counts are
+       * written when it ends; the total is right from the start (the dialog's own estimate is not for folders).
        */
       function poll(runId) {
         var binding = model.bindContext("/TestRuns(" + runId + ")");
         return binding
           .requestObject()
           .then(function (r) {
+            if (r) {
+              state.setProperty("/total", r.totalCount);
+            }
             if (r && r.status !== "RUNNING") {
               state.setProperty("/done", r.totalCount);
               state.setProperty("/passed", r.passedCount);
@@ -129,6 +135,7 @@ sap.ui.define(
                 return c.getObject();
               })
             );
+            state.setProperty("/moreProblems", Math.max(0, state.getProperty("/failed") - contexts.length));
           })
           .catch(function () {
             /* details remain available in the results */
@@ -421,8 +428,8 @@ sap.ui.define(
       });
     }
 
-    /** IDs of the selected nodes that are saved; tells the user if unsaved drafts were left out. */
-    function selectActiveIds(contexts) {
+    /** The selected nodes that are saved; tells the user if unsaved drafts were left out. */
+    function activeContexts(contexts) {
       var all = contexts || [];
       var active = all.filter(function (c) {
         return c.getProperty("IsActiveEntity") !== false;
@@ -430,7 +437,11 @@ sap.ui.define(
       if (active.length !== all.length) {
         MessageToast.show("Unsaved drafts are skipped");
       }
-      return active.map(function (c) {
+      return active;
+    }
+
+    function idsOf(contexts) {
+      return contexts.map(function (c) {
         return c.getProperty("ID");
       });
     }
@@ -438,7 +449,12 @@ sap.ui.define(
     return {
       /** List report toolbar action: saves the selected test cases / folders (everything if nothing is selected) as a JSON file. */
       exportSelected: function (context, selectedContexts) {
-        return exportNodes(this, selectActiveIds(selectedContexts)).catch(showError);
+        var ids = idsOf(activeContexts(selectedContexts));
+        // only unsaved drafts selected: nothing to export (no ids would mean "everything")
+        if ((selectedContexts || []).length && !ids.length) {
+          return;
+        }
+        return exportNodes(this, ids).catch(showError);
       },
 
       /** Object page header action: saves this test case or folder (with everything below) as a JSON file. */
@@ -494,7 +510,7 @@ sap.ui.define(
       /** List report toolbar action (multi selection): copies the selected test cases and folders. */
       copySelected: function (context, selectedContexts) {
         var api = this;
-        var ids = selectActiveIds(selectedContexts);
+        var ids = idsOf(activeContexts(selectedContexts));
         if (!ids.length) {
           return;
         }
@@ -517,11 +533,12 @@ sap.ui.define(
 
       /** List report toolbar action (multi selection). */
       runSelected: function (context, selectedContexts) {
-        var ids = selectActiveIds(selectedContexts);
-        if (!ids.length) {
+        var active = activeContexts(selectedContexts);
+        if (!active.length) {
           return;
         }
-        var label = ids.length === 1 ? (selectedContexts || [])[0].getProperty("name") : ids.length + " test cases";
+        var ids = idsOf(active);
+        var label = ids.length === 1 ? active[0].getProperty("name") : ids.length + " test cases";
         return openRunDialog(this, ids, label).catch(showError);
       },
 

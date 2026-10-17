@@ -271,7 +271,8 @@
             </Column>
           </columns>
           <items>
-            <ColumnListItem type="Active">
+            <!-- the selection is part of the message, so it stays on it when new rows are put on top -->
+            <ColumnListItem type="Active" selected="{state>selected}">
               <cells>
                 <Text text="{state>time}" wrapping="false" class="aemMono aemMuted" />
                 <ObjectIdentifier title="{state>topic}" text="{state>correlationId}" class="aemMono" />

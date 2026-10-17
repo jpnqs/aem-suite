@@ -93,6 +93,8 @@ interface LiveMessage {
   deliveryMode: string;
   size: string;
   savedId?: string;
+  /** the row is selected (bound two-way to the table row) */
+  selected?: boolean;
 }
 
 interface SelectedMessage extends LiveMessage {
@@ -341,14 +343,14 @@ export default class Main extends Controller {
         await this.odata().submitBatch("$auto");
         id = existing.getProperty("ID") as string;
       } else {
-        const created = this.presetBinding().create(data);
-        await created.created();
-        id = created.getProperty("ID") as string;
+        id = await this.create(this.presetBinding(), data);
       }
       this.state.setProperty("/presetId", id);
       MessageToast.show(existing ? `Setup "${name}" updated` : `Setup "${name}" saved`);
       return true;
     } catch (e) {
+      // a rejected change would otherwise stay pending and be sent again with the next request
+      await this.presetBinding().resetChanges().catch(() => undefined);
       MessageBox.error(errorText(e));
       return false;
     }
@@ -632,15 +634,16 @@ export default class Main extends Controller {
     MessageToast.show("Payload copied");
   }
 
-  /** Persists the selected message; returns the context of the saved entity. */
-  private async save(): Promise<Context | undefined> {
+  /** Persists the selected message (once); returns the ID of the saved entity. */
+  private async save(): Promise<string | undefined> {
     const sel = this.state.getProperty("/selected") as SelectedMessage | null;
     if (!sel) return undefined;
-    if (sel.savedId) return this.odata().bindContext(`/ReceivedMessages(${sel.savedId})`).getBoundContext() as Context;
+    if (sel.savedId) return sel.savedId;
 
     // the subscription the message came from - the form may show another one by now
     const list = this.odata().bindList("/ReceivedMessages");
-    const ctx = list.create({
+    try {
+      const id = await this.create(list, {
       broker_ID: sel.origin.brokerId,
       source: sel.origin.sourceLabel,
       sourceType: sel.origin.sourceType,
@@ -649,16 +652,29 @@ export default class Main extends Controller {
       contentType: sel.contentType,
       userProperties: sel.userProperties,
       correlationId: sel.correlationId,
-      deliveryMode: sel.deliveryMode,
-      receivedAt: sel.receivedAt
-    });
-    await ctx.created();
-    const id = ctx.getProperty("ID") as string;
-    this.state.setProperty("/selected/savedId", id);
-    const messages = this.state.getProperty("/messages") as LiveMessage[];
-    const row = messages.find((m) => m.seq === sel.seq && m.receivedAt === sel.receivedAt);
-    if (row) row.savedId = id;
-    return ctx;
+        deliveryMode: sel.deliveryMode,
+        receivedAt: sel.receivedAt
+      });
+      this.state.setProperty("/selected/savedId", id);
+      const messages = this.state.getProperty("/messages") as LiveMessage[];
+      const row = messages.find((m) => m.seq === sel.seq && m.receivedAt === sel.receivedAt);
+      if (row) row.savedId = id;
+      return id;
+    } finally {
+      list.destroy();
+    }
+  }
+
+  /** Creates an entity in the list; a failed creation is taken back, so it is not sent again with the next request. */
+  private async create(list: ODataListBinding, data: Record<string, unknown>): Promise<string> {
+    const ctx = list.create(data);
+    try {
+      await ctx.created();
+    } catch (e) {
+      await list.resetChanges().catch(() => undefined);
+      throw e;
+    }
+    return ctx.getProperty("ID") as string;
   }
 
   public async onSave(): Promise<void> {
@@ -672,9 +688,15 @@ export default class Main extends Controller {
 
   public async onSaveAsTestCase(): Promise<void> {
     try {
-      const ctx = await this.save();
-      if (!ctx) return;
-      const { ID: testCaseId } = await invokeAction<{ ID: string }>(this.odata(), "SubscribeService.createTestCase(...)", {}, ctx);
+      const id = await this.save();
+      if (!id) return;
+      const message = this.odata().bindContext(`/ReceivedMessages(${id})`);
+      let testCaseId: string;
+      try {
+        ({ ID: testCaseId } = await invokeAction<{ ID: string }>(this.odata(), "SubscribeService.createTestCase(...)", {}, message.getBoundContext() as Context));
+      } finally {
+        message.destroy();
+      }
       MessageBox.success("Test case created.", {
         actions: ["Open Test Case", MessageBox.Action.CLOSE],
         emphasizedAction: "Open Test Case",
