@@ -416,7 +416,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 `Apps.js` (the app catalog: key, launchpad intent, icon and required role of every app – `test/launchpad.test.ts` compares it with the launchpad tiles and the manifests), `Actions.js` (error text, `invokeAction` that destroys the operation binding afterwards), `Help.js` (Help buttons, section per app), `LiveSocket.js` (WebSocket client with reconnect, used by the Run dialog and the Live Subscriber), `Navigation.js` (to another app by its key, inside or outside the launchpad) and `MyEntriesFilter.controller.js` (prefills the "Created by" / "Started by" filter once per app start with `currentUser()`; test cases and runs). TypeScript apps get `.d.ts` files too.
 
-Each HTML5 app is deployed on its own, so every app has a **generated copy** in `webapp/shared` and loads it under its own namespace (`com/aem/suite/<app>/shared/...`). Edit only `app/_shared`, then run `npm run sync:ui`; `test/shared-ui.test.ts` fails when a copy is out of date.
+Each HTML5 app is deployed on its own, so every app has a **generated copy** of the modules it uses in `webapp/shared` and loads them under its own namespace (`com/aem/suite/<app>/shared/...`). `scripts/sync-shared-ui.js` finds them in the app's files (`.../shared/Help`, `com.aem.suite.<app>.shared.Help` in a manifest) and adds what those modules load themselves (`./Navigation`); an app that uses none (Help) has no `shared` folder. Edit only `app/_shared`, then run `npm run sync:ui`; `test/shared-ui.test.ts` fails when a copy is out of date.
 
 ### 8.3 Conventions and pitfalls
 
