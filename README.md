@@ -261,6 +261,8 @@ npm run deploy:dev     # dev/test spaces: cf deploy mta_archives/aem-suite.mtar 
 
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.
 
+**One space per subaccount**: the role collection names are fixed and unique per subaccount, so deploy the suite to only one space of a subaccount. A second space (e.g. dev and test side by side) needs its own subaccount; deploying it into the same subaccount fails or takes over the role collections of the first one.
+
 The MTA build runs `cds build --production` (which compiles the TypeScript), `node scripts/build-docs.js` (copies the user guide next to the server for the Help app). Every UI app is an `html5` module: `ui5 build` writes a zip (`ui5-task-zipper`), and `aem-suite-app-deployer` uploads all zips to the HTML5 Application Repository. `node scripts/build-ui.js` runs the same builds locally.
 
 **SAP Build Work Zone**: the apps carry `sap.cloud.service: aemsuite` and the MTA creates the matching instance-level destinations, so after deployment they appear in Work Zone (*Channel Manager* → *HTML5 Apps* → refresh, then add them in the *Content Manager* to a group, a role and a site). Details in the [technical documentation](docs/technical-documentation.md#12-build-and-deployment-cloud-foundry).

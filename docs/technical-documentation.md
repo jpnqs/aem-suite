@@ -443,7 +443,7 @@ Each HTML5 app is deployed on its own, so every app needs the modules it uses un
 - Data visibility: all testers share test cases, runs and saved messages (team workspace); the "my entries" filter is a UI default, not an authorization. Subscriptions can only be stopped by their owner.
 - Broker passwords: see 7.3. Destination credentials stay in the BTP destination service.
 - **XSUAA redirect URIs** (`mta.yaml`, `oauth2-configuration.redirect-uris`): only the standalone approuter's own route, `~{app-api/app-protocol}://~{app-api/app-uri}/**` (the `app-api` property of module `aem-suite`, so it follows org/space and custom routes of the module). Work Zone does not need an entry: it logs in with its own XSUAA and exchanges the token (destination `aem-suite-auth`). The callback of local MCP clients, `http://localhost:8765/**` (section 6, "Connecting a client"), is only in the extension descriptor `dev.mtaext`: deploy dev/test spaces with `cf deploy mta_archives/aem-suite.mtar -e dev.mtaext` (`npm run deploy:dev`). Local MCP clients only work against spaces deployed that way. `test/mta.test.ts` keeps wildcards over `${default-domain}` and localhost out of `mta.yaml`.
-- **Role collection names** are fixed (`AEM_Suite_Admin`, `AEM_Suite_Tester` in `xs-security.json`). Role collection names are unique per subaccount, so a second deployment (another space) in the same subaccount collides with the first one (open decision D2).
+- **Role collection names** are fixed (`AEM_Suite_Admin`, `AEM_Suite_Tester` in `xs-security.json`) on purpose: users and Work Zone roles can rely on stable names. Role collection names are unique per subaccount, so **the suite is deployed to one space per subaccount**. A second deployment (another space) in the same subaccount collides with the first one; give each landscape (dev, test, prod) its own subaccount.
 - AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
 - Local development uses mocked users (`package.json` → `cds.requires.[development].auth`): `admin/admin` (Admin+Tester), `tester/tester` (Tester). The WebSocket is anonymous locally (plugin behaviour with mocked auth); events are isolated by context IDs.
 
@@ -545,6 +545,8 @@ npm run deploy:dev # dev/test spaces: cf deploy mta_archives/aem-suite.mtar -e d
 | `aem-suite-db` | HDI container (HANA Cloud required in the space) |
 | `aem-suite-destination` | destination service (lite), `HTML5Runtime_enabled: true` |
 | `aem-suite-html5-repo-host`, `aem-suite-html5-runtime` | HTML5 Application Repository, plans `app-host` (content) and `app-runtime` (standalone approuter) |
+
+**One space per subaccount** (section 9): the role collections have fixed names, so do not deploy a second copy into another space of the same subaccount.
 
 After deployment: assign role collections, create destinations for DESTINATION brokers (layout in 7.3). `test/data` is not part of the build; `db/data` (code lists) is.
 

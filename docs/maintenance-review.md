@@ -81,7 +81,7 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | T15 | Fixed | 7bca07c | comment in the shim |
 | 5.3 | Fixed | 7bca07c, 748b69c, 4eba3ea, 5bd5b1d, c4bfe31, 4a9b982 | all listed gaps have tests now, incl. direct tests of preview, copy-nodes and the import parsing, the LiveService context isolation and the server.ts listeners. The websocket *login* cannot be tested locally (mocked users let anonymous clients in). Found and fixed on the way: emitLive was rejected outside a request (748b69c) |
 | D1 | Fixed | (D1 commit) | redirect URIs: only the approuter's route (`app-api`); `http://localhost:8765/**` only via `dev.mtaext` (`npm run deploy:dev`); test/mta.test.ts keeps the wildcard out |
-| D2 | Open – decision needed | – | ⚖ names unchanged; the collision is documented (§9) |
+| D2 | Accepted – documented | (D2 commit) | fixed names kept by decision; "one space per subaccount" documented in the README deploy section and the technical docs §9/§12 |
 | D3 | Fixed | 81786a8 | `app/router/package-lock.json`, `builder: npm-ci` |
 | D4 | Fixed | ffc35e5 | layout, services, model, security, tests per kind, build; the optional mta.test check of the doc table not done |
 | D5 | Fixed | ffc35e5 | "Development workflow" in README and technical docs |
