@@ -20,6 +20,14 @@ test.describe('apps (admin)', () => {
     await expect(page.getByText('"broker": "{{broker.name}}"').first()).toBeVisible()
   })
 
+  test('a folder page has no payload and no Preview', async ({ page }) => {
+    // demo folder "Orders" (test/data/aem.suite-TestCases.csv)
+    await page.goto(testCaseUrl('f1000000-0000-4000-8000-000000000001'))
+    await expect(page.getByRole('button', { name: 'Run…' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Preview' })).toHaveCount(0)
+    await expect(page.getByText('Valid JSON')).toHaveCount(0)
+  })
+
   test('Test Runs opens', async ({ page }) => {
     // not "no runs yet": the run dialog specs start runs on the same server in parallel
     await openApp(page, apps.runs)

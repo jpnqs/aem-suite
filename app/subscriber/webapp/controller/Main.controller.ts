@@ -22,11 +22,13 @@ import Actions from "../shared/Actions";
 import Help from "../shared/Help";
 import LiveSocket from "../shared/LiveSocket";
 import Navigation from "../shared/Navigation";
+import Prefs from "../shared/Prefs";
 
 const MAX_MESSAGES = 500;
 const FLUSH_MS = 250;
 const HEARTBEAT_MS = 60 * 1000;
-const PREFS_KEY = "aem-suite.subscriber";
+/** shared/Prefs key ("aem-suite.subscriber" in localStorage, as before) */
+const PREFS_KEY = "subscriber";
 const MAX_TOPIC_HISTORY = 30;
 const MAX_BROKERS = 200;
 /** the server allows a few per user (cds.aemSuite.subscriptions.maxPerUser) */
@@ -533,7 +535,7 @@ export default class Main extends Controller {
         onClose: async (action: string | null) => {
           if (action !== "Stop others") return;
           for (const s of others) await invokeAction(this.odata(), "/stop(...)", { subscriptionId: s.subscriptionId }).catch(() => undefined);
-          MessageToast.show(`${others.length} subscription(s) stopped`);
+          MessageToast.show(others.length === 1 ? "1 subscription stopped" : `${others.length} subscriptions stopped`);
         }
       });
     } catch (e) {
@@ -718,19 +720,11 @@ function splitTopics(text: string): string[] {
 }
 
 function loadPrefs(): SubscriberPrefs {
-  try {
-    return (JSON.parse(window.localStorage.getItem(PREFS_KEY) ?? "{}") as SubscriberPrefs) ?? {};
-  } catch {
-    return {};
-  }
+  return Prefs.get<SubscriberPrefs>(PREFS_KEY, {}) ?? {};
 }
 
 function savePrefs(prefs: SubscriberPrefs): void {
-  try {
-    window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  } catch {
-    /* storage unavailable */
-  }
+  Prefs.set(PREFS_KEY, prefs);
 }
 
 function openTestCase(id: string): void {

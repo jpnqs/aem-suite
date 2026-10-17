@@ -140,7 +140,8 @@
                       "width": "5rem",
                       "horizontalAlign": "Center",
                       "properties": [
-                        "kind"
+                        "kind",
+                        "kindText"
                       ],
                       "position": {
                         "placement": "After",

@@ -3,8 +3,9 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension", "sap/ui/model/json/JSONMod
 
   /**
    * Object page: folders only show name, description and variables.
-   * Manifest "visible" expressions are evaluated at templating time (no data yet), so the
-   * test-case-only parts are toggled here once the page is bound. Fragments bind to aem>/isFolder.
+   * Manifest "visible" expressions are evaluated at templating time (no data yet) - a runtime binding on kind
+   * does not hide the custom action either (e2e/apps.spec.ts) - so the test-case-only parts are toggled here once
+   * the page is bound. Fragments bind to aem>/isFolder.
    */
   return ControllerExtension.extend("com.aem.suite.testcases.ext.ObjectPageExt", {
     override: {
@@ -21,6 +22,7 @@ sap.ui.define(["sap/ui/core/mvc/ControllerExtension", "sap/ui/model/json/JSONMod
             var isFolder = kind === "FOLDER";
             var view = that.base.getView();
             view.getModel("aem").setProperty("/isFolder", isFolder);
+            // the stable ids Fiori elements gives the custom section and action of the manifest
             ["fe::CustomSection::payload", "fe::CustomAction::preview"].forEach(function (id) {
               var control = view.byId(id);
               if (control) {

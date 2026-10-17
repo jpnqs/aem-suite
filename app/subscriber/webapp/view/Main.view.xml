@@ -185,7 +185,6 @@
                   class="sapUiTinyMarginBegin" />
               </HBox>
               <List
-                id="topicList"
                 items="{path: 'state>/topics', templateShareable: false}"
                 mode="{= ${state>/subscriptionId} ? 'None' : 'Delete' }"
                 delete=".onDeleteTopic"

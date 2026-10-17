@@ -26,12 +26,24 @@ sap.ui.define(
     ["{{broker.msgVpn}}", "Message VPN of that broker"],
     ["{{broker.id}}", "ID of that broker"]
   ];
-  var helpPopover;
-
   /** One popover per view: it is a dependent of the view and is destroyed with it (e.g. when the app is closed in the launchpad). */
+  var POPOVER = "aemPayloadHelp";
+
+  function viewOf(control) {
+    var view = control;
+    while (view && !view.isA("sap.ui.core.mvc.View")) {
+      view = view.getParent();
+    }
+    return view;
+  }
+
   function getHelpPopover(source) {
-    if (helpPopover && !helpPopover.isDestroyed()) {
-      return helpPopover;
+    var view = viewOf(source);
+    var existing = view && view.getDependents().filter(function (d) {
+      return d.data(POPOVER) === true;
+    })[0];
+    if (existing) {
+      return existing;
     }
     var list = new List({
       items: HELP.map(function (h) {
@@ -50,7 +62,7 @@ sap.ui.define(
         );
       }
     });
-    helpPopover = new ResponsivePopover({
+    var helpPopover = new ResponsivePopover({
       title: "Template expressions",
       placement: "Bottom",
       contentWidth: "28rem",
@@ -61,10 +73,7 @@ sap.ui.define(
         list
       ]
     });
-    var view = source;
-    while (view && !view.isA("sap.ui.core.mvc.View")) {
-      view = view.getParent();
-    }
+    helpPopover.data(POPOVER, true);
     if (view) {
       view.addDependent(helpPopover);
     }
@@ -88,25 +97,35 @@ sap.ui.define(
     };
   }
 
-  function show(status, text) {
+  /** What the status line says about a payload: { text, state, icon } - decided once, for the bindings and while typing. */
+  function status(text) {
     var err = JsonTemplate.validate(text);
-    status.setText(err ? "Invalid JSON: " + err : text && text.trim() ? "Valid JSON" : "Empty payload");
-    status.setState(err ? "Error" : "Success");
-    status.setIcon(err ? "sap-icon://error" : "sap-icon://sys-enter-2");
+    return {
+      text: err ? "Invalid JSON: " + err : text && text.trim() ? "Valid JSON" : "Empty payload",
+      state: err ? "Error" : "Success",
+      icon: err ? "sap-icon://error" : "sap-icon://sys-enter-2"
+    };
+  }
+
+  /** While typing the payload binding is not updated yet, so the status control is set directly. */
+  function show(control, text) {
+    var s = status(text);
+    control.setText(s.text);
+    control.setState(s.state);
+    control.setIcon(s.icon);
   }
 
   return {
     statusText: function (text) {
-      var err = JsonTemplate.validate(text);
-      return err ? "Invalid JSON: " + err : text && text.trim() ? "Valid JSON" : "Empty payload";
+      return status(text).text;
     },
 
     statusState: function (text) {
-      return JsonTemplate.validate(text) ? "Error" : "Success";
+      return status(text).state;
     },
 
     statusIcon: function (text) {
-      return JsonTemplate.validate(text) ? "sap-icon://error" : "sap-icon://sys-enter-2";
+      return status(text).icon;
     },
 
     onLiveChange: function (event) {

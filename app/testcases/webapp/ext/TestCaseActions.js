@@ -4,7 +4,7 @@ sap.ui.define(
     "sap/m/MessageToast",
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
-    "com/aem/suite/testcases/ext/Prefs",
+    "com/aem/suite/testcases/shared/Prefs",
     "com/aem/suite/testcases/shared/Actions",
     "com/aem/suite/testcases/shared/Help",
     "com/aem/suite/testcases/shared/LiveSocket",
@@ -143,13 +143,11 @@ sap.ui.define(
       }
       var dialog;
       var preselected = false;
+      /** the broker list of the dialog - taken from its own events (updateFinished comes first), not looked up by id */
+      var brokers;
 
-      // found by what it is, not by its position: the dialog layout may change (a help link once shifted it)
-      /** the broker list (id brokerList in RunDialog.fragment.xml; the id gets the fragment's prefix) */
-      function brokerList() {
-        return dialog.findAggregatedObjects(true, function (c) {
-          return /--brokerList$/.test(c.getId());
-        })[0];
+      function selectedBrokers() {
+        return brokers ? brokers.getSelectedContexts() : [];
       }
 
       /**
@@ -161,8 +159,7 @@ sap.ui.define(
         state.getProperty("/credentials").forEach(function (c) {
           typed[c.brokerId] = c;
         });
-        var rows = brokerList()
-          .getSelectedContexts()
+        var rows = selectedBrokers()
           .map(function (c) {
             return c.getObject();
           })
@@ -186,13 +183,13 @@ sap.ui.define(
 
       /** "5 test cases x 2 brokers x 10 = at least 100 messages; the pauses alone take about 2 min" */
       function updateEstimate() {
-        var brokers = brokerList() ? brokerList().getSelectedContexts().length : 0;
+        var brokerCount = selectedBrokers().length;
         var reps = Math.max(1, Number(state.getProperty("/repetitions")) || 1);
         var delay = Math.max(0, Number(state.getProperty("/delayMs")) || 0);
         var perBroker = testCaseIds.length * reps;
         var text = "";
-        if (brokers && (reps > 1 || delay > 0)) {
-          text = perBroker * brokers + " or more messages (" + testCaseIds.length + " × " + brokers + " broker(s) × " + reps + "; folders send everything below them)";
+        if (brokerCount && (reps > 1 || delay > 0)) {
+          text = perBroker * brokerCount + " or more messages (" + testCaseIds.length + " × " + brokerCount + (brokerCount === 1 ? " broker" : " brokers") + " × " + reps + "; folders send everything below them)";
           if (delay > 0 && perBroker > 1) {
             text += "; the pauses alone take about " + formatDuration((perBroker - 1) * delay);
           }
@@ -213,7 +210,8 @@ sap.ui.define(
         onHelp: function () {
           Help.openForRun();
         },
-        onBrokerSelection: function () {
+        onBrokerSelection: function (event) {
+          brokers = event.getSource();
           syncCredentials();
           updateEstimate();
         },
@@ -231,6 +229,7 @@ sap.ui.define(
         /** Preselects the brokers of the last run, or the only broker there is. */
         onBrokersLoaded: function (event) {
           var list = event.getSource();
+          brokers = list;
           var items = list.getItems();
           if (preselected || !items.length) {
             return;
@@ -257,8 +256,7 @@ sap.ui.define(
             openRun(runId);
             return;
           }
-          var brokerIds = brokerList()
-            .getSelectedContexts()
+          var brokerIds = selectedBrokers()
             .map(function (c) {
               return c.getProperty("ID");
             });

@@ -1,7 +1,10 @@
 sap.ui.define([], function () {
   "use strict";
 
-  /** Per-browser preferences (last used brokers etc.). Never throws - storage may be unavailable. */
+  /**
+   * Per-browser preferences (last used brokers, run settings, the subscriber's form ...), as JSON in localStorage
+   * under "aem-suite.<key>". Never throws - storage may be unavailable.
+   */
   var PREFIX = "aem-suite.";
 
   return {

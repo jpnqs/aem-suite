@@ -129,7 +129,9 @@ sap.ui.define(
       /** Only what needs to be done - empty when all is well. */
       _attention: function (o) {
         var t = this._text.bind(this);
-        if (!o.tester) return [{ text: t("attention.noRole"), state: "Information", icon: "sap-icon://message-information" }];
+        if (!o.tester) {
+          return [{ text: t("attention.noRole"), state: "Information", icon: "sap-icon://message-information" }];
+        }
         var items = [];
         var error = function (text, action, target) {
           items.push({ text: text, state: "Error", icon: "sap-icon://error", action: action, target: target });
@@ -138,12 +140,22 @@ sap.ui.define(
           items.push({ text: text, state: "Information", icon: "sap-icon://message-information", action: action, target: target });
         };
         var brokersLink = o.admin ? "brokers" : null;
-        if (o.resultsFailed) error(t("attention.failedResults", [o.resultsFailed]), t("action.runs"), "runs");
+        if (o.resultsFailed) {
+          error(t("attention.failedResults", [o.resultsFailed]), t("action.runs"), "runs");
+        }
         var failing = o.failingBrokers || [];
-        if (failing.length === 1) error(t("attention.failingBroker", [failing[0]]), t("action.brokers"), brokersLink);
-        if (failing.length > 1) error(t("attention.failingBrokers", [failing.join(", ")]), t("action.brokers"), brokersLink);
-        if (!o.brokers) info(t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
-        if (!o.testCases) info(t("attention.noTestCases"), t("action.testcases"), "testcases");
+        if (failing.length === 1) {
+          error(t("attention.failingBroker", [failing[0]]), t("action.brokers"), brokersLink);
+        }
+        if (failing.length > 1) {
+          error(t("attention.failingBrokers", [failing.join(", ")]), t("action.brokers"), brokersLink);
+        }
+        if (!o.brokers) {
+          info(t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
+        }
+        if (!o.testCases) {
+          info(t("attention.noTestCases"), t("action.testcases"), "testcases");
+        }
         return items;
       },
 

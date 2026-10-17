@@ -12,7 +12,7 @@
     <content>
       <VBox class="sapUiSmallMargin">
         <HBox alignItems="Center">
-          <Label text="Resolve for broker" class="sapUiSmallMarginEnd" />
+          <Label text="Resolve for broker" labelFor="previewBroker" class="sapUiSmallMarginEnd" />
           <Select
             id="previewBroker"
             forceSelection="false"

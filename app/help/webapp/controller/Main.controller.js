@@ -1,6 +1,6 @@
 sap.ui.define(
-  ["sap/ui/core/mvc/Controller", "sap/ui/model/json/JSONModel", "sap/ui/model/Sorter"],
-  function (Controller, JSONModel, Sorter) {
+  ["sap/ui/core/mvc/Controller", "sap/ui/model/json/JSONModel", "sap/ui/model/Sorter", "com/aem/suite/help/shared/Actions"],
+  function (Controller, JSONModel, Sorter, Actions) {
     "use strict";
 
     /** Retries scrolling to a heading while the page settles after rendering. */
@@ -57,7 +57,7 @@ sap.ui.define(
                 var headings = [];
                 try {
                   headings = JSON.parse(s.headings || "[]");
-                } catch {
+                } catch (e) {
                   headings = [];
                 }
                 return {
@@ -79,7 +79,7 @@ sap.ui.define(
           .catch(
             function (e) {
               this._doc.setProperty("/ready", true);
-              this._doc.setProperty("/error", "The help could not be loaded: " + ((e && e.message) || e));
+              this._doc.setProperty("/error", "The help could not be loaded: " + Actions.errorText(e));
             }.bind(this)
           );
       },
