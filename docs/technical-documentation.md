@@ -404,7 +404,9 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 | File | Role |
 |---|---|
-| `TestCaseActions.js` | *Run…* (list and object page), Run dialog with broker selection, password fields for DIRECT brokers, live progress via WebSocket, problem list, *Preview* dialog. |
+| `TestCaseActions.js` | The handlers of the custom actions in the manifest: *Run…*, *Copy*, *Export*, *Import* (list and object page) and the *Preview* dialog. |
+| `RunDialog.js` | The Run dialog: broker selection, password fields for DIRECT brokers, advanced settings, live progress via WebSocket (plus a poll), problem list, *Stop run*. |
+| `FileIO.js` | Export / import as a JSON file: save and pick the file in the browser, dry run, confirmation, import. |
 | `RunDialog.fragment.xml`, `PreviewDialog.fragment.xml` | Dialogs. |
 | `TypeColumn.fragment.xml` | Custom "Type" column of the tree table: a small folder / test case icon (name as tooltip) instead of the type text. Defined under `columns` in the manifest, so `kind` is not part of the `@UI.LineItem`. |
 | `MessageSection.*`, `PayloadSection.*`, `JsonTemplate.js` | Custom sections; JSON handling that tolerates `{{…}}` outside strings. |
