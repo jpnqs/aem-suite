@@ -10,8 +10,11 @@ const { tester, noRole } = users
 
 describe('help (user guide rendered from Markdown)', () => {
   describe('rendering', () => {
-    const guide = renderGuide(fs.readFileSync(path.join(root, 'docs/user-guide.md'), 'utf8'))
+    const markdown = fs.readFileSync(path.join(root, 'docs/user-guide.md'), 'utf8')
+    const guide = renderGuide(markdown)
     const byId = new Map(guide.sections.map((s) => [s.id, s]))
+    /** the anchors of all sections and their sub headings */
+    const allIds = new Set(guide.sections.flatMap((s) => [s.id, ...JSON.parse(s.headings).map((h: { id: string }) => h.id)]))
 
     it('makes the guide sections, the table of contents is not one of them', () => {
       expect(guide.title).toBe('AEM Test Suite – User Guide')
@@ -33,12 +36,6 @@ describe('help (user guide rendered from Markdown)', () => {
     })
 
     it('every link inside the guide leads to a heading of the guide', () => {
-      const markdown = fs.readFileSync(path.join(root, 'docs/user-guide.md'), 'utf8')
-      const allIds = new Set<string>()
-      for (const s of guide.sections) {
-        allIds.add(s.id)
-        for (const h of JSON.parse(s.headings)) allIds.add(h.id)
-      }
       const targets = [...markdown.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1])
       expect(targets.length).toBeGreaterThan(10)
       expect(targets.filter((t) => !allIds.has(t))).toEqual([])
@@ -72,11 +69,6 @@ describe('help (user guide rendered from Markdown)', () => {
       const help = fs.readFileSync(path.join(root, 'app', '_shared', 'Help.js'), 'utf8')
       const table = /var SECTIONS = \{([^}]*)\}/.exec(help)![1]
       const referenced = [...table.matchAll(/(\w+): "([a-z0-9-]+)"/g)].map((m) => ({ key: m[1], id: m[2] }))
-      const allIds = new Set<string>()
-      for (const s of guide.sections) {
-        allIds.add(s.id)
-        for (const h of JSON.parse(s.headings)) allIds.add(h.id)
-      }
       expect(referenced.map((r) => r.key)).toEqual(
         expect.arrayContaining(['brokers', 'variables', 'folders', 'testcases', 'run', 'runs', 'subscriber', 'messages'])
       )
@@ -107,20 +99,20 @@ describe('help (user guide rendered from Markdown)', () => {
       const file = path.join(dir, 'guide.md')
       try {
         await withAemSuiteConfig({ help: { file } }, async () => {
-        fs.writeFileSync(file, '# Guide\n\nHello\n\n## First\n\nOne\n')
-        const first = await GET('/odata/v4/help/Sections?$orderby=number', tester)
-        expect(first.data.value.map((s: { title: string }) => s.title)).toEqual(['Overview', 'First'])
+          fs.writeFileSync(file, '# Guide\n\nHello\n\n## First\n\nOne\n')
+          const first = await GET('/odata/v4/help/Sections?$orderby=number', tester)
+          expect(first.data.value.map((s: { title: string }) => s.title)).toEqual(['Overview', 'First'])
 
-        // the modification time is checked on every request
-        fs.writeFileSync(file, '# Guide\n\nHello\n\n## First\n\nOne\n\n## Second\n\nTwo\n')
-        fs.utimesSync(file, new Date(), new Date(Date.now() + 5000))
-        const second = await GET('/odata/v4/help/Sections?$orderby=number', tester)
-        expect(second.data.value.map((s: { title: string }) => s.title)).toEqual(['Overview', 'First', 'Second'])
+          // the modification time is checked on every request
+          fs.writeFileSync(file, '# Guide\n\nHello\n\n## First\n\nOne\n\n## Second\n\nTwo\n')
+          fs.utimesSync(file, new Date(), new Date(Date.now() + 5000))
+          const second = await GET('/odata/v4/help/Sections?$orderby=number', tester)
+          expect(second.data.value.map((s: { title: string }) => s.title)).toEqual(['Overview', 'First', 'Second'])
 
-        fs.rmSync(file)
-        const gone = await GET('/odata/v4/help/Sections', tester)
-        expect(gone.status).toBe(404)
-        expect(gone.data.error.message).toMatch(/user guide is not available/)
+          fs.rmSync(file)
+          const gone = await GET('/odata/v4/help/Sections', tester)
+          expect(gone.status).toBe(404)
+          expect(gone.data.error.message).toMatch(/user guide is not available/)
         })
       } finally {
         fs.rmSync(dir, { recursive: true, force: true })
