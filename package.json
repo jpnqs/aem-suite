@@ -35,6 +35,7 @@
     "@types/jest": "^30.0.0",
     "@types/markdown-it": "^14.2.0",
     "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
     "@ui5/cli": "^4.0.71",
     "cds-plugin-ui5": "^0.17.4",
     "eslint": "^9.39.5",
@@ -47,6 +48,7 @@
     "typescript-eslint": "^8.71.2",
     "ui5-task-zipper": "^3.7.0",
     "ui5-tooling-transpile": "^3.13.1",
+    "ws": "^8.22.0",
     "yaml": "^2.9.1"
   },
   "scripts": {
