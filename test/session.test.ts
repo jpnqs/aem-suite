@@ -57,6 +57,42 @@ describe('SolaceSession', () => {
     await expect(p).rejects.toThrow(/disconnected/)
     expect(dropped).toHaveBeenCalledTimes(1)
   })
+
+  it('still disposes a session the broker dropped, and only once', async () => {
+    const fake = new FakeSession(true, 'ack')
+    useFake(fake)
+    const s = await SolaceSession.connect(cfg)
+    fake.fire(sol().SessionEventCode.DOWN_ERROR, {})
+    expect(s.isClosed).toBe(true)
+    await s.close()
+    await s.close()
+    expect(fake.disposed).toBe(1)
+  })
+
+  it('binds to a queue, reports a failed bind, and gives up when the broker never answers', async () => {
+    const fake = new FakeSession(true, 'ack')
+    useFake(fake)
+    const s = await SolaceSession.connect(cfg)
+    const events = sol().MessageConsumerEventName
+
+    fake.flow.connectAnswer = events.UP as unknown as string
+    await expect(s.createQueueConsumer('q')).resolves.toBe(fake.flow)
+
+    fake.flow.connectAnswer = events.CONNECT_FAILED_ERROR as unknown as string
+    await expect(s.createQueueConsumer('q')).rejects.toThrow('Cannot bind to queue "q": Unknown Queue')
+
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] })
+    try {
+      fake.flow.connectAnswer = undefined
+      fake.flow.disconnected = false
+      const bind = s.createQueueBrowser('q')
+      jest.advanceTimersByTime(cfg.connectTimeoutMs + 2000)
+      await expect(bind).rejects.toThrow('Cannot bind to queue browser "q": no answer from the broker within 3000 ms')
+      expect(fake.flow.disconnected).toBe(true)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
 })
 
 describe('buildMessage / readMessage', () => {

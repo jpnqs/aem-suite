@@ -39,13 +39,30 @@ export class FakeSolclientSession extends EventEmitter {
   disconnect() {
     setImmediate(() => this.fire(sol().SessionEventCode.DISCONNECTED, {}))
   }
-  dispose() {}
+  disposed = 0
+  dispose() {
+    this.disposed++
+  }
+  /** queue consumers / browsers: a flow that never answers the bind (see flowAnswers) */
+  flow = new FakeFlow()
+  createMessageConsumer() {
+    return this.flow
+  }
+  createQueueBrowser() {
+    return this.flow
+  }
 }
 
 /** A queue browser / consumer: emits messages, acknowledges nothing. */
 export class FakeFlow extends EventEmitter {
   disconnected = false
   acknowledged = 0
+  /** what connect() does: nothing (a broker that never answers), or fire the given event */
+  connectAnswer?: string
+  connect() {
+    const answer = this.connectAnswer
+    if (answer) setImmediate(() => this.emit(answer, { infoStr: 'Unknown Queue' }))
+  }
   disconnect() {
     this.disconnected = true
   }
