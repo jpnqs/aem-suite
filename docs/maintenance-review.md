@@ -11,7 +11,7 @@
 
 ## Status
 
-State of branch `chore/maintenance-review` after working through sections 2–7 (2026-10-17). `npm run verify` and `npm run e2e` pass. Commit = where the change is. The IDs of the previous review in section 7 (B28, U13, T3, T8, T13, T16, T18, ...) are covered by the new IDs they map to. Totals: 60 Fixed, 9 Partly fixed, 5 Open – decision needed, 8 Open – not done, 0 Skipped.
+State of branch `chore/maintenance-review` after working through sections 2–7 (2026-10-17) and the remaining open items (2026-10-18). `npm run verify` and `npm run e2e` pass. Commit = where the change is. The IDs of the previous review in section 7 (B28, U13, T3, T8, T13, T16, T18, ...) are covered by the new IDs they map to. Totals: 72 Fixed, 5 Open – decision needed, 3 Partly fixed, 2 Open – not done.
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
@@ -43,8 +43,8 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | B22 | Fixed | 5cca662 | `type Username : String(200)` |
 | B23 | Fixed | 5cca662 | stored as `repetitionOrder` (`order` is an SQL keyword), shown on the run page and to the agent |
 | B24 | Fixed | 5cca662 | `@assert.unique` on NumberRanges.name |
-| B25 | Open – not done | – | titles still in the UI annotations (belongs to U7) |
-| B26 | Open – not done | – | row-by-row writes and per-message tx/emit not throttled or batched |
+| B25 | Fixed | 72b3ddf, 1f416fa | titles and tooltips on db/schema.cds |
+| B26 | Fixed | e2e4986 | progress emits throttled (250 ms + final), copy inserts one per level, renumbering skips unchanged rows. The per-result UPDATE stays one per row (the B1 failure handling relies on it) |
 | B27 | Open – decision needed | – | ⚖ not changed |
 | U1 | Fixed | 32819a0 | `app/router/resources/` deleted |
 | U2 | Fixed | 4eba3ea | `heartbeat(subscriptionId)` action; `activeSubscriptions` read-only |
@@ -52,34 +52,34 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | U4 | Fixed | b88f001, 4d7b60d | total from the run/RunRef, honest strip text, label from saved node, selection bound to the message, bindings destroyed/reset, "… and N more", launchpad frame options, sap.ui.layout |
 | U5 | Fixed | 522167b | `app/_shared/Apps.js`, Navigation takes the app key; launchpad test compares tiles (incl. icons) and manifests. Backend link strings remain (U8); e2e intents stay test data |
 | U6 | Fixed | 28db6fb | `test/ui5-version.test.ts` |
-| U7 | Open – not done | – | annotation consolidation (@title on the schema, one timestamp wording) not done |
-| U8 | Open – not done | – | not straightforward: intent-based navigation into object pages of draft-enabled entities needs key-parameter handling in the target apps, and standalone the links would disappear; needs browser verification |
-| U9 | Partly fixed | 27432a8, 70144cc | each app gets only the modules it uses, LF copies; copies are still committed (generation in the UI5 build open) |
+| U7 | Fixed | 72b3ddf | titles on the schema, shared variables layout in app/common.cds, "<what> At" for timestamps, semantics in srv and UI in app (rule in the technical docs 8.3) |
+| U8 | Open – not done | 4dfa72b | tried: intent-based navigation opens the Test Cases list (not the test case) inside the launchpad and cannot navigate standalone, so the hash links stay; documented in the technical docs |
+| U9 | Fixed | 27432a8, ab1f95e, b15f46a | no committed copies: a UI5 build task and dev server middleware (scripts/ui5) give every app its modules; checked with ui5 build, cds-tsx serve and e2e. `mbt build` itself could not be run here (no GNU make) |
 | U14 | Fixed | a1423e6 | `ext/RunDialog.js`, `ext/FileIO.js` (flat import chain); new e2e spec for export/import |
 | U15 | Fixed | 4e9c8b1 | `util/SubscriptionSession.ts`, `util/MessageBuffer.ts`, `util/TopicList.ts` (+ Jest test). Start/stop/heartbeat not e2e-tested (needs a broker); controller still ~700 lines |
-| U16 | Open – not done | – | optional TS migration of testcases/ext not started |
-| U17 | Partly fixed | b4fe91f | run dialog finds its broker list via its own events; PayloadSection still walks the tree; the preview action stays id-toggled (a manifest `visible` binding on `kind` was tried and did not hide it - e2e added) |
+| U16 | Fixed | 523eea8 | app/testcases/webapp/ext completely TypeScript (ui5-tooling-transpile, strict); Component.js stays JS |
+| U17 | Fixed | b4fe91f, 9b7fbde | run dialog finds its broker list via its own events; the payload status binds to the view model (aem>/typedPayload) - no tree walk. The preview action stays id-toggled: a manifest `visible` binding on `kind` does not hide it (e2e) |
 | U18 | Fixed | b4fe91f | Prefs in `app/_shared`, used by the subscriber (same storage key) |
-| U19 | Open – not done | – | optional i18n not started |
+| U19 | Partly fixed | 1f416fa, e2ba2bb, 1a3cac7, c75eae6, 5dbc606 | all apps: annotations (_i18n), manifests, views, fragments and code texts in bundles (English). Not yet: the launchpad tiles (static sandbox config), the computed kindText, the server's messages |
 | U20 | Fixed | b4fe91f | one `status(text)`, one popover per view |
-| U21 | Partly fixed | b4fe91f | TypeColumn uses `kindText`; the create menu labels stay in the manifest |
+| U21 | Fixed | b4fe91f, e2ba2bb | TypeColumn uses `kindText`; the create menu labels are `{{kind.folder}}` / `{{kind.testCase}}` of the app bundle (e2e check) |
 | U22 | Fixed | b4fe91f | Help.d.ts complete, unused ids handled, `catch (e)`, `Actions.errorText`, braces, real plurals |
 | T1 | Fixed | 8d7e8c3, aba536d | checks that the app opens, not "no runs" |
 | T2 | Fixed | 8d7e8c3 | fixtures in beforeAll, range reset before each test |
 | T3 | Fixed | 8d7e8c3 | unique names and cleanup after each test (`e2e/cleanup.ts`) |
 | T4 | Fixed | 7bca07c | timestamps instead of wall clock, bounded `waitFor`, fake timers in the session tests |
 | T5 | Fixed | 7bca07c | messages asserted, noRole 403, own-run stop, stats before/after, language check |
-| T6 | Partly fixed | 38e2305 | `.all()` after `toHaveCount`, tile list instead of bare count; FE filter-field ids, `.ace_editor` and the OP route id remain (no accessible handle) |
+| T6 | Partly fixed | 38e2305, 9b7fbde | `.all()` after `toHaveCount`, tile list, the payload editor has our own id; the Fiori elements filter-field ids and the object page route id remain (generated by FE, no handle we can add) |
 | T7 | Fixed | 7bca07c | `runAndWait` in helpers.ts |
 | T8 | Fixed | 7bca07c | `withDestinations`/`useDestinations`, restore instead of delete |
 | T9 | Fixed | 7bca07c, 38e2305 | `draft.*`, `mcpRpc`, `MCP_HEADERS`; e2e `PING_ID`, `previewTestCase`, `testCaseUrl` |
 | T10a | Fixed | 7bca07c, 8d7e8c3 | finally, resetDatabase(), redundant deletes removed |
 | T11 | Fixed | 38e2305 | `playwright.base.ts` |
 | T12 | Fixed | 4bc4754 | `*-unit.test.ts` for tree, number ranges, fake data |
-| T13a | Partly fixed | 4bc4754 | shadowed `test` renamed, help.test cleaned; the big `it`s are not split |
-| T14 | Partly fixed | 38e2305 | `:42` catch removed; the `waitForTimeout`s stay (docs tool) |
+| T13a | Fixed | 4bc4754, 896b8b5 | shadowed `test` renamed, help.test cleaned, the big agent and run tests split; the username test stays one (steps build on each other, one finally) |
+| T14 | Fixed | 38e2305, 9b7fbde | no `waitForTimeout` left: settle() waits for network, busy indicators and animations; the silent catch is gone |
 | T15 | Fixed | 7bca07c | comment in the shim |
-| 5.3 | Partly fixed | 7bca07c, 4eba3ea, 5bd5b1d, c4bfe31, 4a9b982 | covered: admin messages/warning, GlobalVariables name, reset 404/negative, DESTINATION branches + currentJwt, session subscribe/guards/close/TEXT, hub failure modes, runner deleted/unresolvable/progress, number range retry/busy, subscribe-service HTTP, demo data previews. Not: direct unit tests of preview/copy-nodes/export-import, LiveService websocket auth, server.ts served/shutdown wiring |
+| 5.3 | Fixed | 7bca07c, 748b69c, 4eba3ea, 5bd5b1d, c4bfe31, 4a9b982 | all listed gaps have tests now, incl. direct tests of preview, copy-nodes and the import parsing, the LiveService context isolation and the server.ts listeners. The websocket *login* cannot be tested locally (mocked users let anonymous clients in). Found and fixed on the way: emitLive was rejected outside a request (748b69c) |
 | D1 | Open – decision needed | – | ⚖ redirect URIs unchanged; current state documented in the technical docs (§9) |
 | D2 | Open – decision needed | – | ⚖ names unchanged; the collision is documented (§9) |
 | D3 | Fixed | 81786a8 | `app/router/package-lock.json`, `builder: npm-ci` |
@@ -88,15 +88,15 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | D6 | Open – decision needed | – | ⚖ engines/.nvmrc unchanged (CI uses Node 22 per engines) |
 | D7 | Fixed | 32819a0 | archived with a note, links adjusted |
 | D8 | Fixed | 32819a0 | .env*, coverage/, *.tgz; Terraform lock no longer ignored (not committed: stack not applied here) |
-| D9 | Partly fixed | ffc35e5 | documented; the per-app devDependencies are kept - the UI5 CLI only finds custom tasks declared in the app's package.json (verified: build fails without) |
+| D9 | Partly fixed | ffc35e5, ab1f95e | documented; the per-app devDependencies stay - the UI5 CLI only finds custom tasks declared in the app's package.json (verified), npm workspaces would not remove that |
 | D10 | Fixed | 70144cc | `.gitattributes`, `.editorconfig`, LF sync script; `--renormalize` changed nothing in the index (already LF), working copy re-checked out |
-| D11 | Partly fixed | 81786a8 | `repository` field, fixed mtar name `aem-suite.mtar` in the docs; no set-version script/CHANGELOG |
+| D11 | Fixed | 81786a8, e82388e | `repository` field, fixed mtar name, `scripts/set-version.js` (+ `test/version.test.ts`), CHANGELOG.md |
 | D12 | Fixed | 81786a8 | caret ranges with tested minimum, `npm dedupe`; the second @sap/cds is bundled in cds-dk and cannot be deduped |
 | D13 | Fixed | 81786a8 | health check `/health`, disk quota srv, memory/disk db-deployer |
 | D14 | Open – not done | – | caching vs. cachebuster needs a choice; not changed |
 | D15 | Fixed | 81786a8 | `mbt` devDependency, `npm run build` / `npm run deploy` |
 | D16 | Fixed | 2a5769a | local README, root README, image pinned to 10.26.0, `${SOLACE_ADMIN_PASSWORD:-admin}` |
-| D17 | Open – not done | – | optional LICENSE/CONTRIBUTING not added |
+| D17 | Fixed | 05a722c | LICENSE (proprietary notice), CONTRIBUTING.md pointing to the README |
 
 Severity: **High** = bug, security issue or a broken quality gate · **Medium** = maintenance cost that grows with the code · **Low** = local cleanup.
 
