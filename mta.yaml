@@ -19,7 +19,11 @@ modules:
       # live subscriptions are held in memory -> keep a single instance (see README)
       instances: 1
       memory: 512M
+      disk-quota: 1024M
       buildpack: nodejs_buildpack
+      # CAP's /health answers without login; a hanging process is restarted, not only a crashed one
+      health-check-type: http
+      health-check-http-endpoint: /health
     build-parameters:
       builder: npm-ci
     provides:
@@ -36,6 +40,8 @@ modules:
     path: gen/db
     parameters:
       buildpack: nodejs_buildpack
+      memory: 256M
+      disk-quota: 512M
     requires:
       - name: aem-suite-db
 
@@ -44,7 +50,7 @@ modules:
     type: approuter.nodejs
     path: app/router
     build-parameters:
-      builder: npm
+      builder: npm-ci
       ignore:
         - default-env.json
     parameters:
