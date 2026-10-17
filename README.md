@@ -118,7 +118,7 @@ npm run docs:screenshots
 ## Architecture
 
 ```
-Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe}  OData V4
+Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe,help,home}  OData V4
                                            ├─ /mcp/agent                        MCP for AI assistants (OAuth login via XSUAA)
                                            └─ /ws/live                          WebSocket (run progress, live messages)
 CAP srv (TypeScript)
@@ -221,10 +221,20 @@ npm test               # jest: unit + service integration tests (broker connecti
 npm run e2e            # Playwright: the UI apps in a browser (starts its own dev server on port 4005)
 npm run e2e:ui         # interactive Playwright runner
 npm run e2e:headed     # watch the browser while the tests run
-npm run typecheck      # backend + subscriber app + e2e tests
+npm run typecheck      # backend + tests + subscriber app + e2e tests
 ```
 
 On Windows the e2e tests use the installed Edge. Elsewhere install Chromium once (`npx playwright install chromium`); `PW_CHANNEL=chrome` / `msedge` picks another installed browser. A failed test leaves a trace: `npm run e2e:trace -- test-results/<test>/trace.zip`.
+
+### Development workflow
+
+- Run **`npm run verify`** (typecheck, lint, Jest) before you push; CI (`.github/workflows/ci.yml`) runs it and the e2e tests on every pull request.
+- UI code shared by the apps lives in **`app/_shared`**. `app/*/webapp/shared/*` are generated copies: never edit them, change `app/_shared` and run **`npm run sync:ui`** (a test fails when a copy is out of date).
+- After changing CDS, `npm run typer` regenerates the cds-typer models.
+- The UI5 tooling is installed once at the root; the apps' `package.json` files only name the UI5 custom tasks.
+- Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
+
+More in the [technical documentation](docs/technical-documentation.md#development-workflow).
 
 ## BTP destination layout
 
@@ -241,9 +251,8 @@ Use one destination per broker:
 ## Deployment (Cloud Foundry)
 
 ```sh
-npm i -g mbt
-mbt build
-cf deploy mta_archives/aem-suite_1.0.0.mtar
+npm run build          # mbt build -> mta_archives/aem-suite.mtar
+npm run deploy         # cf deploy mta_archives/aem-suite.mtar
 ```
 
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.
