@@ -13,6 +13,7 @@
     "baseUrl": "./",
     "types": ["@sapui5/types"],
     "paths": {
+      "com/aem/suite/subscriber/shared/*": ["../_shared/*"],
       "com/aem/suite/subscriber/*": ["./webapp/*"]
     }
   },

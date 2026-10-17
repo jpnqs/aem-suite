@@ -7,6 +7,8 @@ customConfiguration:
     mountPath: /comaemsuitebrokers
 builder:
   customTasks:
+    - name: aem-shared-ui-task
+      beforeTask: minify
     - name: ui5-task-zipper
       afterTask: generateCachebusterInfo
       configuration:
@@ -14,3 +16,24 @@ builder:
         relativePaths: true
         additionalFiles:
           - xs-app.json
+server:
+  customMiddleware:
+    - name: aem-shared-ui-middleware
+      afterMiddleware: compression
+---
+# app/_shared modules of this app: added by the build, served by the dev server (scripts/ui5/shared-ui.js)
+specVersion: "4.0"
+kind: extension
+type: task
+metadata:
+  name: aem-shared-ui-task
+task:
+  path: ../../scripts/ui5/shared-ui-task.js
+---
+specVersion: "4.0"
+kind: extension
+type: server-middleware
+metadata:
+  name: aem-shared-ui-middleware
+middleware:
+  path: ../../scripts/ui5/shared-ui-middleware.js

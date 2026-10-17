@@ -1,5 +1,6 @@
 import cds from '@sap/cds'
-import { TemplateError, type NumberSlot } from './template/resolve'
+import { NumberRanges } from '#cds-models/aem/suite'
+import { TemplateError, type GeneratedSlot } from './template/resolve'
 
 /** Name of a number range as used in {{numberRange.<name>}}. */
 export const RANGE_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/
@@ -39,7 +40,7 @@ export function nextExample(r: NumberRange): string {
   return formatNumber(r, lastOf(r) + stepOf(r))
 }
 
-/** Why the next `count` numbers cannot be issued (exhausted range), or undefined. */
+/** Why the number `last` cannot be issued (exhausted range), or undefined. */
 function overflow(r: NumberRange, last: bigint): string | undefined {
   const max = big(r.maximum)
   if (max !== null && last > max) return `Number range "${r.name}" is exhausted (maximum ${max}). Reset it or raise the maximum.`
@@ -71,8 +72,8 @@ const MAX_ATTEMPTS = 8
  *   peek:    the numbers the message would get now; nothing changes (Preview)
  * Returns slot key -> formatted number.
  */
-export async function allocateNumbers(slots: NumberSlot[], mode: 'consume' | 'peek'): Promise<Record<string, string>> {
-  const byRange = new Map<string, NumberSlot[]>()
+export async function allocateNumbers(slots: GeneratedSlot[], mode: 'consume' | 'peek'): Promise<Record<string, string>> {
+  const byRange = new Map<string, GeneratedSlot[]>()
   for (const s of slots) byRange.set(s.range, [...(byRange.get(s.range) ?? []), s])
 
   const out: Record<string, string> = {}
@@ -84,7 +85,7 @@ export async function allocateNumbers(slots: NumberSlot[], mode: 'consume' | 'pe
 }
 
 async function load(name: string): Promise<NumberRange & { ID: string }> {
-  const r = (await SELECT.one.from('aem.suite.NumberRanges').where({ name })) as (NumberRange & { ID: string }) | undefined
+  const r = (await SELECT.one.from(NumberRanges).where({ name })) as (NumberRange & { ID: string }) | undefined
   if (!r) throw new TemplateError(`Unknown number range "${name}" - maintain it in the Number Ranges app`)
   return r
 }
@@ -103,6 +104,7 @@ async function consume(name: string, count: number): Promise<string[]> {
       const r = await load(name)
       const { values, last } = numbersFrom(r, count)
       const where = r.current === null || r.current === undefined ? { ID: r.ID, current: null } : { ID: r.ID, current: r.current }
+      // by name: cds-typer types Integer64 as number, `current` is written as text (no precision lost)
       const changed = await UPDATE('aem.suite.NumberRanges')
         .set({ current: String(last), lastUsedAt: new Date().toISOString() })
         .where(where)

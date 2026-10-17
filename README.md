@@ -118,7 +118,7 @@ npm run docs:screenshots
 ## Architecture
 
 ```
-Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe}  OData V4
+Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe,help,home}  OData V4
                                            ├─ /mcp/agent                        MCP for AI assistants (OAuth login via XSUAA)
                                            └─ /ws/live                          WebSocket (run progress, live messages)
 CAP srv (TypeScript)
@@ -192,7 +192,7 @@ Open http://localhost:4004/launchpad.html (redirects to `/comaemsuitelaunchpad/i
 
 **Local demo setup** (`test/data/`, loaded by `cds watch` only, never deployed):
 
-- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md) (`docker compose up -d`, then `local/terragrunt/tg.ps1 apply`).
+- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md): `docker compose up -d` in the folder `local/`, then `.\tg.ps1 apply` in `local/terragrunt/` (PowerShell).
 - Brokers `local-docker (publisher)` (user `aem-publisher`/`publisher`, may only publish below `aem/`) and `local-docker (subscriber)` (user `aem-subscriber`/`subscriber`, may not publish) – the same broker, to compare ACLs.
 - Broker `local-docker (ask for user)`: the same broker without a username, to try the username prompt.
 - Broker `aem-dev (destination)`: an inactive example for DESTINATION mode.
@@ -221,10 +221,21 @@ npm test               # jest: unit + service integration tests (broker connecti
 npm run e2e            # Playwright: the UI apps in a browser (starts its own dev server on port 4005)
 npm run e2e:ui         # interactive Playwright runner
 npm run e2e:headed     # watch the browser while the tests run
-npm run typecheck      # backend + subscriber app + e2e tests
+npm run typecheck      # backend + tests + subscriber app + e2e tests
 ```
 
 On Windows the e2e tests use the installed Edge. Elsewhere install Chromium once (`npx playwright install chromium`); `PW_CHANNEL=chrome` / `msedge` picks another installed browser. A failed test leaves a trace: `npm run e2e:trace -- test-results/<test>/trace.zip`.
+
+### Development workflow
+
+- Run **`npm run verify`** (typecheck, lint, Jest) before you push; CI (`.github/workflows/ci.yml`) runs it and the e2e tests on every pull request.
+- UI code shared by the apps lives in **`app/_shared`** - edit it there. The UI5 build and the dev server put the modules an app uses into the app (`scripts/ui5`); there are no copies to keep in sync.
+- After changing CDS, `npm run typer` regenerates the cds-typer models.
+- The UI5 tooling is installed once at the root; the apps' `package.json` files only name the UI5 custom tasks.
+- Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
+- A release: `npm run set-version -- 1.1.0` writes the version into `mta.yaml`, every `package.json` and every manifest (a test checks they agree); add its entries to [CHANGELOG.md](CHANGELOG.md).
+
+More in the [technical documentation](docs/technical-documentation.md#development-workflow).
 
 ## BTP destination layout
 
@@ -241,9 +252,8 @@ Use one destination per broker:
 ## Deployment (Cloud Foundry)
 
 ```sh
-npm i -g mbt
-mbt build
-cf deploy mta_archives/aem-suite_1.0.0.mtar
+npm run build          # mbt build -> mta_archives/aem-suite.mtar
+npm run deploy         # cf deploy mta_archives/aem-suite.mtar
 ```
 
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.

@@ -12,7 +12,8 @@ test('the payload editor checks, formats and explains the payload', async ({ pag
   await expect(page.getByText('Valid JSON', { exact: true })).toBeVisible()
 
   // typing: the status follows every key
-  const editor = page.locator('.ace_editor').first()
+  // the editor of PayloadSection.fragment.xml (our id; Fiori elements prefixes it)
+  const editor = page.locator('[id$="--payloadEditor"]').first()
   await editor.click()
   await page.keyboard.press('Control+End')
   await page.keyboard.type(',')

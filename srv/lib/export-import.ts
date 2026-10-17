@@ -1,9 +1,12 @@
 import cds from '@sap/cds'
 import { SORT_STEP } from './defaults'
-import { httpError } from './errors'
+import { errMsg, httpError } from './errors'
 import { collectProblems, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './node-validation'
-import { selectNodesDeep, TABLE } from './nodes'
+import { TestCases } from '#cds-models/aem/suite'
+import { selectNodesDeep } from './nodes'
+import { FOLDER_FIELDS, TEST_FIELDS } from './test-fields'
 import { Tree, TreeNode } from './tree'
+import type { NodeKind } from '#cds-models/aem/suite'
 
 /**
  * Export / import of test cases and folders as a JSON file.
@@ -30,7 +33,7 @@ export interface VariableDoc {
   value?: string
 }
 export interface NodeDoc {
-  kind: 'FOLDER' | 'TEST'
+  kind: NodeKind
   name?: string
   description?: string
   topic?: string
@@ -74,27 +77,12 @@ export interface ImportResult {
 
 // ------------------------------------------------------------------------------------------------ export
 
-type Row = TreeNode & {
-  description?: string | null
-  topic?: string | null
-  payload?: string | null
-  contentType?: string | null
-  deliveryMode?: string | null
-  timeToLiveMs?: number | null
-  dmqEligible?: boolean | null
-  priority?: number | null
-  correlationId?: string | null
-  ackTimeoutMs?: number | null
-  userProperties?: { name: string; type?: string | null; value?: string | null }[]
-  variables?: { name: string; value?: string | null }[]
-}
-
 /**
  * Builds the export of the given nodes (a folder comes with everything below it; nodes below another selected
  * node are part of that node only). Without IDs the whole tree is exported.
  */
 export async function exportNodes(ids?: string[] | null): Promise<ExportResult> {
-  const rows = (await selectNodesDeep()) as Row[]
+  const rows = await selectNodesDeep()
   const tree = new Tree(rows)
   const byId = new Map(rows.map((r) => [r.ID, r]))
 
@@ -117,35 +105,25 @@ export async function exportNodes(ids?: string[] | null): Promise<ExportResult> 
   let testCases = 0
   const toDoc = (id: string): NodeDoc => {
     const r = byId.get(id)!
-    const variables = sorted(r.variables)?.map((v) => compact({ name: v.name, value: v.value ?? '' }) as unknown as VariableDoc)
+    const variables = sorted(r.variables)?.map((v) => compact({ name: v.name, value: v.value ?? '' }) as VariableDoc)
+    const fields = (names: readonly string[]) => Object.fromEntries(names.map((f) => [f, r[f]]))
     if (r.kind === 'FOLDER') {
       folders++
       return compact({
         kind: 'FOLDER',
-        name: r.name,
-        description: r.description,
+        ...fields(FOLDER_FIELDS),
         variables: variables?.length ? variables : undefined,
         children: (tree.children.get(id) ?? []).map((c) => toDoc(c.ID))
-      }) as unknown as NodeDoc
+      }) as NodeDoc
     }
     testCases++
-    const props = sorted(r.userProperties)?.map((p) => compact({ name: p.name, type: p.type, value: p.value ?? '' }) as unknown as PropertyDoc)
+    const props = sorted(r.userProperties)?.map((p) => compact({ name: p.name, type: p.type, value: p.value ?? '' }) as PropertyDoc)
     return compact({
       kind: 'TEST',
-      name: r.name,
-      description: r.description,
-      topic: r.topic,
-      payload: r.payload,
-      contentType: r.contentType,
-      deliveryMode: r.deliveryMode,
-      timeToLiveMs: r.timeToLiveMs,
-      dmqEligible: r.dmqEligible,
-      priority: r.priority,
-      correlationId: r.correlationId,
-      ackTimeoutMs: r.ackTimeoutMs,
+      ...fields(Object.keys(TEST_FIELDS)),
       userProperties: props?.length ? props : undefined,
       variables: variables?.length ? variables : undefined
-    }) as unknown as NodeDoc
+    }) as NodeDoc
   }
 
   const document: ExportDocument = { format: FORMAT, version: VERSION, exportedAt: new Date().toISOString(), nodes: roots.map(toDoc) }
@@ -182,7 +160,7 @@ export async function importNodes(content: string, opts: { parentId?: string | n
     throw httpError(400, `Nothing was imported: ${shown}${more}`)
   }
 
-  const target = parentId ? (((await SELECT.one.from(TABLE).columns('name').where({ ID: parentId })) as { name: string } | undefined)?.name ?? null) : null
+  const target = parentId ? ((await SELECT.one.from(TestCases).columns('name').where({ ID: parentId }))?.name ?? null) : null
   const count = (kind: string) => flat.filter((n) => n.d.kind === kind).length
   const result: ImportResult = {
     dryRun: !!opts.dryRun,
@@ -203,7 +181,7 @@ function parseDocument(content: string): ExportDocument {
   try {
     doc = JSON.parse(content)
   } catch (e) {
-    throw httpError(400, `Nothing was imported: the file is not valid JSON (${(e as Error).message})`)
+    throw httpError(400, `Nothing was imported: the file is not valid JSON (${errMsg(e)})`)
   }
   const file = doc as Partial<ExportDocument> | null
   if (!file || typeof file !== 'object' || file.format !== FORMAT)
@@ -245,7 +223,7 @@ function flatten(nodes: unknown[]): { flat: Flat[]; problems: string[] } {
 }
 
 /** The fields of one node of the file, as the node will be stored (with a new ID). */
-function nodeData(n: Record<string, unknown>, kind: 'FOLDER' | 'TEST', where: string, problems: string[]): Flat['d'] {
+function nodeData(n: Record<string, unknown>, kind: NodeKind, where: string, problems: string[]): Flat['d'] {
   const d: Record<string, unknown> = { ID: cds.utils.uuid(), kind }
   const text = (k: string) => {
     if (n[k] === undefined || n[k] === null) return
@@ -258,17 +236,14 @@ function nodeData(n: Record<string, unknown>, kind: 'FOLDER' | 'TEST', where: st
     if (typeof n[k] === 'number' && Number.isInteger(n[k])) d[k] = n[k]
     else problems.push(`${where}: ${k} must be a whole number`)
   }
-  text('name')
-  text('description')
-  if (kind === 'TEST') {
-    for (const k of ['topic', 'payload', 'contentType', 'deliveryMode', 'correlationId']) text(k)
-    for (const k of ['timeToLiveMs', 'priority', 'ackTimeoutMs']) whole(k)
-    if (n.dmqEligible !== undefined && n.dmqEligible !== null) {
-      if (typeof n.dmqEligible === 'boolean') d.dmqEligible = n.dmqEligible
-      else problems.push(`${where}: dmqEligible must be true or false`)
-    }
-    d.userProperties = listOf(n.userProperties, 'userProperties', where, problems, ['name', 'type', 'value'])
+  const bool = (k: string) => {
+    if (n[k] === undefined || n[k] === null) return
+    if (typeof n[k] === 'boolean') d[k] = n[k]
+    else problems.push(`${where}: ${k} must be true or false`)
   }
+  const read = { text, int: whole, bool }
+  for (const [k, type] of Object.entries(TEST_FIELDS)) if (kind === 'TEST' || FOLDER_FIELDS.includes(k as keyof typeof TEST_FIELDS)) read[type](k)
+  if (kind === 'TEST') d.userProperties = listOf(n.userProperties, 'userProperties', where, problems, ['name', 'type', 'value'])
   d.variables = listOf(n.variables, 'variables', where, problems, ['name', 'value'])
   return d as unknown as Flat['d']
 }
@@ -311,7 +286,7 @@ async function write(flat: Flat[], parentId: string | null): Promise<void> {
     rows.push(rowFor(n))
     rowsByDepth.set(n.depth, rows)
   }
-  for (const depth of [...rowsByDepth.keys()].sort((a, b) => a - b)) await INSERT.into(TABLE).entries(rowsByDepth.get(depth)!)
+  for (const depth of [...rowsByDepth.keys()].sort((a, b) => a - b)) await INSERT.into(TestCases).entries(rowsByDepth.get(depth)!)
 }
 
 // ------------------------------------------------------------------------------------------------ helpers

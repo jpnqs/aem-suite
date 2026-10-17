@@ -4,7 +4,7 @@
   xmlns:f="sap.ui.layout.form"
   xmlns:ce="sap.ui.codeeditor">
   <Dialog
-    title="Preview resolved message"
+    title="{i18n>preview.previewResolvedMessage}"
     contentWidth="48rem"
     contentHeight="70%"
     resizable="true"
@@ -12,7 +12,7 @@
     <content>
       <VBox class="sapUiSmallMargin">
         <HBox alignItems="Center">
-          <Label text="Resolve for broker" class="sapUiSmallMarginEnd" />
+          <Label text="{i18n>preview.resolveForBroker}" labelFor="previewBroker" class="sapUiSmallMarginEnd" />
           <Select
             id="previewBroker"
             forceSelection="false"
@@ -21,7 +21,7 @@
             change=".onResolve">
             <core:Item key="{ID}" text="{name}" />
           </Select>
-          <Button text="Resolve" icon="sap-icon://refresh" press=".onResolve" class="sapUiSmallMarginBegin" />
+          <Button text="{i18n>preview.resolve}" icon="sap-icon://refresh" press=".onResolve" class="sapUiSmallMarginBegin" />
         </HBox>
         <MessageStrip
           text="{preview>/message}"
@@ -30,19 +30,19 @@
           showIcon="true"
           class="sapUiSmallMarginTopBottom" />
         <f:SimpleForm editable="false" layout="ResponsiveGridLayout" labelSpanM="3" visible="{preview>/valid}">
-          <Label text="Topic" />
+          <Label text="{i18n>preview.topic}" />
           <Text text="{preview>/topic}" />
-          <Label text="Correlation ID" />
+          <Label text="{i18n>preview.correlationID}" />
           <Text text="{preview>/correlationId}" />
         </f:SimpleForm>
-        <Title text="Payload" level="H5" visible="{preview>/valid}" class="sapUiTinyMarginTop" />
+        <Title text="{i18n>section.payload}" level="H5" visible="{preview>/valid}" class="sapUiTinyMarginTop" />
         <ce:CodeEditor type="json" value="{preview>/payload}" editable="false" height="260px" visible="{preview>/valid}" />
-        <Title text="User Properties" level="H5" visible="{preview>/valid}" class="sapUiTinyMarginTop" />
+        <Title text="{i18n>preview.userProperties}" level="H5" visible="{preview>/valid}" class="sapUiTinyMarginTop" />
         <ce:CodeEditor type="json" value="{preview>/userProperties}" editable="false" height="100px" visible="{preview>/valid}" />
       </VBox>
     </content>
     <endButton>
-      <Button text="Close" press=".onClose" />
+      <Button text="{i18n>preview.close}" press=".onClose" />
     </endButton>
   </Dialog>
 </core:FragmentDefinition>

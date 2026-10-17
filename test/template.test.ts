@@ -54,10 +54,6 @@ describe('TemplateResolver', () => {
     const r = new TemplateResolver({ global: { known: '1' } })
     expect(() => r.resolve('{{known}} {{foo}} {{bar}} {{foo}}')).toThrow(expect.objectContaining({ constructor: TemplateError, missing: ['foo', 'bar'] }))
   })
-
-  it('lists referenced non-built-in names', () => {
-    expect(TemplateResolver.referencedNames('{{a}} {{uuid}} {{randomInt(1,2)}} {{b.c}} {{a}}')).toEqual(['a', 'b.c'])
-  })
 })
 
 describe('jsonError', () => {

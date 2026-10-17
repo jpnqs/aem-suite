@@ -1,9 +1,11 @@
 using AdminService as service from '../../srv/admin-service';
 
+// field titles: db/schema.cds - here only the layout of the Brokers app
+
 annotate service.Brokers with @(
   UI.HeaderInfo                : {
-    TypeName      : 'Broker',
-    TypeNamePlural: 'Brokers',
+    TypeName      : '{i18n>Broker}',
+    TypeNamePlural: '{i18n>Brokers}',
     Title         : {Value: name},
     Description   : {Value: description}
   },
@@ -31,20 +33,20 @@ annotate service.Brokers with @(
     {
       $Type : 'UI.DataFieldForAction',
       Action: 'AdminService.testConnection',
-      Label : 'Test Connection'
+      Label : '{i18n>TestConnection}'
     }
   ],
   UI.Identification            : [
     {
       $Type : 'UI.DataFieldForAction',
       Action: 'AdminService.testConnection',
-      Label : 'Test Connection'
+      Label : '{i18n>TestConnection}'
     },
   ],
   UI.HeaderFacets              : [{
     $Type : 'UI.ReferenceFacet',
     Target: '@UI.FieldGroup#Status',
-    Label : 'Last Connection Test'
+    Label : '{i18n>LastConnectionTest}'
   }],
   UI.FieldGroup #Status        : {Data: [
     {
@@ -74,33 +76,33 @@ annotate service.Brokers with @(
     {
       $Type : 'UI.CollectionFacet',
       ID    : 'Connection',
-      Label : 'Connection',
+      Label : '{i18n>Connection}',
       Facets: [
         {
           $Type : 'UI.ReferenceFacet',
           ID    : 'General',
           Target: '@UI.FieldGroup#General',
-          Label : 'General'
+          Label : '{i18n>General}'
         },
         {
           $Type        : 'UI.ReferenceFacet',
           ID           : 'Destination',
           Target       : '@UI.FieldGroup#Destination',
-          Label        : 'BTP Destination',
+          Label        : '{i18n>BTPDestination}',
           ![@UI.Hidden]: (credentialMode <> 'DESTINATION')
         },
         {
           $Type        : 'UI.ReferenceFacet',
           ID           : 'Direct',
           Target       : '@UI.FieldGroup#Direct',
-          Label        : 'Direct Connection',
+          Label        : '{i18n>DirectConnection}',
           ![@UI.Hidden]: (credentialMode <> 'DIRECT')
         },
         {
           $Type : 'UI.ReferenceFacet',
           ID    : 'Advanced',
           Target: '@UI.FieldGroup#Advanced',
-          Label : 'Advanced'
+          Label : '{i18n>Advanced}'
         }
       ]
     },
@@ -108,14 +110,12 @@ annotate service.Brokers with @(
       $Type : 'UI.ReferenceFacet',
       ID    : 'Variables',
       Target: 'variables/@UI.LineItem',
-      Label : 'Broker Variables'
+      Label : '{i18n>BrokerVariables}'
     }
   ]
 ) {
-  name                  @title: 'Name';
-  description           @title: 'Description'  @UI.MultiLineText;
-  credentialMode        @title: 'Credentials'
-                        @Common.ValueListWithFixedValues
+  description           @UI.MultiLineText;
+  credentialMode        @Common.ValueListWithFixedValues
                         @Common.ValueList: {
                           CollectionPath: 'CredentialModes',
                           Parameters    : [
@@ -130,11 +130,9 @@ annotate service.Brokers with @(
                             }
                           ]
                         };
-  destinationName       @title: 'Destination'
-                        @Common.QuickInfo: 'BTP destination: URL = wss:// endpoint, additional property msgVpn'
-                        @Common.ValueList: {
+  destinationName       @Common.ValueList: {
                           CollectionPath: 'Destinations',
-                          Label         : 'Destinations',
+                          Label         : '{i18n>Destinations}',
                           Parameters    : [
                             {
                               $Type            : 'Common.ValueListParameterInOut',
@@ -155,32 +153,26 @@ annotate service.Brokers with @(
                             }
                           ]
                         };
-  url                   @title: 'URL'
-                        @Common.QuickInfo: 'Host is enough, e.g. mr-xyz.messaging.solace.cloud - completed to wss://host:443 (port 55443 gives tcps, 55555 gives tcp)';
-  msgVpn                @title: 'Message VPN';
-  username              @title: 'Username'
-                        @Common.QuickInfo: 'Optional. If empty, the username is asked for together with the password when running tests, testing the connection or subscribing. The password is never stored';
-  clientNamePrefix      @title: 'Client Name Prefix';
-  connectTimeoutMs      @title: 'Connect Timeout (ms)';
-  active                @title: 'Active';
-  lastConnectionStatus  @title: 'Status'  @readonly;
-  lastConnectionAt      @title: 'Tested At'  @readonly;
-  lastConnectionMessage @title: 'Message'  @readonly  @UI.MultiLineText;
+  lastConnectionMessage @UI.MultiLineText;
   connectionCriticality @UI.Hidden;
 }
 
-
-annotate service.BrokerVariables with @(
-  UI.HeaderInfo: {
-    TypeName      : 'Variable',
-    TypeNamePlural: 'Variables',
-    Title         : {Value: name}
-  },
-  UI.LineItem  : [
-    {Value: name},
-    {Value: value}
-  ]
-) {
-  name  @title: 'Name';
-  value @title: 'Value';
+// refresh the connection fields after a save (the automatic test) and after "Test Connection"
+annotate service.Brokers with @Common.SideEffects #connection: {
+  SourceEntities  : ['/AdminService.EntityContainer/Brokers'],
+  TargetProperties: ['lastConnectionStatus', 'lastConnectionAt', 'lastConnectionMessage']
 };
+
+annotate service.Brokers actions {
+  testConnection @Common.SideEffects: {TargetProperties: [
+    'in/lastConnectionStatus',
+    'in/lastConnectionAt',
+    'in/lastConnectionMessage',
+    'in/connectionCriticality'
+  ]}
+  (username @Common.Label: '{i18n>UsernameOnlyIfNotMaintainedOnTheBroker}',
+   password @UI.Masked  @Common.Label: '{i18n>PasswordDirectModeOnlyNotStored}');
+};
+
+
+// BrokerVariables: the layout of all variables lists, app/common.cds

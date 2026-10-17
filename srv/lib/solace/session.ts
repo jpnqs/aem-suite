@@ -1,6 +1,7 @@
 import solace from 'solclientjs'
 import { randomUUID } from 'node:crypto'
 import { DEFAULT_ACK_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS } from '../defaults'
+import { errMsg } from '../errors'
 import { parseBool, parseInt64, PropertyType } from '../property-types'
 
 let initialized = false
@@ -26,7 +27,8 @@ export interface ConnectionConfig {
   connectTimeoutMs?: number
 }
 
-export type DeliveryMode = 'DIRECT' | 'PERSISTENT'
+export type { DeliveryMode } from '#cds-models/aem/suite'
+import type { DeliveryMode, ReceivedDeliveryMode } from '#cds-models/aem/suite'
 
 export interface UserProperty {
   name: string
@@ -63,7 +65,7 @@ export interface ReceivedMessage {
   contentType: string | null
   userProperties: Record<string, unknown>
   correlationId: string | null
-  deliveryMode: string
+  deliveryMode: ReceivedDeliveryMode
   receivedAt: Date
 }
 
@@ -83,7 +85,10 @@ export class SolaceSession implements Publisher {
   private readonly messageListeners = new Set<(msg: solace.Message) => void>()
   private readonly pendingSubscriptions = new Map<string, { resolve: () => void; reject: (e: Error) => void }>()
   private readonly closeListeners = new Set<(reason: string) => void>()
+  /** no longer usable: closed by us or dropped by the broker */
   private closed = false
+  /** the library session was disposed - separate from closed, so a session the broker dropped is still disposed */
+  private disposed = false
 
   private constructor(readonly session: solace.Session, readonly config: ConnectionConfig) {}
 
@@ -145,7 +150,7 @@ export class SolaceSession implements Publisher {
         session.connect()
       } catch (e) {
         clearTimeout(guard)
-        fail(`Connect failed: ${(e as Error).message}`)
+        fail(`Connect failed: ${errMsg(e)}`)
       }
     })
   }
@@ -169,7 +174,7 @@ export class SolaceSession implements Publisher {
       try {
         this.session.send(msg)
       } catch (e) {
-        return Promise.reject(new Error(`Send failed: ${(e as Error).message}`))
+        return Promise.reject(new Error(`Send failed: ${errMsg(e)}`))
       }
       return Promise.resolve({ latencyMs: Date.now() - started })
     }
@@ -188,7 +193,7 @@ export class SolaceSession implements Publisher {
       } catch (e) {
         clearTimeout(timer)
         this.pending.delete(key)
-        reject(new Error(`Send failed: ${(e as Error).message}`))
+        reject(new Error(`Send failed: ${errMsg(e)}`))
       }
     })
   }
@@ -217,7 +222,7 @@ export class SolaceSession implements Publisher {
       } catch (e) {
         clearTimeout(timer)
         this.pendingSubscriptions.delete(key)
-        reject(new Error(`Subscribe failed: ${(e as Error).message}`))
+        reject(new Error(`Subscribe failed: ${errMsg(e)}`))
       }
     })
   }
@@ -236,7 +241,7 @@ export class SolaceSession implements Publisher {
       acknowledgeMode: s.MessageConsumerAcknowledgeMode.CLIENT,
       createIfMissing: false
     })
-    return bindFlow(consumer, s.MessageConsumerEventName, `queue "${queue}"`)
+    return bindFlow(consumer, s.MessageConsumerEventName, `queue "${queue}"`, this.bindTimeoutMs)
   }
 
   /** Opens a queue browser (messages stay on the queue). */
@@ -245,26 +250,35 @@ export class SolaceSession implements Publisher {
     const browser = this.session.createQueueBrowser({
       queueDescriptor: { name: queue, type: s.QueueType.QUEUE }
     })
-    return bindFlow(browser, s.QueueBrowserEventName, `queue browser "${queue}"`)
+    return bindFlow(browser, s.QueueBrowserEventName, `queue browser "${queue}"`, this.bindTimeoutMs)
   }
 
+  /** like the connect guard: the broker's connect timeout plus a margin */
+  private get bindTimeoutMs(): number {
+    return (this.config.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS) + 2000
+  }
+
+  /** Disconnects (unless the broker already dropped the session) and disposes the session, exactly once. */
   async close(): Promise<void> {
-    if (this.closed) return
-    this.closed = true
-    const s = sol()
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, 3000)
-      this.session.on(s.SessionEventCode.DISCONNECTED, () => {
-        clearTimeout(timer)
-        resolve()
+    if (this.disposed) return
+    this.disposed = true
+    if (!this.closed) {
+      this.closed = true
+      const s = sol()
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 3000)
+        this.session.on(s.SessionEventCode.DISCONNECTED, () => {
+          clearTimeout(timer)
+          resolve()
+        })
+        try {
+          this.session.disconnect()
+        } catch {
+          clearTimeout(timer)
+          resolve()
+        }
       })
-      try {
-        this.session.disconnect()
-      } catch {
-        clearTimeout(timer)
-        resolve()
-      }
-    })
+    }
     try {
       this.session.dispose()
     } catch {
@@ -318,20 +332,40 @@ export class SolaceSession implements Publisher {
   }
 }
 
+/**
+ * Connects a queue consumer / browser and resolves once it is up. Guarded by a timeout: if the broker never
+ * answers, the caller (a live subscription being started) must not hang and keep its slot for good.
+ */
 function bindFlow<T extends solace.MessageConsumer | solace.QueueBrowser>(
   flow: T,
   events: { UP: string; CONNECT_FAILED_ERROR: string },
-  label: string
+  label: string,
+  timeoutMs: number
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    flow.on(events.UP, () => resolve(flow))
-    flow.on(events.CONNECT_FAILED_ERROR, (e: { infoStr?: string; message?: string }) =>
-      reject(new Error(`Cannot bind to ${label}: ${e?.infoStr || e?.message || 'unknown error'}`))
-    )
+    let settled = false
+    const settle = (done: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(guard)
+      done()
+    }
+    const fail = (reason: string) => settle(() => reject(new Error(`Cannot bind to ${label}: ${reason}`)))
+    const guard = setTimeout(() => {
+      try {
+        flow.disconnect()
+      } catch {
+        /* ignore */
+      }
+      fail(`no answer from the broker within ${timeoutMs} ms`)
+    }, timeoutMs)
+
+    flow.on(events.UP, () => settle(() => resolve(flow)))
+    flow.on(events.CONNECT_FAILED_ERROR, (e: { infoStr?: string; message?: string }) => fail(e?.infoStr || e?.message || 'unknown error'))
     try {
       flow.connect()
     } catch (e) {
-      reject(new Error(`Cannot bind to ${label}: ${(e as Error).message}`))
+      fail(errMsg(e))
     }
   })
 }

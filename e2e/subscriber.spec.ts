@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { apps, openApp, expectAppOpen } from './launchpad'
+import { deleteAfterEach, uniqueName } from './cleanup'
 
 test.describe('Live Subscriber', () => {
+  const track = deleteAfterEach()
+
   test('offers the demo brokers and asks for the password of the maintained user', async ({ page }) => {
     await openApp(page, apps.subscriber)
     await expectAppOpen(page, apps.subscriber)
@@ -19,6 +22,7 @@ test.describe('Live Subscriber', () => {
   })
 
   test('saves a setup, loads it again and deletes it (no password in it)', async ({ page }) => {
+    const name = uniqueName('E2E orders')
     await openApp(page, apps.subscriber)
     await expectAppOpen(page, apps.subscriber)
     const topic = page.getByPlaceholder(/Add a topic/)
@@ -29,26 +33,29 @@ test.describe('Live Subscriber', () => {
     await page.getByPlaceholder('Not stored').fill('secret-password')
     await page.getByRole('button', { name: 'Save as…' }).click()
     const dialog = page.getByRole('dialog', { name: 'Save setup' })
-    await dialog.getByRole('textbox').fill('E2E orders')
+    await dialog.getByRole('textbox').fill(name)
     await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(page.getByText('Setup "E2E orders" saved')).toBeVisible()
+    await expect(page.getByText(`Setup "${name}" saved`)).toBeVisible()
 
     // what was stored: topics yes, password nowhere
-    const res = await page.request.get(`/odata/v4/subscribe/SubscriberPresets?$filter=${encodeURIComponent("name eq 'E2E orders'")}`)
+    const res = await page.request.get(`/odata/v4/subscribe/SubscriberPresets?$filter=${encodeURIComponent(`name eq '${name}'`)}`)
     const [preset] = (await res.json()).value
+    // removed at the end of the test - also if it fails before deleting the setup in the UI
+    track(`/odata/v4/subscribe/SubscriberPresets(${preset.ID})`)
     expect(JSON.parse(preset.topics)).toEqual(['aem/orders/>', 'aem/events/*'])
     expect(JSON.stringify(preset)).not.toContain('secret-password')
 
     // a fresh page: pick the setup and the topics are back
     await openApp(page, apps.subscriber)
     await expectAppOpen(page, apps.subscriber)
-    await page.locator('[id$="preset"]').click()
-    await page.getByRole('option', { name: 'E2E orders' }).click()
+    // the Select of Main.view.xml (id "preset", our own id): its accessible combobox is a hidden helper element
+    await page.locator('[id$="--preset"]').click()
+    await page.getByRole('option', { name }).click()
     await expect(page.getByText('aem/orders/>', { exact: true })).toBeVisible()
     await expect(page.getByText('aem/events/*', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Delete the selected setup' }).click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
-    await expect(page.getByText('Setup "E2E orders" deleted')).toBeVisible()
+    await expect(page.getByText(`Setup "${name}" deleted`)).toBeVisible()
   })
 })

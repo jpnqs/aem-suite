@@ -2,7 +2,8 @@
  * The types of user properties - one place for inference (on save), validation and conversion (on send).
  */
 
-export type PropertyType = 'STRING' | 'INT' | 'BOOL'
+export type { PropertyType } from '#cds-models/aem/suite'
+import type { PropertyType } from '#cds-models/aem/suite'
 
 const INTEGER = /^-?\d+$/
 const TRUE_WORDS = ['true', '1', 'yes']

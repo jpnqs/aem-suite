@@ -1,5 +1,6 @@
 import { loadBroker } from './credentials/resolve'
-import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord, withNumbers } from './test-case-spec'
+import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord, withGenerated } from './test-case-spec'
+import { errMsg } from './errors'
 
 export interface Preview {
   valid: boolean
@@ -19,7 +20,7 @@ export async function buildPreview(tc: TestCaseRecord, brokerId?: string | null)
     const broker = brokerId ? await loadBroker(brokerId) : undefined
     const vars = await loadVariableScopes(broker ? [broker.ID] : [])
     // peek: the preview shows the next numbers of number ranges without using them up
-    const spec = buildSpec(tc, await withNumbers(tc, scopeFor(tc, broker, vars), 'peek'))
+    const spec = buildSpec(tc, await withGenerated(tc, scopeFor(tc, broker, vars), 'peek'))
     return {
       topic: spec.topic,
       payload: prettyJson(spec.payload),
@@ -29,7 +30,7 @@ export async function buildPreview(tc: TestCaseRecord, brokerId?: string | null)
       message: broker ? `Resolved for broker ${broker.name}` : 'Resolved with global variables only'
     }
   } catch (e) {
-    return { valid: false, message: (e as Error).message }
+    return { valid: false, message: errMsg(e) }
   }
 }
 

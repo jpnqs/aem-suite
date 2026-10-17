@@ -61,7 +61,8 @@
         "sap.m": {},
         "sap.ui.core": {},
         "sap.fe.templates": {},
-        "sap.ui.codeeditor": {}
+        "sap.ui.codeeditor": {},
+        "sap.ui.layout": {}
       }
     },
     "contentDensities": {
@@ -118,7 +119,7 @@
                   "actions": {
                     "help": {
                       "press": "com.aem.suite.testcases.shared.Help.openForList",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     }
                   }
                 }
@@ -134,12 +135,13 @@
                 "@com.sap.vocabularies.UI.v1.LineItem": {
                   "columns": {
                     "typeIcon": {
-                      "header": "Type",
+                      "header": "{{column.type}}",
                       "template": "com.aem.suite.testcases.ext.TypeColumn",
                       "width": "5rem",
                       "horizontalAlign": "Center",
                       "properties": [
-                        "kind"
+                        "kind",
+                        "kindText"
                       ],
                       "position": {
                         "placement": "After",
@@ -158,8 +160,8 @@
                       "nodeType": {
                         "propertyName": "kind",
                         "values": {
-                          "FOLDER": "Folder",
-                          "TEST": "Test Case"
+                          "FOLDER": "{{kind.folder}}",
+                          "TEST": "{{kind.testCase}}"
                         }
                       }
                     }
@@ -167,22 +169,22 @@
                   "actions": {
                     "runSelected": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.runSelected",
-                      "text": "Run…",
+                      "text": "{{action.run}}",
                       "requiresSelection": true
                     },
                     "copySelected": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.copySelected",
-                      "text": "Copy",
+                      "text": "{{action.copy}}",
                       "requiresSelection": true
                     },
                     "exportSelected": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.exportSelected",
-                      "text": "Export",
+                      "text": "{{action.export}}",
                       "requiresSelection": false
                     },
                     "importFile": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.importFile",
-                      "text": "Import",
+                      "text": "{{action.import}}",
                       "requiresSelection": false
                     }
                   }
@@ -204,26 +206,26 @@
                   "actions": {
                     "runThis": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.runFromObjectPage",
-                      "text": "Run…",
+                      "text": "{{action.run}}",
                       "visible": "{= ${IsActiveEntity} === true }"
                     },
                     "copy": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.copyFromObjectPage",
-                      "text": "Copy",
+                      "text": "{{action.copy}}",
                       "visible": "{= ${IsActiveEntity} === true }"
                     },
                     "export": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.exportFromObjectPage",
-                      "text": "Export",
+                      "text": "{{action.export}}",
                       "visible": "{= ${IsActiveEntity} === true }"
                     },
                     "help": {
                       "press": "com.aem.suite.testcases.shared.Help.openForObjectPage",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     },
                     "preview": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.preview",
-                      "text": "Preview"
+                      "text": "{{action.preview}}"
                     }
                   }
                 },
@@ -231,7 +233,7 @@
                   "sections": {
                     "message": {
                       "template": "com.aem.suite.testcases.ext.MessageSection",
-                      "title": "Message",
+                      "title": "{{section.message}}",
                       "position": {
                         "placement": "Before",
                         "anchor": "AdvancedSection"
@@ -239,7 +241,7 @@
                     },
                     "payload": {
                       "template": "com.aem.suite.testcases.ext.PayloadSection",
-                      "title": "Payload",
+                      "title": "{{section.payload}}",
                       "position": {
                         "placement": "After",
                         "anchor": "message"

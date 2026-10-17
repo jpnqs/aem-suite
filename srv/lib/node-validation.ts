@@ -1,20 +1,23 @@
-import cds from '@sap/cds'
+import { TestCases } from '#cds-models/aem/suite'
 import { detectContentType, SORT_STEP } from './defaults'
-import { httpError } from './errors'
+import { errMsg, httpError } from './errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
+import { TEST_FIELDS } from './test-fields'
 import type { TestCaseRecord } from './test-case-spec'
 import { loadTree } from './tree'
+import { columnLength, elementOf, enumValues, rangeOf } from './model'
 
 /**
  * Rules for creating / changing test cases and folders - shared by the UI service (TestService),
  * the AI agent service (TestAgentService), the import and "create test case from message",
- * so all ways in apply exactly the same checks.
+ * so all ways in apply the same checks. Enum values and numeric limits are @assert.range in db/schema.cds:
+ * CAP checks them on OData requests, validateEnums and validateNode do it for the direct database writes.
  */
 
 /** Reports a validation problem (req.error of the calling service). */
 export type Reject = (status: number, message: string, target?: string) => void
 
-export type NodeData = TestCaseRecord & { description?: string | null; sortOrder?: number | null }
+export type NodeData = TestCaseRecord & { sortOrder?: number | null }
 
 export const VAR_NAME = /^[A-Za-z_][\w.-]*$/
 export const VAR_NAME_RULE = 'Variable names must start with a letter or _ and contain only letters, digits, _ . -'
@@ -51,7 +54,7 @@ export async function validateParent(d: Pick<NodeData, 'parent_ID'>, id: string 
 
 /** Position behind the last sibling of the given parent. */
 export async function nextSortOrder(parentId: string | null | undefined): Promise<number> {
-  const siblings = (await SELECT.from('aem.suite.TestCases')
+  const siblings = (await SELECT.from(TestCases)
     .columns('sortOrder')
     .where({ parent_ID: parentId ?? null })) as { sortOrder: number | null }[]
   return Math.max(0, ...siblings.map((x) => x.sortOrder ?? 0)) + SORT_STEP
@@ -59,16 +62,7 @@ export async function nextSortOrder(parentId: string | null | undefined): Promis
 
 // ------------------------------------------------------------------ enums and lengths from db/schema.cds
 
-type Element = { length?: number; enum?: Record<string, unknown> }
-
-function elementOf(entity: string, element: string): Element | undefined {
-  const def = cds.model?.definitions[`aem.suite.${entity}`] as { elements?: Record<string, Element> } | undefined
-  return def?.elements?.[element]
-}
-
-const enumValues = (entity: string, element: string): string[] => Object.keys(elementOf(entity, element)?.enum ?? {})
-
-/** Enum values the UI offers as dropdowns - the database does not check them. */
+/** Enum values for direct database writes (OData requests are checked by CAP through @assert.range). */
 export function validateEnums(d: NodeData, reject: Reject): void {
   const deliveryModes = enumValues('TestCases', 'deliveryMode')
   if (d.deliveryMode && !deliveryModes.includes(d.deliveryMode))
@@ -86,7 +80,7 @@ function validateLengths(d: NodeData, reject: Reject): void {
     if (limit && typeof value === 'string' && value.length > limit)
       reject(400, `${field} is too long (${value.length} characters, maximum ${limit})`, target)
   }
-  for (const f of ['name', 'description', 'topic', 'contentType', 'correlationId'] as const) max('TestCases', f, d[f], f, `in/${f}`)
+  for (const [f, type] of Object.entries(TEST_FIELDS)) if (type === 'text') max('TestCases', f, d[f as keyof NodeData] as string | null | undefined, f, `in/${f}`)
   d.userProperties?.forEach((p, i) => {
     max('TestCaseProperties', 'name', p.name, 'user property name', `in/userProperties(${i})/name`)
     max('TestCaseProperties', 'value', p.value, `user property "${p.name}" value`, `in/userProperties(${i})/value`)
@@ -107,7 +101,7 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
     if (!d.topic?.trim()) reject(400, 'Topic is required', 'in/topic')
   }
   // fill what was left empty
-  const nameLength = elementOf('TestCases', 'name')?.length
+  const nameLength = columnLength('TestCases', 'name')
   if (!d.name && d.topic) d.name = d.topic.slice(0, nameLength)
   if (!d.contentType && d.payload !== undefined) d.contentType = detectContentType(d.payload)
   d.userProperties?.forEach((p) => {
@@ -121,13 +115,19 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
       try {
         JSON.parse(probe)
       } catch (e) {
-        reject(400, `Payload is not valid JSON: ${(e as Error).message}`, 'in/payload')
+        reject(400, `Payload is not valid JSON: ${errMsg(e)}`, 'in/payload')
       }
     }
   }
-  if (d.ackTimeoutMs != null && (d.ackTimeoutMs < 100 || d.ackTimeoutMs > 120000))
-    reject(400, 'ACK timeout must be between 100 and 120000 ms', 'in/ackTimeoutMs')
-  if (d.priority != null && (d.priority < 0 || d.priority > 255)) reject(400, 'Priority must be between 0 and 255', 'in/priority')
+  // the limits are @assert.range in db/schema.cds (CAP checks them for OData requests, this for direct writes)
+  const outside = (value: number | null | undefined, element: string) => {
+    const range = rangeOf('TestCases', element)
+    return value != null && range && (value < range[0] || value > range[1]) ? range : undefined
+  }
+  const ack = outside(d.ackTimeoutMs, 'ackTimeoutMs')
+  if (ack) reject(400, `ACK timeout must be between ${ack[0]} and ${ack[1]} ms`, 'in/ackTimeoutMs')
+  const priority = outside(d.priority, 'priority')
+  if (priority) reject(400, `Priority must be between ${priority[0]} and ${priority[1]}`, 'in/priority')
 
   const seen = new Set<string>()
   d.userProperties?.forEach((p, i) => {
@@ -137,10 +137,19 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
     const problem = propertyValueProblem(p.type, p.value)
     if (problem) reject(400, `User property "${p.name}" ${problem}`, `in/userProperties(${i})/value`)
   })
-  const seenVars = new Set<string>()
-  d.variables?.forEach((v, i) => {
-    if (!VAR_NAME.test(v.name ?? '')) reject(400, `Invalid variable name "${v.name}"`, `in/variables(${i})/name`)
-    if (seenVars.has(v.name)) reject(400, `Duplicate variable "${v.name}"`, `in/variables(${i})/name`)
-    seenVars.add(v.name)
+  validateVariables(d.variables, reject)
+}
+
+/**
+ * Names of a variable list (test case, folder or broker): only names a template can reference ({{name}}),
+ * each once - otherwise whichever row loads last would win.
+ */
+export function validateVariables(list: { name?: string | null }[] | null | undefined, reject: Reject, targetPrefix = 'in/variables'): void {
+  const seen = new Set<string>()
+  list?.forEach((v, i) => {
+    const name = v.name ?? ''
+    if (!VAR_NAME.test(name)) reject(400, `Invalid variable name "${name}"`, `${targetPrefix}(${i})/name`)
+    if (seen.has(name)) reject(400, `Duplicate variable "${name}"`, `${targetPrefix}(${i})/name`)
+    seen.add(name)
   })
 }

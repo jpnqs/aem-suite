@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { parse } from 'yaml'
+import { parse, parseAllDocuments } from 'yaml'
 
 // The MTA lists every UI app by hand (html5 module + zip for the HTML5 repo); scripts/build-ui.js finds them on its own.
 
@@ -17,7 +17,8 @@ const apps = fs
   .readdirSync(path.join(root, 'app'))
   .filter((d) => fs.existsSync(path.join(root, 'app', d, 'ui5.yaml')))
   .map((d) => {
-    const ui5 = parse(fs.readFileSync(path.join(root, 'app', d, 'ui5.yaml'), 'utf8'))
+    // the project is the first document, the extensions of scripts/ui5 follow
+    const ui5 = parseAllDocuments(fs.readFileSync(path.join(root, 'app', d, 'ui5.yaml'), 'utf8'))[0].toJS()
     const zipper = ui5.builder?.customTasks?.find((t: { name: string }) => t.name === 'ui5-task-zipper')
     return { dir: d, zip: `${zipper?.configuration?.archiveName}.zip` }
   })

@@ -6,40 +6,55 @@ using {
   sap.common.CodeList
 } from '@sap/cds/common';
 
-/** Value helps for the enum fields below (initial data in db/data). */
+/**
+ * Value helps for the enum fields below (initial data in db/data).
+ * @singular: the model classes of cds-typer (@cds-models) would otherwise be named like the enum types.
+ */
+@singular: 'CredentialModeCode'
 entity CredentialModes : CodeList {
   key code : CredentialMode;
 }
 
+@singular: 'DeliveryModeCode'
 entity DeliveryModes : CodeList {
   key code : DeliveryMode;
 }
 
+@singular: 'PropertyTypeCode'
 entity PropertyTypes : CodeList {
   key code : PropertyType;
 }
 
+/*
+ * @assert.range on the enum types: CAP rejects other values on every OData write (the UI only offers them as
+ * dropdowns). Direct database writes (agent, import, copy) are checked by lib/node-validation.ts.
+ */
+@assert.range
 type CredentialMode : String(12) enum {
   DESTINATION;
   DIRECT;
 }
 
+@assert.range
 type DeliveryMode   : String(12) enum {
   PERSISTENT;
   DIRECT;
 }
 
+@assert.range
 type RunStatus      : String(10) enum {
   RUNNING;
   DONE;
   FAILED;
 }
 
+@assert.range
 type NodeKind       : String(10) enum {
   FOLDER;
   TEST;
 }
 
+@assert.range
 type ResultStatus   : String(10) enum {
   PENDING;
   PASSED;
@@ -49,18 +64,21 @@ type ResultStatus   : String(10) enum {
   SKIPPED;
 }
 
+@assert.range
 type PropertyType   : String(10) enum {
   STRING;
   INT;
   BOOL;
 }
 
+@assert.range
 type ConnectionStatus : String(10) enum {
   OK;
   ERROR;
 }
 
 /** where a live view message came from (SubscribeService.SourceType) */
+@assert.range
 type SourceType     : String(15) enum {
   TOPIC;
   QUEUE_BROWSE;
@@ -68,10 +86,21 @@ type SourceType     : String(15) enum {
 }
 
 /** delivery mode of a received message - NON_PERSISTENT exists on receive only */
+@assert.range
 type ReceivedDeliveryMode : String(20) enum {
   DIRECT;
   NON_PERSISTENT;
   PERSISTENT;
+}
+
+/** Client username on a broker (Brokers and the saved setups of the live subscriber). */
+type Username : String(200);
+
+/** ROUND: the whole selection N times (a b c a b c), EACH: every test case N times in a row (a a b b c c) */
+@assert.range
+type RunOrder : String(5) enum {
+  ROUND;
+  EACH;
 }
 
 /** A Solace / Advanced Event Mesh broker (message VPN) to test against. */
@@ -88,9 +117,9 @@ entity Brokers : cuid, managed {
    * DIRECT mode: the password is never stored - it is entered for each run / connection test / subscription.
    * The username is optional: if empty, it is entered together with the password.
    */
-  username               : String(200);
+  username               : Username;
   clientNamePrefix       : String(60) default 'aem-suite';
-  connectTimeoutMs       : Integer default 10000;
+  connectTimeoutMs       : Integer default 10000 @assert.range: [1000, 120000];
   active                 : Boolean default true;
   lastConnectionStatus   : ConnectionStatus;
   lastConnectionAt       : Timestamp;
@@ -110,6 +139,7 @@ entity Variables : cuid {
  * Test cases and folders in one tree (Fiori tree table).
  * FOLDER nodes only use name, description, variables and children.
  */
+@singular: 'TestCase' // cds-typer would derive "TestCas"
 entity TestCases : cuid, managed {
   kind           : NodeKind default 'TEST' @mandatory;
   parent         : Association to TestCases;
@@ -131,15 +161,18 @@ entity TestCases : cuid, managed {
   /** empty / 0 = no TTL; empty priority / DMQ = broker defaults */
   timeToLiveMs   : Integer;
   dmqEligible    : Boolean;
-  priority       : Integer;
+  priority       : Integer @assert.range: [0, 255];
   /** correlation id template, e.g. {{uuid}} */
   correlationId  : String(200);
-  ackTimeoutMs   : Integer default 5000;
+  ackTimeoutMs   : Integer default 5000 @assert.range: [100, 120000];
   userProperties : Composition of many TestCaseProperties
                      on userProperties.testCase = $self;
   variables      : Composition of many TestCaseVariables
                      on variables.testCase = $self;
-  /** outcome of the latest run (kept separately, so runs do not touch modifiedAt) */
+  /**
+   * outcome of the latest run (kept separately, so runs do not touch modifiedAt; not a composition, so a draft
+   * does not copy it). TestService deletes the stats of deleted test cases.
+   */
   lastResult     : Association to one TestCaseStats
                      on lastResult.testCase = $self;
 }
@@ -183,6 +216,8 @@ entity TestRuns : cuid, managed {
   skippedCount : Integer default 0;
   /** advanced run settings (Run dialog): how often each message is sent, the pause between messages, ... */
   repetitions  : Integer default 1;
+  /** the order of the repetitions ("order" is an SQL keyword) */
+  repetitionOrder : RunOrder default 'ROUND';
   delayMs      : Integer default 0;
   stopOnFailure : Boolean default false;
   results     : Composition of many RunResults
@@ -240,13 +275,15 @@ entity SubscriberPresets : cuid, managed {
   /** queue name (QUEUE_BROWSE / QUEUE_CONSUME) */
   queue      : String(500);
   /** only if the user wants it remembered; DIRECT brokers without a maintained username */
-  username   : String(100);
+  username   : Username;
 }
 
 /**
  * Number ranges: issue real-looking identifiers (like SAP number ranges). Used in templates as
  * {{numberRange.<name>}}; every message that uses a range gets the next number. `current` is the last number issued.
  */
+// the name check of AdminService ignores case; the constraint also stops two creates that pass it at the same time
+@assert.unique: {name: [name]}
 entity NumberRanges : cuid, managed {
   /** used in the template: {{numberRange.<name>}} */
   name        : String(50) @mandatory;
@@ -264,3 +301,124 @@ entity NumberRanges : cuid, managed {
   current     : Integer64;
   lastUsedAt  : Timestamp;
 }
+
+// ---------------------------------------------------------------------------------------------- field titles
+// Titles and tooltips of the fields, for every app and service (CAP passes them on to the projections).
+// The apps (app/*/annotations.cds) only add their layout. Timestamps are worded "<what> At".
+
+annotate Brokers with {
+  name                  @title: '{i18n>Name}';
+  description           @title: '{i18n>Description}';
+  credentialMode        @title: '{i18n>Credentials}';
+  destinationName       @title: '{i18n>Destination}'
+                        @Common.QuickInfo: '{i18n>InfoBTPDestinationURLWssEndpointAddition}';
+  url                   @title: '{i18n>URL}'
+                        @Common.QuickInfo: '{i18n>InfoHostIsEnoughEGMrXyzMessagingSolaceCl}';
+  msgVpn                @title: '{i18n>MessageVPN}';
+  username              @title: '{i18n>Username}'
+                        @Common.QuickInfo: '{i18n>InfoOptionalIfEmptyTheUsernameIsAskedFor}';
+  clientNamePrefix      @title: '{i18n>ClientNamePrefix}';
+  connectTimeoutMs      @title: '{i18n>ConnectTimeoutMs}';
+  active                @title: '{i18n>Active}';
+  lastConnectionStatus  @title: '{i18n>Status}';
+  lastConnectionAt      @title: '{i18n>TestedAt}';
+  lastConnectionMessage @title: '{i18n>Message}';
+};
+
+annotate Variables with {
+  name  @title: '{i18n>Name}'  @Common.QuickInfo: '{i18n>InfoReferenceItInDoubleCurlyBracesInTopi}';
+  value @title: '{i18n>Value}';
+};
+
+annotate TestCases with {
+  name          @title: '{i18n>Name}'  @Common.QuickInfo: '{i18n>InfoTestCasesEmptyTopic}';
+  kind          @title: '{i18n>Type}';
+  description   @title: '{i18n>Description}';
+  topic         @title: '{i18n>Topic}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur}';
+  payload       @title: '{i18n>Payload}';
+  contentType   @title: '{i18n>ContentType}'  @Common.QuickInfo: '{i18n>InfoDefaultApplicationJsonEmptyDetectedO}';
+  deliveryMode  @title: '{i18n>DeliveryMode}';
+  timeToLiveMs  @title: '{i18n>TimeToLiveMs}'  @Common.QuickInfo: '{i18n>InfoEmptyOr0NoExpiry}';
+  dmqEligible   @title: '{i18n>DMQEligible}'  @Common.QuickInfo: '{i18n>InfoEmptyBrokerDefault}';
+  priority      @title: '{i18n>Priority0255}'  @Common.QuickInfo: '{i18n>InfoEmptyBrokerDefault}';
+  correlationId @title: '{i18n>CorrelationID}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur2}';
+  ackTimeoutMs  @title: '{i18n>ACKTimeoutMs}';
+  createdBy     @title: '{i18n>CreatedBy}';
+  modifiedAt    @title: '{i18n>ChangedAt}';
+  modifiedBy    @title: '{i18n>ChangedBy}';
+};
+
+annotate TestCaseProperties with {
+  name  @title: '{i18n>Name}';
+  value @title: '{i18n>Value}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur3}';
+  type  @title: '{i18n>Type}'  @Common.QuickInfo: '{i18n>InfoEmptyDetectedOnSave42IntegerTrueBool}';
+};
+
+annotate TestCaseVariables with {
+  name  @title: '{i18n>Name}';
+  value @title: '{i18n>Value}';
+};
+
+annotate TestCaseStats with {
+  status  @title: '{i18n>Status}';
+  runAt   @title: '{i18n>RunAt}';
+  brokers @title: '{i18n>Brokers}';
+  message @title: '{i18n>Problems}';
+};
+
+annotate TestRuns with {
+  createdAt       @title: '{i18n>StartedAt}';
+  createdBy       @title: '{i18n>StartedBy}';
+  summary         @title: '{i18n>TestCasesBrokers}';
+  startedAt       @title: '{i18n>StartedAt}';
+  finishedAt      @title: '{i18n>FinishedAt}';
+  status          @title: '{i18n>RunStatus}';
+  totalCount      @title: '{i18n>Total}';
+  passedCount     @title: '{i18n>Passed}';
+  failedCount     @title: '{i18n>FailedError}';
+  skippedCount    @title: '{i18n>NotSent}'  @Common.QuickInfo: '{i18n>InfoMessagesThatWereNotSentTheRunWasStop}';
+  repetitions     @title: '{i18n>Repetitions}';
+  repetitionOrder @title: '{i18n>Order}'  @Common.QuickInfo: '{i18n>InfoWholeSelectionABCABCOrEachTestCaseIn}';
+  delayMs         @title: '{i18n>PauseMs}'  @Common.QuickInfo: '{i18n>InfoPauseBetweenTwoMessagesToTheSameBrok}';
+  stopOnFailure   @title: '{i18n>StopAtFirstFailure}';
+};
+
+annotate RunResults with {
+  testCaseName    @title: '{i18n>TestCase}';
+  brokerName      @title: '{i18n>Broker}';
+  status          @title: '{i18n>Status}';
+  iteration       @title: '{i18n>Repetition}'  @Common.QuickInfo: '{i18n>InfoWhichRepetitionOfTheTestCaseThisIs1T}';
+  deliveryMode    @title: '{i18n>DeliveryMode}';
+  resolvedTopic   @title: '{i18n>Topic}';
+  resolvedPayload @title: '{i18n>Payload}';
+  correlationId   @title: '{i18n>CorrelationID}';
+  ackLatencyMs    @title: '{i18n>ACKLatencyMs}';
+  errorMessage    @title: '{i18n>Error}';
+  executedAt      @title: '{i18n>ExecutedAt}';
+};
+
+annotate ReceivedMessages with {
+  brokerName     @title: '{i18n>Broker}';
+  source         @title: '{i18n>SubscriptionQueue}';
+  sourceType     @title: '{i18n>SourceType}';
+  topic          @title: '{i18n>Topic}';
+  payload        @title: '{i18n>Payload}';
+  contentType    @title: '{i18n>ContentType}';
+  userProperties @title: '{i18n>UserProperties}';
+  correlationId  @title: '{i18n>CorrelationID}';
+  deliveryMode   @title: '{i18n>DeliveryMode}';
+  receivedAt     @title: '{i18n>ReceivedAt}';
+  createdBy      @title: '{i18n>SavedBy}';
+};
+
+annotate NumberRanges with {
+  name        @title: '{i18n>Name}'  @Common.QuickInfo: '{i18n>InfoUseItInTopicsPayloadsCorrelationIdsA}';
+  description @title: '{i18n>Description}';
+  prefix      @title: '{i18n>Prefix}'  @Common.QuickInfo: '{i18n>InfoTextInFrontOfTheNumberEGSO}';
+  suffix      @title: '{i18n>Suffix}'  @Common.QuickInfo: '{i18n>InfoTextAfterTheNumberEGEU}';
+  length      @title: '{i18n>Digits}'  @Common.QuickInfo: '{i18n>InfoLengthOfTheNumberFilledWithLeadingZe}';
+  start       @title: '{i18n>FirstNumber}';
+  step        @title: '{i18n>Step}'  @Common.QuickInfo: '{i18n>InfoIncrementBetweenTwoNumbers}';
+  maximum     @title: '{i18n>LastAllowedNumber}'  @Common.QuickInfo: '{i18n>InfoEmptyUntilTheNumberNoLongerFitsIntoT}';
+  lastUsedAt  @title: '{i18n>LastUsedAt}'  @Common.QuickInfo: '{i18n>InfoWhenARunTookANumberLast}';
+};

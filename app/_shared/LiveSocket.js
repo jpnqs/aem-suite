@@ -1,7 +1,7 @@
 sap.ui.define(["module"], function (module) {
   "use strict";
 
-  // namespace of the app this copy belongs to (see scripts/sync-shared-ui.js)
+  // namespace of the app this module is loaded for (see scripts/ui5/shared-ui.js)
   var APP_NAMESPACE = module.id.replace(/\/shared\/[^/]+$/, "");
   var MAX_BACKOFF_MS = 30000;
 

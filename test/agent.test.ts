@@ -1,29 +1,10 @@
 import cds from '@sap/cds'
-import { fakeBroker, resetDatabase, startServer, users, withAemSuiteConfig } from './helpers'
+import { fakeBroker, mcpRpc, resetDatabase, startServer, useDestinations, users, withAemSuiteConfig } from './helpers'
 
 const { POST, GET } = startServer()
 const { tester } = users
-const MCP_HEADERS = { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' }
 
-/** One MCP JSON-RPC request to the agent endpoint (the server answers as an event stream). */
-async function rpc(method: string, params: object = {}, auth: object | null = tester) {
-  const res = await POST(
-    '/mcp/agent',
-    { jsonrpc: '2.0', id: 1, method, params },
-    { ...(auth ?? {}), headers: MCP_HEADERS, responseType: 'text', transformResponse: (r: string) => r }
-  )
-  const data = String(res.data)
-  const line = data.split('\n').find((l) => l.startsWith('data:'))
-  return { status: res.status, body: line ? JSON.parse(line.slice(5)) : data.length ? safeJson(data) : null }
-}
-
-const safeJson = (s: string) => {
-  try {
-    return JSON.parse(s)
-  } catch {
-    return s
-  }
-}
+const rpc = (method: string, params: object = {}, auth: object | null = tester) => mcpRpc(POST, method, params, auth)
 
 type ToolResult = { ok: boolean; result?: any; error?: string }
 
@@ -49,9 +30,10 @@ describe('AI agent service (MCP)', () => {
   let folder: { ID: string }
   let testCase: { ID: string }
 
+  useDestinations([{ name: 'aem-dest', url: 'https://dest.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }])
+
   beforeAll(async () => {
     await resetDatabase()
-    process.env.destinations = JSON.stringify([{ name: 'aem-dest', url: 'https://dest.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }])
     await INSERT.into('aem.suite.Brokers').entries([
       { ID: dest.ID, name: 'dest', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: true },
       { ID: direct.ID, name: 'direct', credentialMode: 'DIRECT', url: 'wss://d:443', msgVpn: 'v', username: 'u', active: true }
@@ -69,10 +51,6 @@ describe('AI agent service (MCP)', () => {
     await call('createTestCase', { topic: 'ping/a', parentId: folder.ID })
   })
 
-  afterAll(() => {
-    delete process.env.destinations
-  })
-
   describe('access', () => {
     it('speaks MCP to testers only', async () => {
       const init = await rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'test', version: '1' } })
@@ -82,6 +60,9 @@ describe('AI agent service (MCP)', () => {
 
       const anonymous = await rpc('tools/list', {}, null)
       expect(anonymous.status).toBe(401)
+      // logged in, but without the Tester role
+      const noRole = await rpc('tools/list', {}, users.noRole)
+      expect(noRole.status).toBe(403)
     })
 
     it('offers describe, query and call - and no way to reach admin data or delete', async () => {
@@ -178,7 +159,9 @@ describe('AI agent service (MCP)', () => {
       expect(bad.error).toMatch(/ACK timeout must be between/)
       expect(bad.error).toMatch(/must be an integer/)
       expect(bad.error).toMatch(/Duplicate user property "n"/)
+    })
 
+    it('checks the place and the required fields, and creates nothing on a problem', async () => {
       expect((await call('createTestCase', { topic: 'x', parentId: cds.utils.uuid() })).error).toMatch(/Parent folder not found/)
       expect((await call('createTestCase', { topic: 'x', parentId: testCase.ID })).error).toMatch(/only be placed in folders/)
       expect(await call('createFolder', { name: '  ' })).toMatchObject({ ok: false, error: expect.stringMatching(/Folder name is required/) })
@@ -204,7 +187,10 @@ describe('AI agent service (MCP)', () => {
       expect(row).toMatchObject({ name: 'To change', topic: 'change/{{uuid}}', priority: 7 })
       expect(row.userProperties).toEqual([{ name: 'only' }])
       expect(row.variables).toEqual([{ name: 'region', value: 'eu' }]) // not given -> unchanged
+    })
 
+    it('refuses invalid changes, the wrong kind of node and unknown nodes', async () => {
+      const own = (await call('createTestCase', { name: 'Not to break', topic: 'keep/{{uuid}}' })).result
       const bad = await call('updateTestCase', { id: own.ID, payload: '{oops' })
       expect(bad.error).toMatch(/Payload is not valid JSON/)
       expect((await call('updateTestCase', { id: folder.ID, priority: 1 })).error).toMatch(/use updateFolder/)
@@ -317,7 +303,7 @@ describe('AI agent service (MCP)', () => {
       expect(run.result.total).toBe(3) // Order created, ping/a, rejected
 
       const summary = await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
-      expect(summary.result).toMatchObject({ finished: true, status: 'DONE', outcome: 'FAILED', total: 3, passed: 2, failed: 1 })
+      expect(summary.result).toMatchObject({ finished: true, status: 'DONE', outcome: 'FAILED', total: 3, passed: 2, failed: 1, skipped: 0 })
       expect(summary.result.failures).toEqual([
         expect.objectContaining({ testCase: 'rejected', broker: 'dest', status: 'FAILED', error: 'Rejected by broker: no subscribers' })
       ])
@@ -327,6 +313,26 @@ describe('AI agent service (MCP)', () => {
       // details are readable, too
       const results = await query(`SELECT testCaseName, status, ackLatencyMs from RunResults where run_ID = '${run.result.runId}'`)
       expect(results.map((r) => `${r.testCaseName}:${r.status}`).sort()).toEqual(['Order created:PASSED', 'ping/a:PASSED', 'rejected:FAILED'])
+    })
+
+    it('lists up to 25 failures, never skipped or pending messages, and counts the skipped ones', async () => {
+      const id = cds.utils.uuid()
+      const rows = (status: string, n: number, from: number) =>
+        Array.from({ length: n }, (_, i) => ({ ID: cds.utils.uuid(), run_ID: id, testCaseName: `${status} ${i}`, brokerName: 'dest', status, sequence: from + i }))
+      await INSERT.into('aem.suite.TestRuns').entries({ ID: id, summary: 'x', status: 'DONE', totalCount: 38, passedCount: 0, failedCount: 30, skippedCount: 5, createdBy: 'tester' })
+      // PENDING and SKIPPED first: they must not take the places of the failures
+      await INSERT.into('aem.suite.RunResults').entries([...rows('PENDING', 3, 1), ...rows('SKIPPED', 5, 4), ...rows('ERROR', 30, 9)])
+      try {
+        const s = (await call('getRunSummary', { runId: id })).result
+        expect(s).toMatchObject({ failed: 30, skipped: 5 })
+        expect(s.failures).toHaveLength(25)
+        expect(s.failures.every((f: { status: string }) => f.status === 'ERROR')).toBe(true)
+        const [run] = await query(`SELECT skippedCount, repetitions from TestRuns where ID = '${id}'`)
+        expect(run).toMatchObject({ skippedCount: 5, repetitions: 1 })
+      } finally {
+        await DELETE.from('aem.suite.RunResults').where({ run_ID: id })
+        await DELETE.from('aem.suite.TestRuns').where({ ID: id })
+      }
     })
 
     it('reports a running run as such when it does not wait', async () => {
@@ -364,14 +370,15 @@ describe('AI agent service (MCP)', () => {
           credentials: [{ brokerId: direct.ID, password: 'pw' }]
         })
         expect(run.ok).toBe(true)
-        await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
+        const summary = await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
+        expect(summary.result).toMatchObject({ finished: true, passed: 1 })
         expect(connectedAs.direct).toBe('u')
       }))
 
     it('limits the size of a run and the number of parallel runs', () =>
       withAemSuiteConfig({ agent: { maxRunResults: 1, maxActiveRuns: 1 } }, async () => {
         const big = await call('runTests', { testCaseIds: [folder.ID], brokerIds: [dest.ID] })
-        expect(big.error).toMatch(/at most 1 results .* would have 2/)
+        expect(big.error).toMatch(/at most 1 messages .* would have 2/)
 
         const id = cds.utils.uuid()
         await INSERT.into('aem.suite.TestRuns').entries({ ID: id, summary: 'x', status: 'RUNNING', totalCount: 1, createdBy: 'tester' })

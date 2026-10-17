@@ -34,6 +34,8 @@ describe('saved setups of the live subscriber', () => {
     const same = await POST(URL, { name: ' Orders ', sourceType: 'TOPIC' }, tester)
     expect(same.status).toBe(400)
     expect(same.data.error.message).toMatch(/exists already/)
+    // regardless of case (the subscriber page updates a setup of the same name in any case)
+    expect((await POST(URL, { name: 'ORDERS', sourceType: 'TOPIC' }, tester)).data.error.message).toBe('A setup named "ORDERS" exists already')
     // another user may use the same name
     expect((await POST(URL, { name: 'Orders', sourceType: 'TOPIC' }, admin)).status).toBe(201)
   })

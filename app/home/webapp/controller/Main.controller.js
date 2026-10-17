@@ -4,25 +4,25 @@ sap.ui.define(
     "sap/ui/model/json/JSONModel",
     "sap/ui/core/format/DateFormat",
     "com/aem/suite/home/shared/Navigation",
-    "com/aem/suite/home/shared/Actions"
+    "com/aem/suite/home/shared/Actions",
+    "com/aem/suite/home/shared/Apps"
   ],
-  function (Controller, JSONModel, DateFormat, Navigation, Actions) {
+  function (Controller, JSONModel, DateFormat, Navigation, Actions, Apps) {
     "use strict";
 
-    /**
-     * The apps of the suite, in the order of the page. role: what the user needs to open the app (null = everyone).
-     * Icons as on the launchpad tiles (app/launchpad/webapp/index.html).
-     */
+    /** The app tiles of the page, in this order; intent, icon and role come from shared/Apps.js. */
     var APPS = [
-      { key: "testcases", intent: "AEMSuiteTestCases-manage", icon: "sap-icon://lab", color: "Accent6", role: "tester" },
-      { key: "runs", intent: "AEMSuiteTestRuns-display", icon: "sap-icon://kpi-managing-my-area", color: "Accent8", role: "tester" },
-      { key: "subscriber", intent: "AEMSuiteSubscriber-display", icon: "sap-icon://feeder-arrow", color: "Accent5", role: "tester" },
-      { key: "messages", intent: "AEMSuiteSavedMessages-display", icon: "sap-icon://inbox", color: "Accent4", role: "tester" },
-      { key: "brokers", intent: "AEMSuiteBrokers-manage", icon: "sap-icon://connected", color: "Accent1", role: "admin" },
-      { key: "variables", intent: "AEMSuiteVariables-manage", icon: "sap-icon://key-user-settings", color: "Accent3", role: "admin" },
-      { key: "numberranges", intent: "AEMSuiteNumberRanges-manage", icon: "sap-icon://numbered-text", color: "Accent2", role: "admin" },
-      { key: "help", intent: "AEMSuiteHelp-display", icon: "sap-icon://sys-help", color: "Accent10", role: null }
-    ];
+      { key: "testcases", color: "Accent6" },
+      { key: "runs", color: "Accent8" },
+      { key: "subscriber", color: "Accent5" },
+      { key: "messages", color: "Accent4" },
+      { key: "brokers", color: "Accent1" },
+      { key: "variables", color: "Accent3" },
+      { key: "numberranges", color: "Accent2" },
+      { key: "help", color: "Accent10" }
+    ].map(function (a) {
+      return Object.assign({}, Apps.get(a.key), a);
+    });
     var LAST_RUNS = 3;
     /** while a run is in progress, the page follows it */
     var REFRESH_WHILE_RUNNING_MS = 10000;
@@ -38,7 +38,7 @@ sap.ui.define(
     function open(key, path) {
       var app = appByKey(key);
       if (app) {
-        Navigation.toApp({ app: app.key, intent: app.intent, path: path || "" });
+        Navigation.toApp({ app: app.key, path: path || "" });
       }
     }
 
@@ -129,7 +129,9 @@ sap.ui.define(
       /** Only what needs to be done - empty when all is well. */
       _attention: function (o) {
         var t = this._text.bind(this);
-        if (!o.tester) return [{ text: t("attention.noRole"), state: "Information", icon: "sap-icon://message-information" }];
+        if (!o.tester) {
+          return [{ text: t("attention.noRole"), state: "Information", icon: "sap-icon://message-information" }];
+        }
         var items = [];
         var error = function (text, action, target) {
           items.push({ text: text, state: "Error", icon: "sap-icon://error", action: action, target: target });
@@ -138,12 +140,22 @@ sap.ui.define(
           items.push({ text: text, state: "Information", icon: "sap-icon://message-information", action: action, target: target });
         };
         var brokersLink = o.admin ? "brokers" : null;
-        if (o.resultsFailed) error(t("attention.failedResults", [o.resultsFailed]), t("action.runs"), "runs");
+        if (o.resultsFailed) {
+          error(t("attention.failedResults", [o.resultsFailed]), t("action.runs"), "runs");
+        }
         var failing = o.failingBrokers || [];
-        if (failing.length === 1) error(t("attention.failingBroker", [failing[0]]), t("action.brokers"), brokersLink);
-        if (failing.length > 1) error(t("attention.failingBrokers", [failing.join(", ")]), t("action.brokers"), brokersLink);
-        if (!o.brokers) info(t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
-        if (!o.testCases) info(t("attention.noTestCases"), t("action.testcases"), "testcases");
+        if (failing.length === 1) {
+          error(t("attention.failingBroker", [failing[0]]), t("action.brokers"), brokersLink);
+        }
+        if (failing.length > 1) {
+          error(t("attention.failingBrokers", [failing.join(", ")]), t("action.brokers"), brokersLink);
+        }
+        if (!o.brokers) {
+          info(t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
+        }
+        if (!o.testCases) {
+          info(t("attention.noTestCases"), t("action.testcases"), "testcases");
+        }
         return items;
       },
 

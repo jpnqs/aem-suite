@@ -1,9 +1,11 @@
 using AdminService as service from '../../srv/admin-service';
 
+// field titles: db/schema.cds - here only the layout
+
 annotate service.GlobalVariables with @(
   UI.HeaderInfo     : {
-    TypeName      : 'Global Variable',
-    TypeNamePlural: 'Global Variables',
+    TypeName      : '{i18n>GlobalVariable}',
+    TypeNamePlural: '{i18n>GlobalVariables}',
     Title         : {Value: name},
     Description   : {Value: value}
   },
@@ -20,10 +22,9 @@ annotate service.GlobalVariables with @(
     $Type : 'UI.ReferenceFacet',
     ID    : 'Main',
     Target: '@UI.FieldGroup#Main',
-    Label : 'Variable'
+    Label : '{i18n>Variable}'
   }]
 ) {
-  name   @title: 'Name'  @Common.QuickInfo: 'Reference it in double curly braces in topics, payloads, correlation ids and user properties';
-  value  @title: 'Value'  @UI.MultiLineText;
+  value  @UI.MultiLineText;
   broker @UI.Hidden;
 };

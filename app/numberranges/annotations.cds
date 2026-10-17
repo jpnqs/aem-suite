@@ -1,9 +1,11 @@
 using AdminService as service from '../../srv/admin-service';
 
+// field titles: db/schema.cds (lastNumber / nextNumber: srv/admin-service.cds) - here only the layout
+
 annotate service.NumberRanges with @(
   UI.HeaderInfo      : {
-    TypeName      : 'Number Range',
-    TypeNamePlural: 'Number Ranges',
+    TypeName      : '{i18n>NumberRange}',
+    TypeNamePlural: '{i18n>NumberRanges}',
     Title         : {Value: name},
     Description   : {Value: description}
   },
@@ -16,35 +18,27 @@ annotate service.NumberRanges with @(
     {Value: description},
     {
       Value            : nextNumber,
-      Label            : 'Next Number',
       ![@UI.Importance]: #High
     },
     {
       Value            : lastNumber,
-      Label            : 'Last Issued',
       ![@UI.Importance]: #High
     },
     {Value: lastUsedAt},
     {
       $Type : 'UI.DataFieldForAction',
       Action: 'AdminService.reset',
-      Label : 'Reset'
+      Label : '{i18n>Reset}'
     }
   ],
   UI.Identification  : [{
     $Type : 'UI.DataFieldForAction',
     Action: 'AdminService.reset',
-    Label : 'Reset'
+    Label : '{i18n>Reset}'
   }],
   UI.FieldGroup #Status : {Data: [
-    {
-      Value: nextNumber,
-      Label: 'Next Number'
-    },
-    {
-      Value: lastNumber,
-      Label: 'Last Issued'
-    },
+    {Value: nextNumber},
+    {Value: lastNumber},
     {Value: lastUsedAt}
   ]},
   UI.FieldGroup #General : {Data: [
@@ -66,38 +60,36 @@ annotate service.NumberRanges with @(
       $Type : 'UI.ReferenceFacet',
       ID    : 'General',
       Target: '@UI.FieldGroup#General',
-      Label : 'General'
+      Label : '{i18n>General}'
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Format',
       Target: '@UI.FieldGroup#Format',
-      Label : 'Format'
+      Label : '{i18n>Format}'
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Range',
       Target: '@UI.FieldGroup#Range',
-      Label : 'Range'
+      Label : '{i18n>Range}'
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Status',
       Target: '@UI.FieldGroup#Status',
-      Label : 'Status'
+      Label : '{i18n>Status}'
     }
   ]
 ) {
-  name        @title: 'Name'          @Common.QuickInfo: 'Use it in topics, payloads, correlation ids and user properties as {{numberRange.<name>}}';
-  description @title: 'Description';
-  prefix      @title: 'Prefix'        @Common.QuickInfo: 'Text in front of the number, e.g. SO-';
-  suffix      @title: 'Suffix'        @Common.QuickInfo: 'Text after the number, e.g. -EU';
-  length      @title: 'Digits'        @Common.QuickInfo: 'Length of the number, filled with leading zeros (0 = no leading zeros)';
-  start       @title: 'First Number';
-  step        @title: 'Step'          @Common.QuickInfo: 'Increment between two numbers';
-  maximum     @title: 'Last Allowed Number'  @Common.QuickInfo: 'Empty = until the number no longer fits into the digits';
-  current     @UI.Hidden;
-  lastUsedAt  @title: 'Last Used'      @Common.QuickInfo: 'When a run took a number last';
-  lastNumber  @title: 'Last Issued'    @Core.Computed;
-  nextNumber  @title: 'Next Number'    @Core.Computed;
+  current @UI.Hidden;
+};
+
+annotate service.NumberRanges actions {
+  reset @Common.SideEffects: {TargetProperties: [
+    'in/current',
+    'in/lastNumber',
+    'in/nextNumber'
+  ]}
+  (nextNumber @Common.Label: '{i18n>NextNumberEmptyStartOfTheRange}');
 };

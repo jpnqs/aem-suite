@@ -22,6 +22,11 @@ mta_archives/
 .DS_Store
 *.orig
 *.log
+*.tgz
+coverage/
+# local secrets (local/README.md)
+.env
+.env.*
 
 *.iml
 *.flattened-pom.xml
@@ -39,3 +44,5 @@ app/*/dist/
 # Playwright
 test-results/
 playwright-report/
+# app/_shared reaches the apps through the UI5 build and dev server (scripts/ui5/shared-ui.js)
+app/*/webapp/shared/

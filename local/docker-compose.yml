@@ -1,6 +1,7 @@
 services:
   solace:
-    image: solace/solace-pubsub-standard:latest
+    # a fixed version, so every developer runs the same broker (10.26.0 = "lts" / "latest" as of 2026-10)
+    image: solace/solace-pubsub-standard:10.26.0
     container_name: solace-broker
     hostname: solace
     ports:
@@ -18,4 +19,5 @@ services:
         hard: 1048576
     environment:
       - username_admin_globalaccesslevel=admin
-      - username_admin_password=admin
+      # local only; set SOLACE_ADMIN_PASSWORD (and SOLACE_SEMP_PASSWORD for terragrunt/tg.ps1) to use another one
+      - username_admin_password=${SOLACE_ADMIN_PASSWORD:-admin}

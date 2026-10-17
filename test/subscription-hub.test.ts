@@ -157,6 +157,36 @@ describe('subscription hub (live view)', () => {
       await expect(start()).resolves.toBeTruthy()
     }))
 
+  it('closes the session and answers 400 when the broker refuses a topic', async () => {
+    setSessionFactory(async () => {
+      const s = new FakeSubscriberSession()
+      s.failSubscribe = 'secret'
+      sessions.push(s)
+      return s
+    })
+    await expect(start({ topics: ['acme/>', 'secret/>'] })).rejects.toMatchObject({ status: 400, message: 'Subscription rejected: Subscription ACL Denied (secret/>)' })
+    expect(sessions[0].closed).toBe(true)
+    expect(listSubscriptions('alice')).toEqual([])
+  })
+
+  it('closes a queue subscription whose flow went down', async () => {
+    const id = await start({ sourceType: 'QUEUE_CONSUME', queue: 'orders' })
+    sessions[0].flow.emit(sol().MessageConsumerEventName.DOWN_ERROR)
+    await settle()
+    expect(listSubscriptions('alice')).toEqual([])
+    expect(sessions[0].closed).toBe(true)
+    expect(statusOf(id)).toEqual([expect.objectContaining({ data: expect.objectContaining({ status: 'DOWN', message: 'Queue consumer went down' }) })])
+  })
+
+  it('still shows a consumed message when acknowledging it fails', async () => {
+    const id = await start({ sourceType: 'QUEUE_CONSUME', queue: 'orders' })
+    sessions[0].flow.failAck = true
+    sessions[0].flow.deliver(sol().MessageConsumerEventName.MESSAGE)
+    await settle()
+    expect(messagesOf(id)).toHaveLength(1)
+    expect(listSubscriptions('alice')).toHaveLength(1)
+  })
+
   it('closes subscriptions the broker dropped', async () => {
     const id = await start()
     sessions[0].drop()
@@ -179,4 +209,17 @@ describe('subscription hub (live view)', () => {
         expect.objectContaining({ data: expect.objectContaining({ status: 'STOPPED', message: expect.stringMatching(/idle timeout/) }) })
       ])
     }))
+
+  it('answers user errors with 4xx: unknown or inactive broker, failed connect', async () => {
+    const status = async (p: Promise<unknown>) => p.then(() => 'ok', (e: { status?: number; message: string }) => `${e.status}: ${e.message}`)
+    expect(await status(start({ brokerId: cds.utils.uuid() }))).toMatch(/^404: Broker .* not found$/)
+    const inactive = cds.utils.uuid()
+    await INSERT.into('aem.suite.Brokers').entries({ ID: inactive, name: 'off', credentialMode: 'DIRECT', url: 'wss://off:443', msgVpn: 'v', username: 'u', active: false })
+    expect(await status(start({ brokerId: inactive }))).toBe('400: Broker "off" is inactive')
+    setSessionFactory(async () => {
+      throw new Error('Connect failed: Unauthorized')
+    })
+    expect(await status(start())).toBe('400: Connect failed: Unauthorized')
+    expect(sessions).toHaveLength(0)
+  })
 })

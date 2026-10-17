@@ -1,6 +1,6 @@
 /**
- * "Smart defaults": completes user input so less has to be typed - and the runtime defaults
- * for values left empty (the same as the `default`s in db/schema.cds).
+ * Runtime defaults for values left empty (the same as the `default`s in db/schema.cds) and the starter template
+ * of new test cases. Completing broker URLs is in broker-url.ts.
  */
 
 export const DEFAULT_CLIENT_NAME_PREFIX = 'aem-suite'

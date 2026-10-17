@@ -1,5 +1,5 @@
 import { waitForRun } from '../srv/lib/test-runner'
-import { createActive, fakeBroker, resetDatabase, startServer, users, withAemSuiteConfig } from './helpers'
+import { createActive, fakeBroker, resetDatabase, startServer, users, waitFor, withAemSuiteConfig } from './helpers'
 
 const { GET, POST } = startServer()
 const { admin, tester } = users
@@ -17,13 +17,16 @@ describe('advanced run settings (repetitions, delay, stop on failure, stop)', ()
     return POST('/odata/v4/test/runTests', { testCaseIds, brokerIds: [broker.ID], credentials: creds(), options }, auth)
   }
   const results = async (runId: string) =>
-    (await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${runId}&$orderby=sequence&$select=testCaseName,status,iteration,sequence,errorMessage`, tester)).data.value as {
+    (await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${runId}&$orderby=sequence&$select=testCaseName,status,iteration,sequence,errorMessage,executedAt`, tester)).data.value as {
       testCaseName: string
       status: string
       iteration: number
       sequence: number
       errorMessage?: string
+      executedAt: string
     }[]
+  const lastResultOf = async (testCaseId: string) =>
+    ((await GET('/odata/v4/test/TestCaseStats', tester)).data.value as { testCase_ID: string; run_ID: string }[]).find((s) => s.testCase_ID === testCaseId)
 
   beforeAll(async () => {
     await resetDatabase()
@@ -44,31 +47,36 @@ describe('advanced run settings (repetitions, delay, stop on failure, stop)', ()
 
   it('repeats the whole selection (ROUND, default) or every test case in a row (EACH)', async () => {
     let res = await run([a.ID, b.ID], { repetitions: 3 })
+    // the number of messages, so the Run dialog can show the progress right away
+    expect(res.data.total).toBe(6)
     await waitForRun(res.data.runId)
     expect(published.map((p) => p.spec.topic)).toEqual(['run/a', 'run/b', 'run/a', 'run/b', 'run/a', 'run/b'])
     const rows = await results(res.data.runId)
     expect(rows.map((r) => `${r.sequence}:${r.testCaseName}#${r.iteration}`)).toEqual(['1:A#1', '2:B#1', '3:A#2', '4:B#2', '5:A#3', '6:B#3'])
     const { data } = await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)
-    expect(data).toMatchObject({ totalCount: 6, passedCount: 6, repetitions: 3 })
+    expect(data).toMatchObject({ totalCount: 6, passedCount: 6, repetitions: 3, repetitionOrder: 'ROUND' })
     expect(data.summary).toContain('× 3')
 
     res = await run([a.ID, b.ID], { repetitions: 2, order: 'each' })
     await waitForRun(res.data.runId)
     expect(published.map((p) => p.spec.topic)).toEqual(['run/a', 'run/a', 'run/b', 'run/b'])
     expect((await results(res.data.runId)).map((r) => `${r.testCaseName}#${r.iteration}`)).toEqual(['A#1', 'A#2', 'B#1', 'B#2'])
+    // the order is stored with the run, so it can be understood afterwards
+    expect((await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)).data.repetitionOrder).toBe('EACH')
   })
 
   it('pauses between two messages, but not before the first', async () => {
-    const started = Date.now()
     const res = await run([a.ID], { repetitions: 3, delayMs: 150 })
     await waitForRun(res.data.runId)
-    const took = Date.now() - started
     expect(published).toHaveLength(3)
-    expect(took).toBeGreaterThanOrEqual(290) // two pauses
-    expect(took).toBeLessThan(2500)
+    // a message is stored right after it was sent, the next one is sent after the pause
+    const sentAt = (await results(res.data.runId)).map((r) => Date.parse(r.executedAt))
+    expect(sentAt[1] - sentAt[0]).toBeGreaterThanOrEqual(150)
+    expect(sentAt[2] - sentAt[1]).toBeGreaterThanOrEqual(150)
   })
 
   it('stops after the first failure when asked: the rest of the broker is skipped', async () => {
+    const before = await lastResultOf(b.ID)
     const res = await run([a.ID, bad.ID, b.ID], { stopOnFailure: true })
     await waitForRun(res.data.runId)
     const rows = await results(res.data.runId)
@@ -79,8 +87,8 @@ describe('advanced run settings (repetitions, delay, stop on failure, stop)', ()
     const { data } = await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)
     expect(data).toMatchObject({ status: 'DONE', totalCount: 3, passedCount: 1, failedCount: 1, skippedCount: 1, outcome: 'FAILED', stopOnFailure: true })
     // a skipped test case does not change its last result
-    const stats = (await GET('/odata/v4/test/TestCaseStats', tester)).data.value as { testCase_ID: string; run_ID: string }[]
-    expect(stats.find((s) => s.testCase_ID === b.ID)?.run_ID).not.toBe(res.data.runId)
+    expect(await lastResultOf(b.ID)).toEqual(before)
+    expect((await lastResultOf(a.ID))?.run_ID).toBe(res.data.runId)
   })
 
   it('without the setting a failure does not stop the run', async () => {
@@ -89,43 +97,69 @@ describe('advanced run settings (repetitions, delay, stop on failure, stop)', ()
     expect((await results(res.data.runId)).map((r) => `${r.testCaseName}:${r.status}`)).toEqual(['Bad:FAILED', 'B:PASSED'])
   })
 
-  it('can be stopped: what was not sent yet is skipped', async () => {
+  // 100 messages with 300 ms between them: the run takes 30 s, so the stop always comes before its end
+  const REPETITIONS = 100
+
+  it('can be stopped: what was not sent yet is skipped (administrators stop any run)', async () => {
     // started by the administrator: another tester may not stop it
-    const res = await run([a.ID], { repetitions: 20, delayMs: 300 }, admin)
+    const res = await run([a.ID], { repetitions: REPETITIONS, delayMs: 300 }, admin)
     const runId = res.data.runId
     // wait for the first message, then stop
-    while (!published.length) await new Promise((r) => setTimeout(r, 20))
-    expect((await POST('/odata/v4/test/cancelRun', { runId }, tester)).status).toBe(403)
+    await waitFor(() => published.length > 0, 5000, 'the first message')
+    const refused = await POST('/odata/v4/test/cancelRun', { runId }, tester)
+    expect(refused.status).toBe(403)
+    expect(refused.data.error.message).toMatch(/Only the user who started the run/)
     expect((await POST('/odata/v4/test/cancelRun', { runId }, users.noRole)).status).toBe(403)
     expect((await POST('/odata/v4/test/cancelRun', { runId }, admin)).status).toBeLessThan(300)
     await waitForRun(runId)
     const rows = await results(runId)
     const sent = rows.filter((r) => r.status === 'PASSED').length
     expect(sent).toBeGreaterThanOrEqual(1)
-    expect(sent).toBeLessThan(20)
-    expect(rows.filter((r) => r.status === 'SKIPPED')).toHaveLength(20 - sent)
+    expect(sent).toBeLessThan(REPETITIONS)
+    expect(rows.filter((r) => r.status === 'SKIPPED')).toHaveLength(REPETITIONS - sent)
     expect(rows.find((r) => r.status === 'SKIPPED')?.errorMessage).toMatch(/stopped/)
     const { data } = await GET(`/odata/v4/test/TestRuns(${runId})`, tester)
-    expect(data).toMatchObject({ status: 'DONE', passedCount: sent, skippedCount: 20 - sent, failedCount: 0, outcome: 'PASSED' })
+    expect(data).toMatchObject({ status: 'DONE', passedCount: sent, skippedCount: REPETITIONS - sent, failedCount: 0, outcome: 'PASSED' })
     // a finished run cannot be stopped again
-    expect((await POST('/odata/v4/test/cancelRun', { runId }, admin)).status).toBe(409)
-    expect((await POST('/odata/v4/test/cancelRun', { runId: '00000000-0000-4000-8000-000000000000' }, admin)).status).toBe(404)
+    const again = await POST('/odata/v4/test/cancelRun', { runId }, admin)
+    expect(again.status).toBe(409)
+    expect(again.data.error.message).toMatch(/not running/)
+    const unknown = await POST('/odata/v4/test/cancelRun', { runId: '00000000-0000-4000-8000-000000000000' }, admin)
+    expect(unknown.status).toBe(404)
+    expect(unknown.data.error.message).toBe('Run not found')
+  })
+
+  it('a tester stops their own run', async () => {
+    const res = await run([a.ID], { repetitions: REPETITIONS, delayMs: 300 }, tester)
+    await waitFor(() => published.length > 0, 5000, 'the first message')
+    expect((await POST('/odata/v4/test/cancelRun', { runId: res.data.runId }, tester)).status).toBeLessThan(300)
+    await waitForRun(res.data.runId)
+    const { data } = await GET(`/odata/v4/test/TestRuns(${res.data.runId})`, tester)
+    expect(data.skippedCount).toBeGreaterThan(0)
   })
 
   it('checks the settings against the limits', async () => {
-    for (const options of [{ repetitions: 0 }, { repetitions: 1001 }, { repetitions: 1.5 }, { delayMs: -1 }, { delayMs: 60001 }, { order: 'SOMETIMES' }]) {
+    const refused: [object, RegExp][] = [
+      [{ repetitions: 0 }, /Repetitions must be a whole number from 1 to 1000/],
+      [{ repetitions: 1001 }, /Repetitions must be/],
+      [{ repetitions: 1.5 }, /Repetitions must be/],
+      [{ delayMs: -1 }, /delay between messages must be from 0 to 60000 ms/],
+      [{ delayMs: 60001 }, /delay between messages/],
+      [{ order: 'SOMETIMES' }, /order must be ROUND .* or EACH/]
+    ]
+    for (const [options, message] of refused) {
       const res = await run([a.ID], options)
-      expect(res.status).toBe(400)
+      expect({ options, status: res.status, message: res.data.error?.message }).toEqual({ options, status: 400, message: expect.stringMatching(message) })
     }
     const tooMany = await withAemSuiteConfig({ runs: { maxResults: 5 } }, () => run([a.ID, b.ID], { repetitions: 3 }))
     expect(tooMany.status).toBe(400)
     expect(tooMany.data.error.message).toMatch(/at most 5 messages .* 6/)
     const limits = await withAemSuiteConfig({ runs: { maxRepetitions: 2 } }, () => run([a.ID], { repetitions: 3 }))
     expect(limits.status).toBe(400)
+    expect(limits.data.error.message).toMatch(/from 1 to 2$/)
   })
 
   it('numbers from number ranges are taken for every repetition', async () => {
-    await DELETE.from('aem.suite.NumberRanges')
     await createActive(POST, 'admin', 'NumberRanges', { name: 'REP', prefix: 'R-', length: 3, start: 1 }, admin)
     const counted = await createActive(POST, 'test', 'TestCases', { name: 'numbered', topic: 'run/{{numberRange.REP}}', payload: '{}', deliveryMode: 'PERSISTENT' })
     const res = await run([counted.ID], { repetitions: 3 })

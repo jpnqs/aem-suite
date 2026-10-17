@@ -24,7 +24,7 @@ A test result passes when the broker **acknowledges** the message (guaranteed me
 | Broker access | `solclientjs` 10.x (Solace JS API, SMF over `ws(s)://` or `tcp(s)://`) |
 | Live push | `@cap-js-community/websocket` (plain WebSocket, CAP service `LiveService`) |
 | Destinations | `@sap-cloud-sdk/connectivity` 4.x |
-| UI | SAPUI5 **1.148 (LTS)** from CDN: Fiori elements V4 (List Report / Object Page, tree table) and one freestyle UI5 app in TypeScript |
+| UI | SAPUI5 **1.148 (LTS)** from CDN: Fiori elements V4 (List Report / Object Page, tree table) and freestyle UI5 apps; the Live Subscriber and the Test Cases extensions are TypeScript (`ui5-tooling-transpile`) |
 | UI tooling | `cds-plugin-ui5` (serves the apps inside `cds watch`), `@ui5/cli` 4, `ui5-tooling-transpile` |
 | Security | XSUAA, standalone approuter (`@sap/approuter` 23) |
 | Tests | Jest 30 + ts-jest, `@cap-js/cds-test`; Playwright (UI, e2e) |
@@ -51,10 +51,10 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
 **Request flow of a run**
 
 1. UI calls `runTest` / `runTests` with test case or folder IDs, broker IDs and per-broker credentials (password, plus username for brokers without one).
-2. `createRun` validates the input, expands folders to test cases (tree order), and inserts `TestRuns` plus one `PENDING` `RunResults` row per test case × broker in the request transaction.
+2. `createRun` validates the input, expands folders to test cases (tree order), and inserts `TestRuns` plus one `PENDING` `RunResults` row per message – test case × broker × repetition (advanced settings, section 7.6) – in the request transaction.
 3. After commit (`req.on('succeeded')`) `executeRunInBackground` starts. Brokers are processed **in parallel**, the test cases of one broker **sequentially** over one session.
-4. Each result row is updated in its own transaction and a `runProgress` event goes to WebSocket context = run ID.
-5. At the end the run gets status `DONE`, counters, and `TestCaseStats` (last result per test case) is upserted.
+4. Each result row is updated in its own transaction (PASSED, FAILED, ERROR, or SKIPPED when the run was stopped) and a `runProgress` event goes to WebSocket context = run ID.
+5. At the end the run gets status `DONE`, counters, and `TestCaseStats` (last result per test case) is upserted. If storing a result fails, or the run crashes, it ends `FAILED` instead and its open results get `ERROR` (`failRuns`); runs left `RUNNING` by a server restart are ended the same way on the next start.
 
 ## 4. Repository layout
 
@@ -62,26 +62,38 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
 app/
   launchpad/                  sandbox Fiori launchpad (all tiles; webapp/appconfig removes the SAP sample tiles)
   services.cds                imports all UI annotation files
-  brokers/ variables/ runs/ messages/   Fiori elements apps (annotations.cds + webapp/)
+  brokers/ variables/ numberranges/ runs/ messages/   Fiori elements apps (annotations.cds + webapp/)
   testcases/                  Fiori elements app with extensions (webapp/ext/*)
   subscriber/                 freestyle UI5 app in TypeScript
+  help/ home/                 freestyle UI5 apps: the user guide, the start page
+  _shared/                    UI modules all apps share (Apps, Actions, Help, LiveSocket, Navigation, MyEntriesFilter) -
+                              the UI5 build and dev server add them to each app (scripts/ui5, nothing copied or committed)
   router/                     standalone approuter (xs-app.json: MCP, OAuth discovery, everything else from the HTML5 repo)
   <app>/xs-app.json           routes of each app in the HTML5 repo (odata/, ws/ -> destination srv-api)
 db/
   schema.cds                  domain model (namespace aem.suite)
   data/                       code lists (deployed)
 srv/
-  admin-service.*, test-service.*, subscribe-service.*, live-service.cds
+  admin-service.*, test-service.*, subscribe-service.*, live-service.cds   the UI services
+  help-service.*, home-service.*   Help app and Home app (every logged-in user)
+  agent-service.*             MCP service for AI assistants
   server.ts                   MCP OAuth discovery; dev only: app-relative odata/ws rewrite, no-cache header for UI files
   lib/                        business logic (see section 7)
   types/solclientjs.d.ts      typings for solclientjs (the package ships none)
 test/
-  *.test.ts                   unit and service tests
+  *.test.ts                   Jest: unit, service and consistency tests (section 11)
+  helpers.ts, fakes/          test server, fake broker connections, database reset
   data/                       demo data – loaded by cds watch / tests only, never deployed
-local/                        docker-compose for a local Solace broker
+e2e/                          Playwright tests of the UI apps (section 11)
+docs/                         user guide (also shown by the Help app), this document, reviews (archive/ = old ones)
+local/                        docker-compose for a local Solace broker, terragrunt for its VPN, users and queues
 scripts/build-ui.js           ui5 build of all apps (each writes its HTML5 repo zip into dist/)
 scripts/build-docs.js         copies docs/user-guide.md next to the built server (gen/srv/docs) for the Help app
+scripts/ui5/                  UI5 build task + dev server middleware that give every app its app/_shared modules
+scripts/set-version.js        one version in mta.yaml, every package.json and manifest
+scripts/screenshots/          Playwright spec that takes the images in docs/images (npm run docs:screenshots)
 mta.yaml, xs-security.json    deployment
+.github/workflows/ci.yml      CI: npm run verify and the e2e tests on every push to main and every pull request
 ```
 
 ## 5. Domain model (`db/schema.cds`)
@@ -93,13 +105,15 @@ mta.yaml, xs-security.json    deployment
 | `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`. Compositions `userProperties`, `variables`. Association `lastResult` → `TestCaseStats`. |
 | `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
 | `TestCaseVariables` | Variables of a test case **or a folder** | Folder variables apply to all descendants. |
-| `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases. |
-| `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE, counters. Composition `results`. |
-| `RunResults` | One test case × broker | `status` PENDING/PASSED/FAILED/ERROR, resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
+| `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases (an association, so drafts do not copy it). `TestService` deletes the stats of deleted test cases. |
+| `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED (FAILED = aborted), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `repetitionOrder` (ROUND / EACH), `delayMs`, `stopOnFailure`. Composition `results`. |
+| `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
 | `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
-| `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name, prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
+| `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name (`@assert.unique`; the service also refuses the same name in another case), prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
 | `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
 | `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
+
+All enum types carry `@assert.range`, and so do the numeric limits `ackTimeoutMs` (100–120 000), `priority` (0–255) and `connectTimeoutMs` (1 000–120 000): CAP rejects other values on every OData write. Writes that bypass OData (AI agent, import, copy, test case from a message) are checked by `srv/lib/node-validation.ts`, which reads the same limits from the model (`srv/lib/model.ts`).
 
 Result semantics:
 
@@ -108,6 +122,7 @@ Result semantics:
 | PASSED | PERSISTENT: broker ACK received within `ackTimeoutMs`. DIRECT: `send()` succeeded. |
 | FAILED | Broker rejected the message, ACK timeout, send error, session dropped. |
 | ERROR | The message could not be built or sent at all: unknown variable, invalid JSON, missing password, connection/login failure, destination problems. |
+| SKIPPED | Not sent: the run was stopped, or an earlier message to the same broker failed with *stop on first failure*. Counted as done, not as failed. |
 
 `TestCaseStats.status` is PASSED only if every broker of the latest run passed, otherwise FAILED (any FAILED) or ERROR.
 
@@ -121,8 +136,9 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 |---|---|
 | `Brokers` (draft) | Broker maintenance. Handlers: URL completion while editing and on save, validation, **automatic connection test on save for DESTINATION brokers** (max. 5 s). |
 | `Brokers.testConnection(username, password)` | Opens/closes a session, stores the outcome. `password` is required for DIRECT brokers and never stored; `username` only if none is maintained on the broker. |
-| `BrokerVariables` | Broker variables (composition of `Brokers`). |
-| `GlobalVariables` (draft) | Projection on `Variables` without broker; unique names. |
+| `BrokerVariables` | Broker variables (composition of `Brokers`); the same name rules as test case variables (a name a template can reference, each once). |
+| `GlobalVariables` (draft) | Projection on `Variables` without broker; names unique regardless of case (like number ranges and subscriber setups, `srv/lib/unique-name.ts`). |
+| `NumberRanges` (draft) | Virtual `lastNumber` / `nextNumber` (formatted). Bound action `reset(nextNumber)`. `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
 | `Destinations` | Read-only value help (`@cds.persistence.skip`) – destinations from the bound destination service and from env `destinations`, filtered to broker URLs. |
 | `CredentialModes` | Code list. |
 
@@ -131,14 +147,15 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | Element | Description |
 |---|---|
 | `TestCases` (draft, **hierarchy**) | Folder/test case tree. Computed columns `LimitedDescendantCount`, `DistanceFromRoot`, `DrillState`, `LimitedRank` and `@Aggregation.RecursiveHierarchy #TestTree` / `@Hierarchy.RecursiveHierarchy #TestTree` enable CAP hierarchy queries for the Fiori tree table. `kindText` is a display text for `kind`. |
-| `TestCases.runTest(brokerIds, credentials)` | Runs one node (a folder runs its subtree). |
+| `TestCases.runTest(brokerIds, credentials, options)` | Runs one node (a folder runs its subtree). `options`: the advanced settings (section 7.6). |
 | `TestCases.preview(brokerId)` | Resolves topic, payload, correlation ID and properties without sending. Works on drafts. |
 | `TestCases.duplicate()` | Copies a test case or a folder with everything below it (`srv/lib/copy-nodes.ts`); the copy is named "… (Copy)" and placed right after the original. |
 | `exportNodes(ids)` | Returns `{ filename, content, folders, testCases }`: the JSON file for the given nodes (folders with everything below them; without ids the whole tree). The browser saves `content` as a file. |
 | `importNodes(content, parentId, dryRun)` | Creates the nodes of an export file below `parentId` (empty = top level) as **new** nodes; with `dryRun` it only checks and counts. All or nothing, see "Export and import file" below. The service accepts request bodies up to 5 MB (`@cds.server.body_parser.limit`). |
 | `copyNodes(ids)` | Same for several nodes; a node below another selected node is copied with that node only. Returns `{ ID, name }` per copy. Used by the *Copy* buttons. |
 | `TestCases.moveBefore(NextSibling)` | `ChangeNextSiblingAction` of the tree table (drag & drop ordering). |
-| `runTests(testCaseIds, brokerIds, credentials)` | Runs several nodes against several brokers in one run. |
+| `runTests(testCaseIds, brokerIds, credentials, options)` | Runs several nodes against several brokers in one run. |
+| `cancelRun(runId)` | Stops a running run: messages not sent yet are SKIPPED. For the user who started it and administrators; only on the instance that executes the run. |
 | `currentUser()` | Logged-in user ID – used to prefill the "Created by" / "Started by" filters. |
 | `Brokers` | Active brokers (read-only projection incl. `credentialMode`, `username`). |
 | `TestRuns`, `RunResults` | Read-only, with `outcome` (PASSED/FAILED/RUNNING) and criticality fields. |
@@ -153,10 +170,10 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 |---|---|
 | `start(brokerId, sourceType, topics, queue, password, username)` | Opens a dedicated session. `sourceType`: `TOPIC` (direct subscriptions, wildcards), `QUEUE_BROWSE` (messages stay), `QUEUE_CONSUME` (client ack, messages removed). Returns `subscriptionId`. |
 | `stop(subscriptionId)` | Closes the subscription (owner only). |
-| `activeSubscriptions()` | Own subscriptions; also acts as **heartbeat** (keeps them alive). |
-| `NumberRanges` | Draft-enabled, Admin. Virtual `lastNumber` / `nextNumber` (formatted). Bound action `reset(nextNumber)`. `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
+| `heartbeat(subscriptionId)` | **Heartbeat** of the page that started the subscription: keeps this one subscription alive; `active = false` if it ended on the server. |
+| `activeSubscriptions()` | Own subscriptions (read only). |
 | `SubscriberPresets` | The user's saved subscriber setups. `@restrict` to `createdBy = $user` (a user sees and changes only their own); a `before` handler checks the name (required, unique per user), source type and the topic list. |
-| `ReceivedMessages` | Saved messages (no update). Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
+| `ReceivedMessages` | Saved messages (no update). Testers read all and delete only their own, administrators delete any. Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
 | `Brokers` | Active brokers (incl. `credentialMode`, `username`). |
 
 ### LiveService – WebSocket `/ws/live` (role `Tester`)
@@ -169,7 +186,7 @@ Clients enter a **context** to receive only their events:
 
 | Event | Context | Payload |
 |---|---|---|
-| `runProgress` | run ID | `status` RUNNING/DONE, `total`, `done`, `passed`, `failed`, `resultId` |
+| `runProgress` | run ID | `status` RUNNING/DONE, `total`, `done`, `passed`, `failed`, `skipped`, `resultId` |
 | `message` | subscription ID | topic, payload, contentType, userProperties (JSON), correlationId, deliveryMode, receivedAt, seq |
 | `subscriptionStatus` | subscription ID | `STOPPED`, `DOWN`, `THROTTLED`, `RESUMED` + message |
 
@@ -238,7 +255,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 | `TestNodes` | test cases and folders (`kind`, `parent`, topic, payload, headers, `lastResult`, ...), with `userProperties` and `variables` |
 | `TestNodeProperties`, `TestNodeVariables`, `TestNodeLastResults` | the same as separate entities |
 | `Brokers` | broker data without credentials; `needsCredentials` = true for direct brokers |
-| `TestRuns`, `RunResults` | runs and one result per test case x broker (resolved topic / payload, ACK latency, error) |
+| `TestRuns`, `RunResults` | runs (with `skippedCount` and the advanced settings) and one result per message (`iteration`, `sequence`, resolved topic / payload, ACK latency, error) |
 
 | Action / function | Purpose |
 |---|---|
@@ -248,7 +265,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 | `exportNodes(ids)`, `importNodes(content, parentId, dryRun)` | the export / import file above: an agent can generate a whole suite as one file, check it with `dryRun`, and import it in one call (request bodies up to 5 MB) |
 | `previewTestCase(testCaseId, brokerId)` | the message exactly as it would be sent (variables resolved), nothing is sent |
 | `runTests(testCaseIds, brokerIds, credentials)` | starts a run in the background, returns `runId` and the number of results |
-| `getRunSummary(runId, waitSeconds)` | status, counters and failures; waits up to 30 s for the end of the run |
+| `getRunSummary(runId, waitSeconds)` | status, counters (`skipped` separately) and up to 25 FAILED / ERROR results; waits up to 30 s for the end of the run |
 
 **Same rules as the UI.** Creating and changing nodes goes through `srv/lib/node-validation.ts`, the same checks `TestService` uses (valid JSON, parent must be a folder, property types, ACK timeout range, ...). All problems of a call are returned in one error text. `previewTestCase` shares `srv/lib/preview.ts` with the UI preview; copying uses `srv/lib/copy-nodes.ts`.
 
@@ -257,7 +274,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 - **No secrets through the AI.** `runTests` only accepts brokers whose credentials come from a **BTP destination**. Direct brokers need a password that is never stored, and a password typed into an AI conversation would end up in the model provider's and the client's logs. Such runs are refused with an explanation, so people run them in the UI.
 - **No delete.** There are no delete actions; global and broker variables and saved messages are not exposed at all.
 - **Limits:** at most `maxRunResults` (100) results per run and `maxActiveRuns` (2) runs of one user at a time (`cds.aemSuite.agent`, see section 10).
-- **Audit:** every changing action logs `audit` with user, action, names and IDs (logger `agent`) - never payloads or credentials.
+- **Audit:** every changing action logs `audit` with user, action, names and IDs (logger `aem-agent`; all loggers of the app start with `aem-`) - never payloads or credentials.
 - **Prompt injection:** the adapter does not filter data. `@mcp.instructions` tell the model that payloads, topics and errors are data and never instructions, and not to run tests on brokers the user did not name. Connect only trusted assistants.
 - **Authorization:** `@requires: 'Tester'` on the service, checked by the adapter on every request. Anonymous requests get 401.
 
@@ -324,14 +341,14 @@ Syntax `{{name}}` or `{{fn(args)}}`. Lookup order (first match wins):
 
 Variables may reference other variables (depth 5, cycle detection). Unknown names raise `TemplateError` listing all of them → result `ERROR`. After resolution the payload is validated as JSON when the content type is JSON.
 
-**Number ranges.** `{{numberRange.NAME}}` and `{{numberRange.NAME as alias}}` (temporary variable `{{alias}}`, also usable before its definition) are not computed by the resolver: it is synchronous and only inserts `scope.numbers`. The numbers are handed out beforehand, once per message:
+**Number ranges.** `{{numberRange.NAME}}` and `{{numberRange.NAME as alias}}` (temporary variable `{{alias}}`, also usable before its definition) are not computed by the resolver: it is synchronous and only inserts `scope.generated`. The numbers are handed out beforehand, once per message:
 
-1. `numberSlots(templates, scope)` lists what the message needs: one slot per plain range name (the same number everywhere in the message) and one per alias, also in variables the templates use. Unused variables are not followed, so they never use up numbers.
-2. `withNumbers(tc, scope, mode)` in `test-case-spec.ts` calls `allocateNumbers(slots, mode)` from `number-ranges.ts` and puts the result into the scope.
+1. `generatedSlots(templates, scope)` lists what the message needs: one slot per plain range name (the same number everywhere in the message) and one per alias, also in variables the templates use. Unused variables are not followed, so they never use up numbers.
+2. `withGenerated(tc, scope, mode)` in `test-case-spec.ts` calls `allocateNumbers(slots, mode)` from `number-ranges.ts` and puts the result into the scope.
 3. `consume` (runs) takes the numbers with a compare-and-set `UPDATE` of `NumberRanges.current` in a transaction of its own that commits at once, retried a few times, so parallel runs never get the same number and a number is not reissued if the message fails later. `peek` (Preview, MCP preview) only computes the next numbers.
 4. An exhausted range (`maximum` or digits exceeded) or an unknown range is a `TemplateError`, so the result is `ERROR` and `current` does not move.
 
-**Faker.** `{{faker.<module>.<method>[(args)]}}` (`fake-data.ts`, [`@faker-js/faker`](https://fakerjs.dev), v9 because it ships CommonJS, which Jest needs) uses the same mechanism as number ranges: `numberSlots` lists the expressions (one slot per distinct expression, one per `as` alias), `withNumbers` calls `generateFake` for them (also in `peek` mode) and the resolver inserts the values. Safety: only the data modules in `MODULES` are reachable (not `helpers`, `seed`, `constructor`, ...), the method must be a function of that module, and the arguments are parsed as numbers, booleans or text - a template cannot run code. `number.int/float`, `finance.amount` take (min,max), `date.between` (from,to). Dates are written as ISO text. The language is `cds.aemSuite.faker.locale`; an unknown locale falls back to English. `test/fake-data.test.ts` pins the refusals.
+**Faker.** `{{faker.<module>.<method>[(args)]}}` (`fake-data.ts`, [`@faker-js/faker`](https://fakerjs.dev), v9 because it ships CommonJS, which Jest needs) uses the same mechanism as number ranges: `generatedSlots` lists the expressions (one slot per distinct expression, one per `as` alias), `withGenerated` calls `generateFake` for them (also in `peek` mode) and the resolver inserts the values. Safety: only the data modules in `MODULES` are reachable (not `helpers`, `seed`, `constructor`, ...), the method must be a function of that module, and the arguments are parsed as numbers, booleans or text - a template cannot run code. `number.int/float`, `finance.amount` take (min,max), `date.between` (from,to). Dates are written as ISO text. The language is `cds.aemSuite.faker.locale`; an unknown locale falls back to English. `test/fake-data.test.ts` pins the refusals.
 
 ### 7.5 `test-case-spec.ts`
 
@@ -350,7 +367,7 @@ In-memory tree over `TestCases` (`ID`, `parent_ID`, `kind`, `name`, `sortOrder`)
 
 ### 7.8 `solace/subscription-hub.ts`
 
-In-memory registry of live subscriptions (one session each). Limits (configurable, section 10): 5 per user, 100 forwarded messages/s per subscription (excess is counted but not forwarded; THROTTLED/RESUMED events), payloads > 512 KB truncated in the live view. A sweeper closes subscriptions without heartbeat for 5 minutes (the UI calls `activeSubscriptions()` every 60 s) – messages do not count as activity, so subscriptions of closed browser tabs end. All subscriptions are closed on server shutdown.
+In-memory registry of live subscriptions (one session each). Limits (configurable, section 10): 5 per user, 100 forwarded messages/s per subscription (excess is counted but not forwarded; THROTTLED/RESUMED events), payloads > 512 KB truncated in the live view. A sweeper closes subscriptions without heartbeat for 5 minutes (the page that started a subscription calls `heartbeat` for it every 60 s; another open tab does not keep it alive) – messages do not count as activity, so subscriptions of closed browser tabs end. All subscriptions are closed on server shutdown.
 
 > **Single instance:** the hub state lives in one Node.js process. `mta.yaml` pins the backend to `instances: 1`. Scaling out needs sticky sessions plus a shared registry (e.g. Redis), and the websocket plugin's Redis adapter.
 
@@ -377,46 +394,56 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 | App (`app/…`) | Type | Highlights |
 |---|---|---|
 | `testcases` | Fiori elements LR/OP | **Tree table** (`hierarchyQualifier: TestTree`, create menu Folder/Test Case, drag & drop, Cut/Paste, Move Up/Down); custom sections `MessageSection` (full-width topic + name) and `PayloadSection` (`sap.ui.codeeditor` JSON editor, validation, format, template help); custom actions *Run…*, *Copy*, *Export*, *Import* and *Preview*. |
-| `runs` | Fiori elements LR/OP | List on `RunResults` (one row per test case × broker, filters for test case, broker, status, started by/at); link columns to the test case, broker and run (`testCaseLink`, `brokerLink`, `runLink` in `TestService.RunResults` are launchpad intents). Run page (`TestRuns`) with totals and its results. |
-| `subscriber` | Freestyle UI5, **TypeScript** | Live subscriptions over WebSocket, message list (batched, max. 500), detail panel, save / save as test case. |
+| `runs` | Fiori elements LR/OP | List on `RunResults` (one row per test case × broker, filters for test case, broker, status, started by/at); link columns to the test case, broker and run (`testCaseLink`, `brokerLink`, `runLink` in `TestService.RunResults` are launchpad hashes; they work inside the launchpad - standalone the hash lands in the runs app's own router). `UI.DataFieldWithIntentBasedNavigation` was tried instead (2026-10, e2e): inside the launchpad it opens the Test Cases *list* with every column of the row as a URL parameter instead of the test case page, and standalone (no shell) it renders a button that cannot navigate - so the hash links stay. Run page (`TestRuns`) with totals and its results. |
+| `subscriber` | Freestyle UI5, **TypeScript** | Live subscriptions over WebSocket, message list (batched, max. 500), detail panel, save / save as test case. Besides the controller: `util/SubscriptionSession.ts` (start, stop, heartbeat), `util/MessageBuffer.ts` (buffer, flush, search filter), `util/TopicList.ts` (the topic list of the form, unit-tested in `test/topic-list.test.ts`). |
 | `messages` | Fiori elements | Saved messages, *Create Test Case*. |
-| `brokers`, `variables` | Fiori elements | Admin apps. |
+| `brokers`, `variables`, `numberranges` | Fiori elements | Admin apps. |
 | `help` | Freestyle UI5 | The user guide from `docs/user-guide.md`, see HelpService in section 6. |
 | `home` | Freestyle UI5 | Start page: figures, the apps of the user's roles, latest runs – see HomeService in section 6. |
 
-### 8.2 Test case app extensions (`app/testcases/webapp/ext`)
+### 8.2 Test case app extensions (`app/testcases/webapp/ext`, TypeScript)
 
 | File | Role |
 |---|---|
-| `TestCaseActions.js` | *Run…* (list and object page), Run dialog with broker selection, password fields for DIRECT brokers, live progress via WebSocket, problem list, *Preview* dialog. |
+| `TestCaseActions.ts` | The handlers of the custom actions in the manifest: *Run…*, *Copy*, *Export*, *Import* (list and object page) and the *Preview* dialog. |
+| `RunDialog.ts` | The Run dialog: broker selection, password fields for DIRECT brokers, advanced settings, live progress via WebSocket (plus a poll), problem list, *Stop run*. |
+| `FileIO.ts` | Export / import as a JSON file: save and pick the file in the browser, dry run, confirmation, import. |
 | `RunDialog.fragment.xml`, `PreviewDialog.fragment.xml` | Dialogs. |
 | `TypeColumn.fragment.xml` | Custom "Type" column of the tree table: a small folder / test case icon (name as tooltip) instead of the type text. Defined under `columns` in the manifest, so `kind` is not part of the `@UI.LineItem`. |
-| `MessageSection.*`, `PayloadSection.*`, `JsonTemplate.js` | Custom sections; JSON handling that tolerates `{{…}}` outside strings. |
-| `ObjectPageExt.controller.js` | Hides test-case-only parts for folders (manifest `visible` expressions are evaluated before data is loaded). |
-| `MyEntriesFilter.controller.js` | Prefills the "Created by" filter once per app start with `currentUser()`. Same file in the runs app ("Started by"). |
-| `TreeRules.js` | Tree hooks: create and drop only in folders/root. Preloaded in `Component.js` because FE resolves hooks synchronously. |
-| `LiveSocket.js`, `Prefs.js` | WebSocket client; browser-local preferences (last brokers). |
+| `MessageSection.*`, `PayloadSection.*`, `JsonTemplate.ts` | Custom sections; JSON handling that tolerates `{{…}}` outside strings. |
+| `ObjectPageExt.controller.ts` | Hides test-case-only parts for folders (manifest `visible` expressions are evaluated before data is loaded). |
+| `TreeRules.ts` | Tree hooks: create and drop only in folders/root. Preloaded in `Component.js` because FE resolves hooks synchronously. |
+
+### 8.2a Shared UI modules (`app/_shared`)
+
+`Apps.js` (the app catalog: key, launchpad intent, icon and required role of every app – `test/launchpad.test.ts` compares it with the launchpad tiles and the manifests), `Actions.js` (error text, `invokeAction` that destroys the operation binding afterwards), `Help.js` (Help buttons, section per app), `LiveSocket.js` (WebSocket client with reconnect, used by the Run dialog and the Live Subscriber), `Navigation.js` (to another app by its key, inside or outside the launchpad) and `MyEntriesFilter.controller.js` (prefills the "Created by" / "Started by" filter once per app start with `currentUser()`; test cases and runs). TypeScript apps get `.d.ts` files too.
+
+Each HTML5 app is deployed on its own, so every app needs the modules it uses under its own namespace (`com/aem/suite/<app>/shared/...`). Nothing is copied into the apps: every `ui5.yaml` has the build task `aem-shared-ui-task` (adds the modules to the build result before the Component-preload is bundled, so they are in the preload and the HTML5 repo zip) and the middleware `aem-shared-ui-middleware` (serves `.../shared/<module>.js` from `app/_shared`, also in `cds watch` through cds-plugin-ui5), both in `scripts/ui5/`. The modules an app gets are the ones its files name (`.../shared/Help`, `com.aem.suite.<app>.shared.Help` in a manifest) plus what those load (`./Navigation`). The TypeScript app imports them as `com/aem/suite/subscriber/shared/...`, which its `tsconfig.json` maps to `app/_shared` (the `.d.ts` files there). `app/*/webapp/shared/` is git-ignored; `test/shared-ui.test.ts` checks the wiring.
 
 ### 8.3 Conventions and pitfalls
 
+- **Where annotations go:** field titles and tooltips (`@title`, `@Common.QuickInfo`) on the entities in `db/schema.cds` (end of the file) - CAP passes them on to every projection, so all apps and the agent see the same words; timestamps are worded "<what> At". Titles of elements a service adds (e.g. `outcome`, `runStartedAt`, `nextNumber`) next to them in `srv/*.cds`. Service semantics (`@readonly`, `@Core.Immutable`, `@Capabilities…`, `@assert…`, `@restrict`) in `srv/*.cds` or `db/schema.cds`. UI only (layout, `@UI…`, value lists, side effects, action parameter labels) in `app/<app>/annotations.cds`; layout several apps share (the variables lists) in `app/common.cds`.
 - **Never put `{` `}` into annotation texts** (labels, QuickInfo): Fiori elements interprets them as bindings and sends broken requests. In XML escape as `\{`, in JS controls set texts via setters, not constructor settings.
 - UI5 TypeScript classes: **no getters** in controllers (`ui5-tooling-transpile` converts the class to `Controller.extend({...})` and evaluates getters at definition time).
 - Models in `onInit` of a root view: use `getOwnerComponent().getModel()`.
-- All apps pin `https://ui5.sap.com/1.148.12`.
+- All apps pin `https://ui5.sap.com/1.148.12`. The version is repeated in every `index.html`, every manifest (`minUI5Version`) and the `@sapui5/types` packages; `test/ui5-version.test.ts` fails unless they agree with `@sapui5/types` in the root `package.json`.
 
 ### 8.4 Launchpad
 
 `app/launchpad/webapp/index.html` uses the ushell **sandbox** (`sap-ushell-config.applications` creates the tiles/intents). `webapp/appconfig/fioriSandboxConfig.json` empties the sandbox's sample groups. The sandbox always reads it from the host root (`/appconfig/...`), so the standalone approuter routes `/appconfig/*` into the launchpad app in the HTML5 repo, and the dev server rewrites it the same way. It is an HTML5 app itself (`comaemsuitelaunchpad`, the standalone approuter's welcome page), because an approuter bound to the HTML5 repo cannot also serve local files. For a central launchpad use SAP Build Work Zone (section 12); the sandbox launchpad has no `crossNavigation` inbounds, so it does not show up there.
 
-**URLs.** In the HTML5 repo an app lives at `/<app name>/` (`sap.app.id` without dots, e.g. `/comaemsuitebrokers/`); Work Zone adds a prefix (`/<sap.cloud.service>.<app name>-<version>/`). The apps therefore call the backend **relative to themselves**: `odata/v4/...` in the manifests, `ws/live` via `sap.ui.require.toUrl(...)` in the two `LiveSocket` clients. Each app's `xs-app.json` routes `odata/` (and `ws/`, websockets enabled) to the destination `srv-api`. Locally `cds-plugin-ui5` mounts the apps at the same names (`mountPath` in `ui5.yaml`), and `srv/server.ts` strips the `/comaemsuite<app>/` prefix from `odata/` and `ws/` requests (development only).
+**URLs.** In the HTML5 repo an app lives at `/<app name>/` (`sap.app.id` without dots, e.g. `/comaemsuitebrokers/`); Work Zone adds a prefix (`/<sap.cloud.service>.<app name>-<version>/`). The apps therefore call the backend **relative to themselves**: `odata/v4/...` in the manifests, `ws/live` via `sap.ui.require.toUrl(...)` in the shared `LiveSocket` client. Each app's `xs-app.json` routes `odata/` (and `ws/`, websockets enabled) to the destination `srv-api`. Locally `cds-plugin-ui5` mounts the apps at the same names (`mountPath` in `ui5.yaml`), and `srv/server.ts` strips the `/comaemsuite<app>/` prefix from `odata/` and `ws/` requests (development only).
 
 ## 9. Security
 
 - **Scopes / role templates** (`xs-security.json`): `Admin` (contains `Tester`), `Tester`. Role collections `AEM_Suite_Admin`, `AEM_Suite_Tester`.
-- `AdminService` requires `Admin`; `TestService`, `SubscribeService`, `LiveService` require `Tester`.
+- `AdminService` (brokers, global variables, number ranges) requires `Admin`; `TestService`, `SubscribeService`, `LiveService` and the MCP service `TestAgentService` require `Tester`; `HelpService` and `HomeService` only a login (`authenticated-user`), so everyone sees the guide and the start page.
+- Saved messages: every tester reads them all and can make a test case of any, but deletes only their own (administrators any); nobody changes one. Subscriber setups are private to their user.
 - Standalone approuter (`app/router/xs-app.json`): `/mcp/*` and `/.well-known/oauth-*` passed through (the backend checks the bearer token and serves the OAuth discovery), everything else from the HTML5 repo (`html5-apps-repo-rt`, `xsuaa`). The apps' own `xs-app.json` (also used by the Work Zone managed approuter): `odata/*` with CSRF, `ws/*` with websockets enabled, static files no-cache, all routes `xsuaa`.
 - Data visibility: all testers share test cases, runs and saved messages (team workspace); the "my entries" filter is a UI default, not an authorization. Subscriptions can only be stopped by their owner.
 - Broker passwords: see 7.3. Destination credentials stay in the BTP destination service.
+- **XSUAA redirect URIs** (`mta.yaml`, `oauth2-configuration.redirect-uris`): `https://*.${default-domain}/**` and `http://localhost:8765/**` in every environment. The localhost entry is the callback of local MCP clients (section 6, "Connecting a client"). Both are deliberate today and listed as an open decision in [maintenance-review.md](maintenance-review.md) (D1).
+- **Role collection names** are fixed (`AEM_Suite_Admin`, `AEM_Suite_Tester` in `xs-security.json`). Role collection names are unique per subaccount, so a second deployment (another space) in the same subaccount collides with the first one (open decision D2).
 - AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
 - Local development uses mocked users (`package.json` → `cds.requires.[development].auth`): `admin/admin` (Admin+Tester), `tester/tester` (Tester). The WebSocket is anonymous locally (plugin behaviour with mocked auth); events are isolated by context IDs.
 
@@ -459,52 +486,58 @@ npm run watch                 # cds watch (TypeScript, SQLite in memory, demo da
 - Local destinations: set env `destinations`, e.g.
   `destinations='[{"name":"aem-dev","url":"https://mr-xyz.messaging.solace.cloud:443","username":"solace-cloud-client","password":"…","msgVpn":"dev-vpn"}]'`
 
-Quality checks:
+### Development workflow
 
 ```sh
-npm test            # Jest: unit + service tests (broker connection stubbed)
+npm run verify      # before every commit: typecheck + lint + Jest (what CI runs first)
 npm run e2e         # Playwright: UI apps in a browser (e2e:ui, e2e:headed, e2e:trace)
-npm run typecheck   # backend + tests + subscriber app + e2e
+npm run typer       # regenerate the cds-typer models (@cds-models) - typecheck, test, watch and the e2e server do it first
+npm run build:ui    # ui5 build of all apps, as the MTA build does it
 ```
 
-| Test file | Covers |
+| Script | Does |
 |---|---|
-| `template.test.ts` | template resolver, precedence, built-ins, cycles |
-| `session.test.ts` | ACK / reject / timeout / disconnect with a faked solclientjs session; message mapping |
-| `resolve.test.ts`, `defaults.test.ts` | URL handling, runtime passwords, detection helpers |
-| `services.test.ts` | OData services end-to-end with stubbed broker: brokers, variables, test cases, runs, preview, saved messages, filters |
-| `tree.test.ts` | hierarchy queries, folder validation, moves (incl. concurrent change set), folder runs and variables, folder deletion, copying |
-| `help.test.ts` | rendering of the guide (sections, GitHub anchors, every link of the guide resolves, raw HTML escaped, tables), that every Help button names an existing heading, the service (access, one section, file changes, missing file) |
-| `export-import.test.ts` | export content (nested, no IDs, sorted), selections, round trip, dry run, import into a folder, lenient hand-written files, files above 100 kb, all-or-nothing validation with positions |
-| `agent.test.ts` | the AI agent service over real MCP JSON-RPC: access, tools, create / change / move / copy with UI validation, preview, runs on destination brokers, credential refusal, limits |
-| `mcp-oauth.test.ts` | MCP OAuth discovery: 401 hint, protected resource and authorization server metadata, public URL from forwarded headers, nothing advertised without XSUAA |
-| `dev-server.test.ts` | app-relative `odata/` under `/comaemsuite<app>/`, `/launchpad.html` redirect |
+| `typecheck` | `tsc` for the backend + tests, the subscriber app and the e2e tests |
+| `lint` | ESLint (TypeScript, the UI code, the scripts); a committed `.only` is an error |
+| `test` | Jest |
+| `verify` | the three above, in this order |
+
+- Shared UI code: edit `app/_shared` - no copies (section 8.2a).
+- The server code uses the **cds-typer** models (`import { TestRuns } from '#cds-models/aem/suite'`): entities for queries and types for rows and enums instead of hand-written shapes. `@cds-models` is generated and not committed; `npm run typecheck`, `npm test`, `cds watch` and the e2e server generate it first, `cds build` puts it into `gen/srv`. `@singular` in the CDS fixes the class names cds-typer would derive badly (`TestCas`, a code list named like its enum type).
+- The UI5 tooling (`@ui5/cli`, `ui5-task-zipper`, `ui5-tooling-transpile`, `@sapui5/types`) is installed once at the root (`npm install` / `npm ci`); the apps' own `package.json` files only name the custom tasks their `ui5.yaml` uses, which the UI5 CLI needs to find them.
+- Versions: `npm run set-version -- <version>` (`scripts/set-version.js`) sets one version in `mta.yaml`, the root and app `package.json` files and the manifests; `test/version.test.ts` fails when they differ. Changes are listed in `CHANGELOG.md`.
+- Line endings are LF (`.gitattributes`, `.editorconfig`).
+- Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
+- CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run verify` and `npm run e2e` on Node 22 for every pull request and every push to `main`; the Playwright report is attached when it fails.
+
+**Jest (`test/*.test.ts`)**, by kind – the file names say which module they cover:
+
+| Kind | What | How |
+|---|---|---|
+| Unit | template resolver, number ranges, faker, property types, defaults, URLs, node validation, test case spec, the Solace session | no server; the solclientjs session is faked (`test/fakes/solace.ts`) |
+| Service | the OData services, the run engine (`test-runner`, `run-options`), tree, export / import, subscriptions (hub and HTTP), Home, Help, the MCP agent and its OAuth discovery, the dev server | `startServer()` (`cds.test`, SQLite in memory) with `resetDatabase()`; broker connections replaced by `fakeBroker()` / `setSessionFactory()` (`test/helpers.ts`) |
+| Consistency | `mta.test.ts` (apps vs. MTA modules), `launchpad.test.ts` (tiles vs. manifests), `shared-ui.test.ts` (shared modules wired into every app), `ui5-version.test.ts`, `version.test.ts`, `help.test.ts` (help anchors and links of the guide) | read the files of the repository |
 
 **End-to-end (`e2e/*.spec.ts`, Playwright).** `playwright.config.ts` starts `cds-tsx serve` with mocked users and the demo data on port 4005 (`E2E_PORT`; an already running server on that port is reused outside CI) and drives the sandbox launchpad in Chromium, locale en-US. Browser: on Windows the installed Edge, elsewhere Playwright's Chromium (`npx playwright install chromium` once); `PW_CHANNEL` overrides it. No broker is needed.
 
-| Spec | Covers |
-|---|---|
-| `launchpad.spec.ts` | the seven tiles, no sandbox sample apps (`/appconfig` routing), a tile opens its app |
-| `apps.spec.ts` | every app opens through its intent and shows the demo data; test case detail page by deep link |
-| `subscriber.spec.ts` | Live Subscriber form, live socket connects app-relative (`/comaemsuitesubscriber/ws/live`) |
-| `authorization.spec.ts` | user `tester`: tester apps open, Brokers / Global Variables fail to load (admin service 403) |
+The specs cover the launchpad and its tiles, every app opening through its intent with the demo data, the role checks (user `tester`), and the main flows: Run dialog, payload editor, topic → name, number ranges, "my entries" filters, Home, the Live Subscriber (form, app-relative live socket, saved setups), the standalone apps and the demo data previews. Specs that create data use unique names and delete it after each test (`e2e/cleanup.ts`), so they also pass against a reused dev server.
 
 `e2e/launchpad.ts` holds the intents and helpers (`openApp`, `expectAppOpen` waits for the window title the shell sets). Failures keep a trace in `test-results/` (`npx playwright show-trace ...`).
 
 ## 12. Build and deployment (Cloud Foundry)
 
 ```sh
-npm i -g mbt
-mbt build                                   # npm ci → cds build --production → node scripts/build-docs.js, then ui5 build per html5 module
-cf deploy mta_archives/aem-suite_1.0.0.mtar
+npm run build      # mbt build (mbt is a devDependency): npm ci → cds build --production → node scripts/build-docs.js,
+                   # then ui5 build per html5 module → mta_archives/aem-suite.mtar
+npm run deploy     # cf deploy mta_archives/aem-suite.mtar
 ```
 
 | MTA module / resource | Description |
 |---|---|
-| `aem-suite-srv` | CAP backend (`gen/srv`, compiled JS), **1 instance**, 512 MB |
+| `aem-suite-srv` | CAP backend (`gen/srv`, compiled JS), **1 instance**, 512 MB, HTTP health check on `/health` |
 | `aem-suite-db-deployer` | HDI deployer |
 | `aem-suite` | standalone approuter: sandbox launchpad (welcome page), MCP; UI files from the HTML5 repo (bound to `app-runtime`) |
-| `aem-suite-launchpad`, `aem-suite-testcases`, `-runs`, `-subscriber`, `-messages`, `-brokers`, `-variables`, `-help` | `html5` modules: `npm run build` → `dist/comaemsuite<app>.zip` (incl. `xs-app.json`) |
+| `aem-suite-launchpad`, `aem-suite-testcases`, `-runs`, `-subscriber`, `-messages`, `-brokers`, `-variables`, `-numberranges`, `-help`, `-home` | `html5` modules (10): `npm run build` in the app → `dist/comaemsuite<app>.zip` (incl. `xs-app.json`) |
 | `aem-suite-app-deployer` | uploads the zips to the HTML5 Application Repository (`app-host`) |
 | `aem-suite-destination-content` | instance-level destinations for the managed approuter, `sap.cloud.service: aemsuite`: HTML5 repo, XSUAA (`OAuth2UserTokenExchange`), `srv-api` (forwards the token). Creates the service keys `aem-suite-auth-key` and `aem-suite-html5-repo-host-key`. |
 | `aem-suite-auth` | XSUAA (`xs-security.json`) |
@@ -518,7 +551,7 @@ After deployment: assign role collections, create destinations for DESTINATION b
 
 **SAP Build Work Zone (standard edition).** Requires a Work Zone subscription in the same subaccount.
 
-1. Work Zone → *Channel Manager* → refresh the **HTML5 Apps** content provider. The seven apps appear with title, description and the `crossNavigation` intents from their manifests (e.g. `AEMSuiteTestCases-manage`).
+1. Work Zone → *Channel Manager* → refresh the **HTML5 Apps** content provider. The nine apps appear with title, description and the `crossNavigation` intents from their manifests (e.g. `AEMSuiteTestCases-manage`).
 2. *Content Manager* → *Content Explorer* → *HTML5 Apps* → add the apps to *My Content*.
 3. Create a group (e.g. "AEM Test Suite") and a role, assign the apps, add the role to a site, and assign the Work Zone role to users.
 4. Authorization still comes from the app's own roles: the managed approuter exchanges the login token for one of `aem-suite-auth` (destination `aem-suite-auth`), so users also need **AEM_Suite_Admin** / **AEM_Suite_Tester**.
@@ -531,11 +564,11 @@ The live views (Test Cases run progress, Live Subscriber) use WebSockets through
 |---|---|
 | Change or add help text | edit `docs/user-guide.md` - nothing else. Keep headings stable (apps link to them, see the Help buttons above); a new `## ` heading becomes a new section automatically |
 | New agent capability (MCP) | an unbound action / function in `srv/agent-service.cds` + handler in `srv/agent-service.ts`; reuse the checks in `srv/lib/node-validation.ts`; list it in `test/agent.test.ts` (the test pins the exact set of entities and actions) |
-| New built-in template function | `TemplateResolver.callFunction` / `fixed` in `srv/lib/template/resolve.ts` (+ `isBuiltin`, help list in `PayloadSection.js`) |
+| New built-in template function | `TemplateResolver.callFunction` / `fixed` in `srv/lib/template/resolve.ts` (+ the help list in `PayloadSection.js`) |
 | Payload assertions / round-trip checks | `test-runner.ts`: subscribe before publishing (use `SolaceSession.subscribe`/`onMessage`), new result fields in `RunResults` |
 | Other protocols (MQTT, AMQP, REST) | implement the `Publisher` interface and route in `solace/connector.ts` per broker setting |
 | Scaling beyond one instance | replace `subscription-hub` state with a shared store, enable the websocket Redis adapter |
-| Translations | i18n bundles in the apps; annotation texts are English literals today |
+| Translations | Add `i18n_<lang>.properties` next to each bundle: `_i18n/i18n.properties` (CDS field titles, annotations - CAP serves them in the `$metadata` of the request's language) and `app/<app>/webapp/i18n/i18n.properties` (views, fragments, code, `{{…}}` in the manifests). Not translatable yet: the launchpad tiles (`app/launchpad/webapp/index.html`, they repeat the apps' titles - `test/launchpad.test.ts` checks that), the computed `kindText` and the server's messages |
 
 ## 14. Troubleshooting
 

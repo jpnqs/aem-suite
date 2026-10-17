@@ -1,3 +1,4 @@
+import { TestCases, type TestCase } from '#cds-models/aem/suite'
 import { SORT_STEP } from './defaults'
 import { httpError } from './errors'
 
@@ -5,17 +6,11 @@ import { httpError } from './errors'
  * Helpers for the test case tree (folders + test cases in aem.suite.TestCases).
  */
 
-const TABLE = 'aem.suite.TestCases'
+export type { NodeKind } from '#cds-models/aem/suite'
 
-export type NodeKind = 'FOLDER' | 'TEST'
-
-export interface TreeNode {
-  ID: string
-  parent_ID: string | null
-  kind: NodeKind
-  name: string | null
-  sortOrder: number | null
-}
+/** The columns of a node the tree needs (the key is always read). */
+export type TreeNode = Pick<TestCase, 'parent_ID' | 'kind' | 'name' | 'sortOrder'> & { ID: string }
+const TREE_COLUMNS = ['ID', 'parent_ID', 'kind', 'name', 'sortOrder'] as const
 
 export class Tree {
   readonly byId: Map<string, TreeNode>
@@ -79,27 +74,32 @@ export function compareSiblings(a: TreeNode, b: TreeNode): number {
 }
 
 export async function loadTree(): Promise<Tree> {
-  const nodes = (await SELECT.from(TABLE).columns('ID', 'parent_ID', 'kind', 'name', 'sortOrder')) as TreeNode[]
+  const nodes = (await SELECT.from(TestCases).columns(...TREE_COLUMNS)) as TreeNode[]
   return new Tree(nodes)
 }
 
 // ------------------------------------------------------------------ manual order
 
-type Sibling = TreeNode & { modifiedAt: string; modifiedBy: string }
-const SIBLING_COLUMNS = ['ID', 'parent_ID', 'kind', 'name', 'sortOrder', 'modifiedAt', 'modifiedBy']
+type Sibling = TreeNode & Pick<TestCase, 'modifiedAt' | 'modifiedBy'>
+const SIBLING_COLUMNS = [...TREE_COLUMNS, 'modifiedAt', 'modifiedBy'] as const
 
 /** Reordering is no content change: modifiedAt / modifiedBy are written back unchanged. */
 const unchanged = (s: Sibling) => ({ modifiedAt: s.modifiedAt, modifiedBy: s.modifiedBy })
 
 async function siblingsOf(parentId: string | null): Promise<Sibling[]> {
-  const siblings = (await SELECT.from(TABLE).columns(...SIBLING_COLUMNS).where({ parent_ID: parentId ?? null })) as Sibling[]
+  const siblings = (await SELECT.from(TestCases).columns(...SIBLING_COLUMNS).where({ parent_ID: parentId ?? null })) as Sibling[]
   return siblings.sort(compareSiblings)
 }
 
-/** Gives the nodes a clean 10, 20, 30 ... order (default: the current order of the folder's children). */
+/**
+ * Gives the nodes a clean 10, 20, 30 ... order (default: the current order of the folder's children).
+ * One UPDATE per node whose position changes - nodes that already have theirs are not written (the values differ
+ * per row, so the updates cannot be one statement).
+ */
 export async function renumberSiblings(parentId: string | null, order?: Sibling[]): Promise<void> {
   for (const [i, s] of (order ?? (await siblingsOf(parentId))).entries()) {
-    await UPDATE(TABLE, s.ID).with({ sortOrder: (i + 1) * SORT_STEP, ...unchanged(s) })
+    const sortOrder = (i + 1) * SORT_STEP
+    if (s.sortOrder !== sortOrder) await UPDATE(TestCases, s.ID).with({ sortOrder, ...unchanged(s) })
   }
 }
 
@@ -109,20 +109,19 @@ export async function renumberSiblings(parentId: string | null, order?: Sibling[
  * concurrently - so the target parent is derived from the next sibling, not from the node itself.
  */
 export async function moveBefore(id: string, nextId: string | null): Promise<void> {
-  const node = (await SELECT.one.from(TABLE).columns(...SIBLING_COLUMNS).where({ ID: id })) as Sibling | undefined
+  const node = (await SELECT.one.from(TestCases).columns(...SIBLING_COLUMNS).where({ ID: id })) as Sibling | undefined
   if (!node) throw httpError(404, 'Node not found')
 
   if (!nextId) {
     // last position in whatever folder the node ends up in
-    const max = (await SELECT.one.from(TABLE).columns('max(sortOrder) as max')) as { max: number | null }
-    await UPDATE(TABLE, id).with({ sortOrder: (max?.max ?? 0) + SORT_STEP, ...unchanged(node) })
+    const max = (await SELECT.one.from(TestCases).columns('max(sortOrder) as max')) as { max: number | null }
+    await UPDATE(TestCases, id).with({ sortOrder: (max?.max ?? 0) + SORT_STEP, ...unchanged(node) })
     return
   }
-  const next = (await SELECT.one.from(TABLE).columns('ID', 'parent_ID').where({ ID: nextId })) as
-    | { ID: string; parent_ID: string | null }
-    | undefined
+  const next = await SELECT.one.from(TestCases).columns('ID', 'parent_ID').where({ ID: nextId })
   if (!next) throw httpError(404, 'Next sibling not found')
-  const siblings = (await siblingsOf(next.parent_ID)).filter((x) => x.ID !== id)
+  const parentId = next.parent_ID ?? null
+  const siblings = (await siblingsOf(parentId)).filter((x) => x.ID !== id)
   siblings.splice(Math.max(0, siblings.findIndex((x) => x.ID === nextId)), 0, node)
-  await renumberSiblings(next.parent_ID, siblings)
+  await renumberSiblings(parentId, siblings)
 }
