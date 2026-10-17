@@ -4,7 +4,7 @@ import { normalizeBrokerUrl, toSmfUrl } from './lib/broker-url'
 import { config } from './lib/config'
 import { listDestinations } from './lib/credentials/destinations'
 import { currentJwt, needsPassword } from './lib/credentials/resolve'
-import { VAR_NAME, VAR_NAME_RULE } from './lib/node-validation'
+import { validateVariables, VAR_NAME, VAR_NAME_RULE } from './lib/node-validation'
 import { keyOf } from './lib/request'
 import { currentForNext, formatNumber, MAX_LENGTH, nextExample, RANGE_NAME } from './lib/number-ranges'
 
@@ -86,8 +86,9 @@ export default class AdminService extends cds.ApplicationService {
           req.error(400, (e as Error).message, 'in/url')
         }
       }
-      if (d.connectTimeoutMs != null && (Number(d.connectTimeoutMs) < 1000 || Number(d.connectTimeoutMs) > 120000))
-        req.error(400, 'Connect timeout must be between 1000 and 120000 ms', 'in/connectTimeoutMs')
+      // connectTimeoutMs and credentialMode: @assert.range in db/schema.cds
+      // broker variables follow the same rules as test case variables (a deep update sends the whole list)
+      validateVariables(d.variables as { name?: string | null }[] | undefined, (status, message, target) => req.error(status, message, target))
     })
 
     // automatic connection test on save - only possible for destination brokers

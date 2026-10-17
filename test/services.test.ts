@@ -124,6 +124,43 @@ describe('AEM test suite services', () => {
     expect(JSON.stringify(res.data)).toMatch(/Destination name is required/)
   })
 
+  it('checks broker variable names like test case variables', async () => {
+    const broker = { credentialMode: 'DIRECT', url: 'vars.example', msgVpn: 'v' }
+    const activate = async (data: object) => {
+      const { data: draft } = await POST('/odata/v4/admin/Brokers', data, admin)
+      return POST(`/odata/v4/admin/Brokers(ID=${draft.ID},IsActiveEntity=false)/AdminService.draftActivate`, {}, admin)
+    }
+    const invalid = await activate({ ...broker, name: 'vars1', variables: [{ name: 'my var', value: 'x' }] })
+    expect(invalid.status).toBe(400)
+    expect(invalid.data.error).toMatchObject({ message: 'Invalid variable name "my var"', target: 'in/variables(0)/name' })
+    const duplicate = await activate({ ...broker, name: 'vars2', variables: [{ name: 'region', value: 'eu' }, { name: 'region', value: 'us' }] })
+    expect(duplicate.status).toBe(400)
+    expect(duplicate.data.error.message).toBe('Duplicate variable "region"')
+    expect((await activate({ ...broker, name: 'vars3', variables: [{ name: 'region', value: 'eu' }] })).status).toBeLessThan(300)
+  })
+
+  it('rejects enum values and numbers outside the schema limits on the OData paths too', async () => {
+    const activate = async (service: 'admin' | 'test', entity: string, data: object, auth: object) => {
+      const { data: draft } = await POST(`/odata/v4/${service}/${entity}`, data, auth)
+      return POST(`/odata/v4/${service}/${entity}(ID=${draft.ID},IsActiveEntity=false)/${service === 'admin' ? 'AdminService' : 'TestService'}.draftActivate`, {}, auth)
+    }
+    const message = (res: { data: unknown }) => JSON.stringify(res.data)
+    const tc = { name: 'enum', topic: 't/enum', payload: '{}' }
+    const results = [
+      await activate('test', 'TestCases', { ...tc, deliveryMode: 'FOO' }, tester),
+      await activate('test', 'TestCases', { ...tc, userProperties: [{ name: 'p', type: 'X', value: '1' }] }, tester),
+      await activate('test', 'TestCases', { ...tc, priority: 256 }, tester),
+      await activate('admin', 'Brokers', { name: 'enum', credentialMode: 'X', url: 'a.example', msgVpn: 'v' }, admin),
+      await activate('admin', 'Brokers', { name: 'slow', credentialMode: 'DIRECT', url: 'a.example', msgVpn: 'v', connectTimeoutMs: 50 }, admin)
+    ]
+    expect(results.map((r) => r.status)).toEqual([400, 400, 400, 400, 400])
+    expect(message(results[0])).toMatch(/ASSERT_ENUM.*in\/deliveryMode/)
+    expect(message(results[1])).toMatch(/ASSERT_ENUM.*userProperties/)
+    expect(message(results[2])).toMatch(/in\/priority/)
+    expect(message(results[3])).toMatch(/ASSERT_ENUM.*in\/credentialMode/)
+    expect(message(results[4])).toMatch(/between 1000 and 120000.*in\/connectTimeoutMs/)
+  })
+
   it('creates global variables and rejects duplicates', async () => {
     await createActive(POST, 'admin', 'GlobalVariables', { name: 'tenant', value: 'acme' }, admin)
     const { data: draft } = await POST('/odata/v4/admin/GlobalVariables', { name: 'tenant', value: 'x' }, admin)

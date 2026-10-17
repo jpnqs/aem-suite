@@ -5,7 +5,7 @@ import cds from '@sap/cds'
  * Entity names without the namespace: columnLength('RunResults', 'resolvedTopic').
  */
 
-type Element = { length?: number; enum?: Record<string, unknown> }
+type Element = { length?: number; enum?: Record<string, unknown>; '@assert.range'?: unknown }
 
 export function elementOf(entity: string, element: string): Element | undefined {
   const def = cds.model?.definitions[`aem.suite.${entity}`] as { elements?: Record<string, Element> } | undefined
@@ -26,3 +26,9 @@ export function columnLength(entity: string, element: string): number {
 
 /** The values of an enum-typed element. */
 export const enumValues = (entity: string, element: string): string[] => Object.keys(elementOf(entity, element)?.enum ?? {})
+
+/** The limits of a numeric element with @assert.range: [min, max]. */
+export function rangeOf(entity: string, element: string): [number, number] | undefined {
+  const range = elementOf(entity, element)?.['@assert.range']
+  return Array.isArray(range) && range.length === 2 ? [Number(range[0]), Number(range[1])] : undefined
+}

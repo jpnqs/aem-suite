@@ -3,12 +3,13 @@ import { httpError } from './errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
 import type { TestCaseRecord } from './test-case-spec'
 import { loadTree } from './tree'
-import { elementOf, enumValues } from './model'
+import { elementOf, enumValues, rangeOf } from './model'
 
 /**
  * Rules for creating / changing test cases and folders - shared by the UI service (TestService),
  * the AI agent service (TestAgentService), the import and "create test case from message",
- * so all ways in apply exactly the same checks.
+ * so all ways in apply the same checks. Enum values and numeric limits are @assert.range in db/schema.cds:
+ * CAP checks them on OData requests, validateEnums and validateNode do it for the direct database writes.
  */
 
 /** Reports a validation problem (req.error of the calling service). */
@@ -59,7 +60,7 @@ export async function nextSortOrder(parentId: string | null | undefined): Promis
 
 // ------------------------------------------------------------------ enums and lengths from db/schema.cds
 
-/** Enum values the UI offers as dropdowns - the database does not check them. */
+/** Enum values for direct database writes (OData requests are checked by CAP through @assert.range). */
 export function validateEnums(d: NodeData, reject: Reject): void {
   const deliveryModes = enumValues('TestCases', 'deliveryMode')
   if (d.deliveryMode && !deliveryModes.includes(d.deliveryMode))
@@ -116,9 +117,15 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
       }
     }
   }
-  if (d.ackTimeoutMs != null && (d.ackTimeoutMs < 100 || d.ackTimeoutMs > 120000))
-    reject(400, 'ACK timeout must be between 100 and 120000 ms', 'in/ackTimeoutMs')
-  if (d.priority != null && (d.priority < 0 || d.priority > 255)) reject(400, 'Priority must be between 0 and 255', 'in/priority')
+  // the limits are @assert.range in db/schema.cds (CAP checks them for OData requests, this for direct writes)
+  const outside = (value: number | null | undefined, element: string) => {
+    const range = rangeOf('TestCases', element)
+    return value != null && range && (value < range[0] || value > range[1]) ? range : undefined
+  }
+  const ack = outside(d.ackTimeoutMs, 'ackTimeoutMs')
+  if (ack) reject(400, `ACK timeout must be between ${ack[0]} and ${ack[1]} ms`, 'in/ackTimeoutMs')
+  const priority = outside(d.priority, 'priority')
+  if (priority) reject(400, `Priority must be between ${priority[0]} and ${priority[1]}`, 'in/priority')
 
   const seen = new Set<string>()
   d.userProperties?.forEach((p, i) => {
@@ -128,10 +135,19 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
     const problem = propertyValueProblem(p.type, p.value)
     if (problem) reject(400, `User property "${p.name}" ${problem}`, `in/userProperties(${i})/value`)
   })
-  const seenVars = new Set<string>()
-  d.variables?.forEach((v, i) => {
-    if (!VAR_NAME.test(v.name ?? '')) reject(400, `Invalid variable name "${v.name}"`, `in/variables(${i})/name`)
-    if (seenVars.has(v.name)) reject(400, `Duplicate variable "${v.name}"`, `in/variables(${i})/name`)
-    seenVars.add(v.name)
+  validateVariables(d.variables, reject)
+}
+
+/**
+ * Names of a variable list (test case, folder or broker): only names a template can reference ({{name}}),
+ * each once - otherwise whichever row loads last would win.
+ */
+export function validateVariables(list: { name?: string | null }[] | null | undefined, reject: Reject, targetPrefix = 'in/variables'): void {
+  const seen = new Set<string>()
+  list?.forEach((v, i) => {
+    const name = v.name ?? ''
+    if (!VAR_NAME.test(name)) reject(400, `Invalid variable name "${name}"`, `${targetPrefix}(${i})/name`)
+    if (seen.has(name)) reject(400, `Duplicate variable "${name}"`, `${targetPrefix}(${i})/name`)
+    seen.add(name)
   })
 }

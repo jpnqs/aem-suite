@@ -19,27 +19,36 @@ entity PropertyTypes : CodeList {
   key code : PropertyType;
 }
 
+/*
+ * @assert.range on the enum types: CAP rejects other values on every OData write (the UI only offers them as
+ * dropdowns). Direct database writes (agent, import, copy) are checked by lib/node-validation.ts.
+ */
+@assert.range
 type CredentialMode : String(12) enum {
   DESTINATION;
   DIRECT;
 }
 
+@assert.range
 type DeliveryMode   : String(12) enum {
   PERSISTENT;
   DIRECT;
 }
 
+@assert.range
 type RunStatus      : String(10) enum {
   RUNNING;
   DONE;
   FAILED;
 }
 
+@assert.range
 type NodeKind       : String(10) enum {
   FOLDER;
   TEST;
 }
 
+@assert.range
 type ResultStatus   : String(10) enum {
   PENDING;
   PASSED;
@@ -49,18 +58,21 @@ type ResultStatus   : String(10) enum {
   SKIPPED;
 }
 
+@assert.range
 type PropertyType   : String(10) enum {
   STRING;
   INT;
   BOOL;
 }
 
+@assert.range
 type ConnectionStatus : String(10) enum {
   OK;
   ERROR;
 }
 
 /** where a live view message came from (SubscribeService.SourceType) */
+@assert.range
 type SourceType     : String(15) enum {
   TOPIC;
   QUEUE_BROWSE;
@@ -68,6 +80,7 @@ type SourceType     : String(15) enum {
 }
 
 /** delivery mode of a received message - NON_PERSISTENT exists on receive only */
+@assert.range
 type ReceivedDeliveryMode : String(20) enum {
   DIRECT;
   NON_PERSISTENT;
@@ -90,7 +103,7 @@ entity Brokers : cuid, managed {
    */
   username               : String(200);
   clientNamePrefix       : String(60) default 'aem-suite';
-  connectTimeoutMs       : Integer default 10000;
+  connectTimeoutMs       : Integer default 10000 @assert.range: [1000, 120000];
   active                 : Boolean default true;
   lastConnectionStatus   : ConnectionStatus;
   lastConnectionAt       : Timestamp;
@@ -131,10 +144,10 @@ entity TestCases : cuid, managed {
   /** empty / 0 = no TTL; empty priority / DMQ = broker defaults */
   timeToLiveMs   : Integer;
   dmqEligible    : Boolean;
-  priority       : Integer;
+  priority       : Integer @assert.range: [0, 255];
   /** correlation id template, e.g. {{uuid}} */
   correlationId  : String(200);
-  ackTimeoutMs   : Integer default 5000;
+  ackTimeoutMs   : Integer default 5000 @assert.range: [100, 120000];
   userProperties : Composition of many TestCaseProperties
                      on userProperties.testCase = $self;
   variables      : Composition of many TestCaseVariables
