@@ -7,8 +7,6 @@ import Label from "sap/m/Label";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import Controller from "sap/ui/core/mvc/Controller";
 import JSONModel from "sap/ui/model/json/JSONModel";
-import Filter from "sap/ui/model/Filter";
-import FilterOperator from "sap/ui/model/FilterOperator";
 import ListBinding from "sap/ui/model/ListBinding";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import Context from "sap/ui/model/odata/v4/Context";
@@ -23,10 +21,12 @@ import Help from "../shared/Help";
 import LiveSocket from "../shared/LiveSocket";
 import Navigation from "../shared/Navigation";
 import Prefs from "../shared/Prefs";
+import MessageBuffer, { messageFilter } from "../util/MessageBuffer";
+import SubscriptionSession from "../util/SubscriptionSession";
+import { rememberTopics, splitTopics, withTopics } from "../util/TopicList";
 
 const MAX_MESSAGES = 500;
 const FLUSH_MS = 250;
-const HEARTBEAT_MS = 60 * 1000;
 /** shared/Prefs key ("aem-suite.subscriber" in localStorage, as before) */
 const PREFS_KEY = "subscriber";
 const MAX_TOPIC_HISTORY = 30;
@@ -113,9 +113,9 @@ interface SelectedMessage extends LiveMessage {
 export default class Main extends Controller {
   private state: JSONModel;
   private socket: LiveSocket;
-  private buffer: LiveMessage[] = [];
+  private session: SubscriptionSession;
+  private buffer = new MessageBuffer<LiveMessage>(MAX_MESSAGES);
   private flushTimer?: ReturnType<typeof setInterval>;
-  private heartbeatTimer?: ReturnType<typeof setInterval>;
 
   public onInit(): void {
     const prefs = loadPrefs();
@@ -154,6 +154,11 @@ export default class Main extends Controller {
       (event, data) => this.onLiveEvent(event, data),
       (connected) => this.state.setProperty("/socketConnected", connected)
     );
+    this.session = new SubscriptionSession(
+      () => this.odata(),
+      this.socket,
+      () => this.markStopped("Subscription ended on the server")
+    );
     // the page shows the connection state from the start
     void this.socket.connect();
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
@@ -179,11 +184,9 @@ export default class Main extends Controller {
 
   /** Appends topics to the list (trimmed, no duplicates). */
   private addTopics(texts: string[]): void {
-    const topics = this.topicList();
-    for (const text of texts.map((t) => t.trim())) if (text && !topics.includes(text)) topics.push(text);
     this.state.setProperty(
       "/topics",
-      topics.map((text) => ({ text }))
+      withTopics(this.topicList(), texts).map((text) => ({ text }))
     );
   }
 
@@ -218,12 +221,11 @@ export default class Main extends Controller {
 
   /** The list plus the text still being typed (so Start works without pressing Add first). */
   private collectTopics(): string[] {
-    return [...new Set([...this.topicList(), ...splitTopics(this.topicInput().getValue())])];
+    return withTopics(this.topicList(), splitTopics(this.topicInput().getValue()));
   }
 
   private rememberTopics(topics: string[]): string[] {
-    const history = [...topics, ...((this.state.getProperty("/topicHistory") as { text: string }[]) ?? []).map((h) => h.text)];
-    const unique = [...new Set(history)].slice(0, MAX_TOPIC_HISTORY);
+    const unique = rememberTopics(topics, ((this.state.getProperty("/topicHistory") as { text: string }[]) ?? []).map((h) => h.text), MAX_TOPIC_HISTORY);
     this.state.setProperty(
       "/topicHistory",
       unique.map((text) => ({ text }))
@@ -423,8 +425,7 @@ export default class Main extends Controller {
 
     this.state.setProperty("/busy", true);
     try {
-      // the binding (with the password) is dropped from the model afterwards, also if starting fails
-      const { subscriptionId: id } = await invokeAction<{ subscriptionId: string }>(this.odata(), "/start(...)", {
+      const id = await this.session.start({
         brokerId,
         sourceType: s.sourceType,
         topics: s.sourceType === "TOPIC" ? topics : [],
@@ -433,7 +434,6 @@ export default class Main extends Controller {
         username: s.needsUsername ? s.enteredUsername.trim() : null
       });
       this.state.setProperty("/password", "");
-      await this.socket.enter(id);
       // the text that was still being typed is now a topic, too
       this.topicInput().setValue("");
       this.addTopics(topics);
@@ -453,7 +453,6 @@ export default class Main extends Controller {
       this.state.setProperty("/brokerName", (this.byId("broker") as Select).getSelectedItem()?.getText() ?? "");
       this.state.setProperty("/sourceLabel", label);
       this.state.setProperty("/status", "Subscribed");
-      this.heartbeatTimer = setInterval(() => void this.heartbeat(), HEARTBEAT_MS);
       // the form is not needed while listening - give the messages the room
       this.setHeaderExpanded(false);
     } catch (e) {
@@ -473,20 +472,17 @@ export default class Main extends Controller {
   }
 
   private async stopCurrent(): Promise<void> {
-    const id = this.state.getProperty("/subscriptionId") as string | null;
-    if (!id) return;
+    if (!this.session.currentId()) return;
     this.markStopped("Not subscribed");
-    this.socket.exit(id);
     try {
-      await invokeAction(this.odata(), "/stop(...)", { subscriptionId: id });
+      await this.session.stop();
     } catch (e) {
       MessageToast.show(errorText(e));
     }
   }
 
+  /** The page shows "not subscribed" (the session itself is ended by its owner: stop, status event, heartbeat). */
   private markStopped(status: string): void {
-    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
-    this.heartbeatTimer = undefined;
     this.state.setProperty("/subscriptionId", null);
     this.state.setProperty("/subscription", null);
     this.state.setProperty("/status", status);
@@ -495,18 +491,6 @@ export default class Main extends Controller {
 
   private setHeaderExpanded(expanded: boolean): void {
     (this.byId("page") as DynamicPage | undefined)?.setHeaderExpanded(expanded);
-  }
-
-  /** Keeps this page's subscription alive on the server (only this one: a closed tab's subscription times out). */
-  private async heartbeat(): Promise<void> {
-    const id = this.state.getProperty("/subscriptionId") as string | null;
-    if (!id) return;
-    try {
-      const { active } = await invokeAction<{ active: boolean }>(this.odata(), "/heartbeat(...)", { subscriptionId: id });
-      if (!active && this.state.getProperty("/subscriptionId") === id) this.markStopped("Subscription ended on the server");
-    } catch {
-      /* transient - retry on next tick */
-    }
   }
 
   private async fetchActive(): Promise<Record<string, string>[]> {
@@ -565,14 +549,13 @@ export default class Main extends Controller {
         deliveryMode: String(data.deliveryMode ?? ""),
         size: formatSize(new Blob([payload]).size)
       });
-      // while paused nothing is shown - keep only what the table could show afterwards
-      if (this.buffer.length > MAX_MESSAGES) this.buffer.splice(0, this.buffer.length - MAX_MESSAGES);
       this.state.setProperty("/received", (this.state.getProperty("/received") as number) + 1);
     } else if (event === "subscriptionStatus") {
       const status = String(data.status);
       if (status === "THROTTLED" || status === "RESUMED") {
         MessageToast.show(String(data.message));
       } else {
+        this.session.ended();
         this.markStopped(`${status}: ${data.message}`);
         if (status === "DOWN") MessageBox.warning(`Subscription lost: ${data.message}`);
       }
@@ -581,14 +564,13 @@ export default class Main extends Controller {
 
   /** Batches incoming messages into the table (newest first). */
   private flush(): void {
-    if (!this.buffer.length || this.state.getProperty("/paused")) return;
-    const incoming = this.buffer.splice(0).reverse();
-    const messages = (this.state.getProperty("/messages") as LiveMessage[]) ?? [];
-    this.state.setProperty("/messages", incoming.concat(messages).slice(0, MAX_MESSAGES));
+    if (this.state.getProperty("/paused")) return;
+    const messages = this.buffer.flushInto((this.state.getProperty("/messages") as LiveMessage[]) ?? []);
+    if (messages) this.state.setProperty("/messages", messages);
   }
 
   public onClear(): void {
-    this.buffer = [];
+    this.buffer.clear();
     this.state.setProperty("/messages", []);
     this.state.setProperty("/received", 0);
     this.state.setProperty("/selected", null);
@@ -596,20 +578,7 @@ export default class Main extends Controller {
 
   public onFilter(event: SearchField$LiveChangeEvent): void {
     const query = event.getParameter("newValue") ?? "";
-    const binding = (this.byId("messages") as Table).getBinding("items") as ListBinding;
-    binding.filter(
-      query
-        ? [
-            new Filter({
-              filters: [
-                new Filter("topic", FilterOperator.Contains, query),
-                new Filter("payload", FilterOperator.Contains, query)
-              ],
-              and: false
-            })
-          ]
-        : []
-    );
+    ((this.byId("messages") as Table).getBinding("items") as ListBinding).filter(messageFilter(query));
   }
 
   public onSelect(event: ListBase$SelectionChangeEvent): void {
@@ -710,13 +679,6 @@ export default class Main extends Controller {
       MessageBox.error(errorText(e));
     }
   }
-}
-
-function splitTopics(text: string): string[] {
-  return text
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
 }
 
 function loadPrefs(): SubscriberPrefs {
