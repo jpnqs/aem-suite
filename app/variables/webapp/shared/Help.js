@@ -20,7 +20,7 @@ sap.ui.define(["module", "./Navigation"], function (module, Navigation) {
 
   /** Opens a section of the user guide in a new tab, so nothing being edited here is lost. */
   function openSection(key) {
-    Navigation.toApp({ app: "help", intent: "AEMSuiteHelp-display", path: SECTIONS[key], newTab: true });
+    Navigation.toApp({ app: "help", path: SECTIONS[key], newTab: true });
   }
 
   return {

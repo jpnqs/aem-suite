@@ -66,7 +66,7 @@ app/
   testcases/                  Fiori elements app with extensions (webapp/ext/*)
   subscriber/                 freestyle UI5 app in TypeScript
   help/ home/                 freestyle UI5 apps: the user guide, the start page
-  _shared/                    UI modules all apps share (Actions, Help, LiveSocket, Navigation, MyEntriesFilter) -
+  _shared/                    UI modules all apps share (Apps, Actions, Help, LiveSocket, Navigation, MyEntriesFilter) -
                               the original; npm run sync:ui copies them to <app>/webapp/shared (generated, committed)
   router/                     standalone approuter (xs-app.json: MCP, OAuth discovery, everything else from the HTML5 repo)
   <app>/xs-app.json           routes of each app in the HTML5 repo (odata/, ws/ -> destination srv-api)
@@ -414,7 +414,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 ### 8.2a Shared UI modules (`app/_shared`)
 
-`Actions.js` (error text, `invokeAction` that destroys the operation binding afterwards), `Help.js` (Help buttons, section per app), `LiveSocket.js` (WebSocket client with reconnect, used by the Run dialog and the Live Subscriber), `Navigation.js` (to another app, inside or outside the launchpad) and `MyEntriesFilter.controller.js` (prefills the "Created by" / "Started by" filter once per app start with `currentUser()`; test cases and runs). TypeScript apps get `.d.ts` files too.
+`Apps.js` (the app catalog: key, launchpad intent, icon and required role of every app – `test/launchpad.test.ts` compares it with the launchpad tiles and the manifests), `Actions.js` (error text, `invokeAction` that destroys the operation binding afterwards), `Help.js` (Help buttons, section per app), `LiveSocket.js` (WebSocket client with reconnect, used by the Run dialog and the Live Subscriber), `Navigation.js` (to another app by its key, inside or outside the launchpad) and `MyEntriesFilter.controller.js` (prefills the "Created by" / "Started by" filter once per app start with `currentUser()`; test cases and runs). TypeScript apps get `.d.ts` files too.
 
 Each HTML5 app is deployed on its own, so every app has a **generated copy** in `webapp/shared` and loads it under its own namespace (`com/aem/suite/<app>/shared/...`). Edit only `app/_shared`, then run `npm run sync:ui`; `test/shared-ui.test.ts` fails when a copy is out of date.
 

@@ -734,7 +734,7 @@ function savePrefs(prefs: SubscriberPrefs): void {
 }
 
 function openTestCase(id: string): void {
-  Navigation.toApp({ app: "testcases", intent: "AEMSuiteTestCases-manage", path: `TestCases(ID=${id},IsActiveEntity=true)` });
+  Navigation.toApp({ app: "testcases", path: `TestCases(ID=${id},IsActiveEntity=true)` });
 }
 
 function tryJson(text: string): unknown {

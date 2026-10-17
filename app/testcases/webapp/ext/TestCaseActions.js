@@ -26,7 +26,7 @@ sap.ui.define(
 
     /** Navigates to the run in the runs app. */
     function openRun(runId) {
-      Navigation.toApp({ app: "runs", intent: "AEMSuiteTestRuns-display", path: "TestRuns(" + runId + ")" });
+      Navigation.toApp({ app: "runs", path: "TestRuns(" + runId + ")" });
     }
 
     /**
