@@ -7,6 +7,7 @@ import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord,
 import { loadTree } from './tree'
 import { TemplateError } from './template/resolve'
 import { config } from './config'
+import { columnLength } from './model'
 
 const LOG = cds.log('aem-runner')
 
@@ -310,11 +311,15 @@ async function executeRun(runId: string, jwt: string | undefined, credentials: C
   }
 
   // brokers in parallel, the test cases of one broker one after the other
-  await Promise.allSettled(brokerIds.map((brokerId) => runBroker(brokerId, pending.filter((p) => p.broker_ID === brokerId), ctx)))
+  const settled = await Promise.allSettled(brokerIds.map((brokerId) => runBroker(brokerId, pending.filter((p) => p.broker_ID === brokerId), ctx)))
+  // a broker loop only stops early when storing a result failed: then the run cannot be completed as DONE
+  // (results would stay PENDING) - executeRunInBackground marks it FAILED instead
+  const crashed = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected')
+  if (crashed) throw crashed.reason
   await ctx.progress.complete()
 }
 
-/** Connects to one broker and publishes its test cases; every result ends PASSED, FAILED or ERROR. */
+/** Connects to one broker and publishes its test cases; every result ends PASSED, FAILED, ERROR or SKIPPED. */
 async function runBroker(brokerId: string, results: PendingResult[], ctx: RunContext): Promise<void> {
   const { progress } = ctx
   let broker: BrokerRecord
@@ -365,7 +370,13 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
     await progress.finish(r, 'ERROR', { errorMessage: truncate(errMsg(e), MAX_ERROR), deliveryMode: tc.deliveryMode })
     return false
   }
-  const sent = { deliveryMode: spec.deliveryMode, resolvedTopic: spec.topic, resolvedPayload: spec.payload, correlationId: spec.correlationId ?? null }
+  // variables can make topic and correlation id longer than their columns (HANA would reject the write)
+  const sent = {
+    deliveryMode: spec.deliveryMode,
+    resolvedTopic: truncate(spec.topic, columnLength('RunResults', 'resolvedTopic')),
+    resolvedPayload: spec.payload,
+    correlationId: spec.correlationId == null ? null : truncate(spec.correlationId, columnLength('RunResults', 'correlationId'))
+  }
   try {
     const res = await publisher.publish(spec)
     await progress.finish(r, 'PASSED', { ...sent, ackLatencyMs: res.latencyMs })

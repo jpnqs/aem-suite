@@ -1,9 +1,9 @@
-import cds from '@sap/cds'
 import { detectContentType, SORT_STEP } from './defaults'
 import { httpError } from './errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
 import type { TestCaseRecord } from './test-case-spec'
 import { loadTree } from './tree'
+import { elementOf, enumValues } from './model'
 
 /**
  * Rules for creating / changing test cases and folders - shared by the UI service (TestService),
@@ -58,15 +58,6 @@ export async function nextSortOrder(parentId: string | null | undefined): Promis
 }
 
 // ------------------------------------------------------------------ enums and lengths from db/schema.cds
-
-type Element = { length?: number; enum?: Record<string, unknown> }
-
-function elementOf(entity: string, element: string): Element | undefined {
-  const def = cds.model?.definitions[`aem.suite.${entity}`] as { elements?: Record<string, Element> } | undefined
-  return def?.elements?.[element]
-}
-
-const enumValues = (entity: string, element: string): string[] => Object.keys(elementOf(entity, element)?.enum ?? {})
 
 /** Enum values the UI offers as dropdowns - the database does not check them. */
 export function validateEnums(d: NodeData, reject: Reject): void {
