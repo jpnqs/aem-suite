@@ -28,7 +28,7 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | B8 | Fixed | 33f262f | skippedCount/repetitions/iteration/sequence exposed, `skipped` in the summary, failures filtered in the query |
 | B9 | Fixed | 474e687, a8baccb | `lib/model.ts#columnLength` for every cut; redundant preset length checks removed |
 | B10 | Fixed | 5bd5b1d | separate `disposed` flag; `bindFlow` timeout guard |
-| B11 | Open – decision needed | – | ⚖ not changed: a stopped run still ends DONE/PASSED |
+| B11 | Fixed | (B11 commit) | new RunStatus STOPPED: cancelRun ends the run STOPPED, outcome STOPPED / criticality 2 (FAILED if something failed), in TestService, Home, the agent (RunSummary, instructions), the run dialog and the docs; failRuns stays FAILED |
 | B12 | Fixed | 135ddca, 33f262f | comments fixed, `@mcp.instructions` extended, createRun/executeRunInBackground/normalizeOptions no longer exported |
 | B13 | Fixed | 35c5ed0 | enum unions come from the cds-typer models; preset SOURCE_TYPES check replaced by `@assert.range` |
 | B14 | Fixed | 135ddca | `lib/live.ts#emitLive`; all loggers `aem-` (audit logger is now `aem-agent`) |

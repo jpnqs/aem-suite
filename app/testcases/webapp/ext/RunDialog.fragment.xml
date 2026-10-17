@@ -92,7 +92,7 @@
           showIcon="true"
           class="sapUiSmallMarginBottom" />
         <ObjectStatus
-          text="{= ${run>/finished} ? (${run>/aborted} ? ${i18n>run.aborted} : (${run>/skipped} > 0 ? ${i18n>run.finished} + ' - ' + ${run>/skipped} + ' ' + ${i18n>run.notSent} : ${i18n>run.finished})) : (${run>/stopping} ? ${i18n>run.stopping} : ${i18n>run.running}) }"
+          text="{= ${run>/finished} ? (${run>/aborted} ? ${i18n>run.aborted} : (${run>/stopped} ? ${i18n>run.stopped} + ' - ' + ${run>/skipped} + ' ' + ${i18n>run.notSent} : (${run>/skipped} > 0 ? ${i18n>run.finished} + ' - ' + ${run>/skipped} + ' ' + ${i18n>run.notSent} : ${i18n>run.finished}))) : (${run>/stopping} ? ${i18n>run.stopping} : ${i18n>run.running}) }"
           state="{= ${run>/finished} ? (${run>/failed} > 0 ? 'Error' : (${run>/skipped} > 0 ? 'Warning' : 'Success')) : 'Information' }"
           icon="{= ${run>/finished} ? (${run>/failed} > 0 ? 'sap-icon://error' : 'sap-icon://sys-enter-2') : 'sap-icon://pending' }"
           class="sapMObjectStatusLarge sapUiSmallMarginBottom" />

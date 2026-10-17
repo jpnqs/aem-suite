@@ -119,7 +119,8 @@ describe('advanced run settings (repetitions, delay, stop on failure, stop)', ()
     expect(rows.filter((r) => r.status === 'SKIPPED')).toHaveLength(REPETITIONS - sent)
     expect(rows.find((r) => r.status === 'SKIPPED')?.errorMessage).toMatch(/stopped/)
     const { data } = await GET(`/odata/v4/test/TestRuns(${runId})`, tester)
-    expect(data).toMatchObject({ status: 'DONE', passedCount: sent, skippedCount: REPETITIONS - sent, failedCount: 0, outcome: 'PASSED' })
+    // stopped by its user: its own status and outcome (warning), not DONE / PASSED
+    expect(data).toMatchObject({ status: 'STOPPED', passedCount: sent, skippedCount: REPETITIONS - sent, failedCount: 0, outcome: 'STOPPED', statusCriticality: 2 })
     // a finished run cannot be stopped again
     const again = await POST('/odata/v4/test/cancelRun', { runId }, admin)
     expect(again.status).toBe(409)

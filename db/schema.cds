@@ -45,7 +45,10 @@ type DeliveryMode   : String(12) enum {
 type RunStatus      : String(10) enum {
   RUNNING;
   DONE;
+  /** aborted: crashed, or the server stopped while it ran */
   FAILED;
+  /** stopped by the user (cancelRun): the messages not sent yet are SKIPPED */
+  STOPPED;
 }
 
 @assert.range

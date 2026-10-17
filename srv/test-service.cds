@@ -102,11 +102,14 @@ service TestService {
         when status = 'RUNNING' then 'RUNNING'
         when status = 'FAILED'  then 'FAILED'
         when failedCount > 0    then 'FAILED'
+        when status = 'STOPPED' then 'STOPPED'
         else 'PASSED'
       end as outcome : String(10) @title: '{i18n>Result}',
+      // PASSED 3, FAILED 1, RUNNING and STOPPED 2 (warning)
       case status
-        when 'DONE'   then (case when failedCount > 0 then 1 else 3 end)
-        when 'FAILED' then 1
+        when 'DONE'    then (case when failedCount > 0 then 1 else 3 end)
+        when 'FAILED'  then 1
+        when 'STOPPED' then (case when failedCount > 0 then 1 else 2 end)
         else 2
       end as statusCriticality : Integer
     };

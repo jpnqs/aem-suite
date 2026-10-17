@@ -239,7 +239,7 @@ For repeating a message, simulating traffic or watching a flow over time:
 
 The dialog shows what you are about to start, for example *"30 or more messages … the pauses alone take about 2 min"* (a folder sends everything below it). Your settings are remembered for the next run.
 
-**Stop run** ends a run early (the user who started it, or an administrator): messages not sent yet get the status **SKIPPED**. A message that is already on its way is finished.
+**Stop run** ends a run early (the user who started it, or an administrator): messages not sent yet get the status **SKIPPED**. A message that is already on its way is finished. The run itself then ends **STOPPED** (shown as a warning), not as passed.
 
 A run is limited (`cds.aemSuite.runs`): at most 1000 repetitions and 5000 messages (test cases × brokers × repetitions) per run.
 
@@ -251,6 +251,8 @@ A run is limited (`cds.aemSuite.runs`): at most 1000 repetitions and 5000 messag
 | **FAILED** | The broker rejected the message, or no acknowledgement arrived in time. |
 | **ERROR** | The message could not be sent at all – e.g. unknown variable, invalid JSON, wrong password, broker not reachable. |
 | **SKIPPED** | Not sent: the run was stopped, or an earlier message to this broker failed and *Stop at the first failure* was on. Skipped messages are not counted as failed. |
+
+The **result of a whole run** is PASSED (all sent messages passed), FAILED (at least one failed, or the run was aborted on the server), STOPPED (you or an administrator stopped it and nothing failed before) or RUNNING.
 
 PASSED means the broker accepted the message. It does not check whether a consumer received or processed it – use the Live Subscriber or saved messages for that.
 

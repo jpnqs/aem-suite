@@ -28,6 +28,7 @@ describe('home (start page)', () => {
     await INSERT.into('aem.suite.TestRuns').entries([
       { summary: 'old', startedAt: ago(30 * day), status: 'DONE', totalCount: 9, passedCount: 0, failedCount: 9, createdBy: 'tester' },
       { summary: 'yesterday', startedAt: ago(day), status: 'DONE', totalCount: 4, passedCount: 3, failedCount: 1, createdBy: 'tester' },
+      { summary: 'stopped', startedAt: ago(2 * day), status: 'STOPPED', totalCount: 5, passedCount: 2, failedCount: 0, skippedCount: 3, createdBy: 'tester' },
       { summary: 'now', startedAt: ago(1000), status: 'RUNNING', totalCount: 2, passedCount: 1, failedCount: 0, createdBy: 'admin' }
     ])
     await INSERT.into('aem.suite.ReceivedMessages').entries({ topic: 't', payload: 'x' })
@@ -43,11 +44,11 @@ describe('home (start page)', () => {
       testCases: 2,
       folders: 1,
       myTestCases: 1,
-      runsLast7Days: 2,
+      runsLast7Days: 3,
       runningRuns: 1,
-      resultsPassed: 4,
+      resultsPassed: 6,
       resultsFailed: 1,
-      passRate: 80,
+      passRate: 86,
       brokers: 3,
       brokersOk: 1,
       brokersFailing: 1,
@@ -57,7 +58,7 @@ describe('home (start page)', () => {
       liveSubscriptions: 0
     })
     // newest first, with the outcome the Test Runs app shows
-    expect(data.lastRuns.map((r: { summary: string; outcome: string }) => `${r.summary}:${r.outcome}`)).toEqual(['now:RUNNING', 'yesterday:FAILED', 'old:FAILED'])
+    expect(data.lastRuns.map((r: { summary: string; outcome: string }) => `${r.summary}:${r.outcome}`)).toEqual(['now:RUNNING', 'yesterday:FAILED', 'stopped:STOPPED', 'old:FAILED'])
     expect(data.lastRuns[0]).toMatchObject({ startedBy: 'admin', totalCount: 2 })
   })
 

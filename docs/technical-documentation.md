@@ -54,7 +54,7 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
 2. `createRun` validates the input, expands folders to test cases (tree order), and inserts `TestRuns` plus one `PENDING` `RunResults` row per message – test case × broker × repetition (advanced settings, section 7.6) – in the request transaction.
 3. After commit (`req.on('succeeded')`) `executeRunInBackground` starts. Brokers are processed **in parallel**, the test cases of one broker **sequentially** over one session.
 4. Each result row is updated in its own transaction (PASSED, FAILED, ERROR, or SKIPPED when the run was stopped) and a `runProgress` event goes to WebSocket context = run ID.
-5. At the end the run gets status `DONE`, counters, and `TestCaseStats` (last result per test case) is upserted. If storing a result fails, or the run crashes, it ends `FAILED` instead and its open results get `ERROR` (`failRuns`); runs left `RUNNING` by a server restart are ended the same way on the next start.
+5. At the end the run gets status `DONE` (or `STOPPED` when its user stopped it with `cancelRun`), counters, and `TestCaseStats` (last result per test case) is upserted. If storing a result fails, or the run crashes, it ends `FAILED` instead and its open results get `ERROR` (`failRuns`); runs left `RUNNING` by a server restart are ended the same way on the next start.
 
 ## 4. Repository layout
 
@@ -106,7 +106,7 @@ mta.yaml, xs-security.json    deployment
 | `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
 | `TestCaseVariables` | Variables of a test case **or a folder** | Folder variables apply to all descendants. |
 | `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases (an association, so drafts do not copy it). `TestService` deletes the stats of deleted test cases. |
-| `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED (FAILED = aborted), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `repetitionOrder` (ROUND / EACH), `delayMs`, `stopOnFailure`. Composition `results`. |
+| `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED/STOPPED (FAILED = aborted, `failRuns`; STOPPED = stopped by its user, `cancelRun`), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `repetitionOrder` (ROUND / EACH), `delayMs`, `stopOnFailure`. Composition `results`. |
 | `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
 | `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
 | `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name (`@assert.unique`; the service also refuses the same name in another case), prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
@@ -158,7 +158,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `cancelRun(runId)` | Stops a running run: messages not sent yet are SKIPPED. For the user who started it and administrators; only on the instance that executes the run. |
 | `currentUser()` | Logged-in user ID – used to prefill the "Created by" / "Started by" filters. |
 | `Brokers` | Active brokers (read-only projection incl. `credentialMode`, `username`). |
-| `TestRuns`, `RunResults` | Read-only, with `outcome` (PASSED/FAILED/RUNNING) and criticality fields. |
+| `TestRuns`, `RunResults` | Read-only, with `outcome` (PASSED/FAILED/STOPPED/RUNNING; FAILED wins over STOPPED when something failed) and criticality fields (PASSED 3, FAILED 1, RUNNING and STOPPED 2 = warning). |
 | `TestCaseStats` | Read-only, with criticality. |
 | `DeliveryModes`, `PropertyTypes` | Code lists. |
 
@@ -186,7 +186,7 @@ Clients enter a **context** to receive only their events:
 
 | Event | Context | Payload |
 |---|---|---|
-| `runProgress` | run ID | `status` RUNNING/DONE, `total`, `done`, `passed`, `failed`, `skipped`, `resultId` |
+| `runProgress` | run ID | `status` RUNNING/DONE/STOPPED, `total`, `done`, `passed`, `failed`, `skipped`, `resultId` |
 | `message` | subscription ID | topic, payload, contentType, userProperties (JSON), correlationId, deliveryMode, receivedAt, seq |
 | `subscriptionStatus` | subscription ID | `STOPPED`, `DOWN`, `THROTTLED`, `RESUMED` + message |
 
@@ -359,7 +359,7 @@ Loads test cases with properties and variables, builds the variable scopes (`loa
 `createRun` → validation (brokers exist and are active, passwords for DIRECT brokers, at least one test case after folder expansion), `summary`, pending rows. `executeRunInBackground` → see section 3. `waitForRun(runId)` exists for tests.
 
 
-**Advanced settings** (`RunOptions` of `runTests` / `runTest`, saved on the `TestRuns` row): `repetitions` (1 - `runs.maxRepetitions`), `delayMs` (0 - `runs.maxDelayMs`), `order` (`ROUND`: the selection N times; `EACH`: every test case N times in a row) and `stopOnFailure`. `createRun` checks them (`normalizeOptions`) and the total (test cases x brokers x repetitions <= `runs.maxResults`), and creates one PENDING `RunResults` row per message with `iteration` and `sequence` (the order within a broker). `runBroker` sends a broker's rows in `sequence` order, waits `delayMs` between two messages (`pause`, interrupted when the run is stopped) and - after a failed message with `stopOnFailure`, or when the run was stopped - marks the rest `SKIPPED` (`RunProgress.skip`: counted as done, in `TestRuns.skippedCount`, not as failed; skipped results do not touch `TestCaseStats`). `cancelRun` (service action `cancelRun(runId)`) puts the run into an in-memory set that the loops check, so it only works on the instance that executes the run; allowed for the user who started the run and for administrators.
+**Advanced settings** (`RunOptions` of `runTests` / `runTest`, saved on the `TestRuns` row): `repetitions` (1 - `runs.maxRepetitions`), `delayMs` (0 - `runs.maxDelayMs`), `order` (`ROUND`: the selection N times; `EACH`: every test case N times in a row) and `stopOnFailure`. `createRun` checks them (`normalizeOptions`) and the total (test cases x brokers x repetitions <= `runs.maxResults`), and creates one PENDING `RunResults` row per message with `iteration` and `sequence` (the order within a broker). `runBroker` sends a broker's rows in `sequence` order, waits `delayMs` between two messages (`pause`, interrupted when the run is stopped) and - after a failed message with `stopOnFailure`, or when the run was stopped - marks the rest `SKIPPED` (`RunProgress.skip`: counted as done, in `TestRuns.skippedCount`, not as failed; skipped results do not touch `TestCaseStats`). `cancelRun` (service action `cancelRun(runId)`) puts the run into an in-memory set that the loops check, so it only works on the instance that executes the run; allowed for the user who started the run and for administrators. A stopped run ends with status `STOPPED` (outcome STOPPED, or FAILED if a message failed before); `maxActiveRuns` and every "running" filter look at `RUNNING` only, so a stopped run frees its slot like a finished one.
 
 ### 7.7 `tree.ts`
 

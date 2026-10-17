@@ -118,8 +118,15 @@ sap.ui.define(
             return {
               ID: r.ID,
               summary: r.summary,
-              state: r.outcome === "PASSED" ? "Success" : r.outcome === "FAILED" ? "Error" : "Information",
-              icon: r.outcome === "PASSED" ? "sap-icon://sys-enter-2" : r.outcome === "FAILED" ? "sap-icon://error" : "sap-icon://pending",
+              state: r.outcome === "PASSED" ? "Success" : r.outcome === "FAILED" ? "Error" : r.outcome === "STOPPED" ? "Warning" : "Information",
+              icon:
+                r.outcome === "PASSED"
+                  ? "sap-icon://sys-enter-2"
+                  : r.outcome === "FAILED"
+                    ? "sap-icon://error"
+                    : r.outcome === "STOPPED"
+                      ? "sap-icon://stop"
+                      : "sap-icon://pending",
               when: r.startedAt ? relative.format(new Date(r.startedAt)) : ""
             };
           })

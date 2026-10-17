@@ -99,6 +99,8 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
     moreProblems: 0,
     finished: false,
     aborted: false,
+    /** stopped by the user (run status STOPPED) */
+    stopped: false,
     connectionLost: false
   });
   const socket = new LiveSocket(
@@ -112,6 +114,7 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
       state.setProperty("/failed", data.failed);
       state.setProperty("/skipped", data.skipped || 0);
       if (data.status !== "RUNNING") {
+        state.setProperty("/stopped", data.status === "STOPPED");
         finish(String(data.runId));
       }
     },
@@ -151,6 +154,7 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
           state.setProperty("/failed", r.failedCount);
           state.setProperty("/skipped", r.skippedCount || 0);
           state.setProperty("/aborted", r.status === "FAILED");
+          state.setProperty("/stopped", r.status === "STOPPED");
           finish(runId);
         }
       })

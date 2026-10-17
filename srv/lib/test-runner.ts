@@ -264,12 +264,13 @@ class RunProgress {
     await this.progressed(r.ID)
   }
 
-  /** Marks the run DONE once every result is stored. */
+  /** Marks the run DONE (or STOPPED, when its user stopped it) once every result is stored. */
   async complete(): Promise<void> {
     const { passed, failed, skipped } = this.counts
+    const status = cancelledRuns.has(this.runId) ? 'STOPPED' : 'DONE'
     await cds.db.tx(() =>
       UPDATE(TestRuns, this.runId).with({
-        status: 'DONE',
+        status,
         finishedAt: new Date().toISOString(),
         passedCount: passed,
         failedCount: failed,
@@ -278,8 +279,8 @@ class RunProgress {
     )
     await updateTestCaseStats(this.runId, this.perTestCase)
     this.stop()
-    await this.emit(undefined, 'DONE')
-    LOG.info(`Run ${this.runId} finished: ${passed}/${this.total} passed`)
+    await this.emit(undefined, status)
+    LOG.info(`Run ${this.runId} ${status === 'STOPPED' ? 'stopped' : 'finished'}: ${passed}/${this.total} passed`)
   }
 
   /** No more live progress (the run ends, or it crashed and failRuns takes over). */
@@ -428,12 +429,13 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
 }
 
 /**
- * RUNNING while in progress, then FAILED if anything failed or the run was aborted, otherwise PASSED.
- * Keep in sync with TestRuns.outcome in srv/test-service.cds.
+ * RUNNING while in progress, then FAILED if anything failed or the run was aborted, STOPPED if its user stopped it
+ * (and nothing failed before), otherwise PASSED. Keep in sync with TestRuns.outcome in srv/test-service.cds.
  */
-export function runOutcome(run: Pick<TestRun, 'status' | 'failedCount'>): 'RUNNING' | 'FAILED' | 'PASSED' {
+export function runOutcome(run: Pick<TestRun, 'status' | 'failedCount'>): 'RUNNING' | 'FAILED' | 'STOPPED' | 'PASSED' {
   if (run.status === 'RUNNING') return 'RUNNING'
-  return run.status === 'FAILED' || (run.failedCount ?? 0) > 0 ? 'FAILED' : 'PASSED'
+  if (run.status === 'FAILED' || (run.failedCount ?? 0) > 0) return 'FAILED'
+  return run.status === 'STOPPED' ? 'STOPPED' : 'PASSED'
 }
 
 /**
