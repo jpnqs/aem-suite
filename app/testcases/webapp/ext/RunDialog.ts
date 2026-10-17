@@ -14,6 +14,7 @@ import Actions from "com/aem/suite/testcases/shared/Actions";
 import Help from "com/aem/suite/testcases/shared/Help";
 import LiveSocket from "com/aem/suite/testcases/shared/LiveSocket";
 import Navigation from "com/aem/suite/testcases/shared/Navigation";
+import { textsOf, Texts } from "./i18n";
 
 /**
  * The Run dialog (RunDialog.fragment.xml): broker selection, credentials of direct brokers, the advanced
@@ -60,13 +61,13 @@ function openRun(runId: string): void {
 }
 
 /** "45 s", "3 min 20 s", "1 h 5 min" */
-function formatDuration(ms: number): string {
+function formatDuration(ms: number, t: Texts): string {
   const s = Math.round(ms / 1000);
   if (s < 60) {
-    return Math.max(s, 1) + " s";
+    return t("run.seconds", [Math.max(s, 1)]);
   }
   const m = Math.floor(s / 60);
-  return m < 60 ? m + " min " + (s % 60) + " s" : Math.floor(m / 60) + " h " + (m % 60) + " min";
+  return m < 60 ? t("run.minutesSeconds", [m, s % 60]) : t("run.hoursMinutes", [Math.floor(m / 60), m % 60]);
 }
 
 /**
@@ -75,6 +76,7 @@ function formatDuration(ms: number): string {
  */
 function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string): Promise<void> {
   const model = api.getModel() as ODataModel;
+  const t = textsOf(api);
   const state = new JSONModel({
     label: label,
     credentials: [] as CredentialRow[],
@@ -220,9 +222,9 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
     const perBroker = testCaseIds.length * reps;
     let text = "";
     if (brokerCount && (reps > 1 || delay > 0)) {
-      text = perBroker * brokerCount + " or more messages (" + testCaseIds.length + " × " + brokerCount + (brokerCount === 1 ? " broker" : " brokers") + " × " + reps + "; folders send everything below them)";
+      text = t("run.estimate", [perBroker * brokerCount, testCaseIds.length, t(brokerCount === 1 ? "run.brokerOne" : "run.brokerMany", [brokerCount]), reps]);
       if (delay > 0 && perBroker > 1) {
-        text += "; the pauses alone take about " + formatDuration((perBroker - 1) * delay);
+        text += t("run.estimatePauses", [formatDuration((perBroker - 1) * delay, t)]);
       }
     }
     state.setProperty("/estimate", text);
@@ -280,7 +282,7 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
       }
       const brokerIds = selectedBrokers().map((c) => c.getProperty("ID") as string);
       if (!brokerIds.length) {
-        MessageToast.show("Select at least one broker");
+        MessageToast.show(t("run.selectBroker"));
         return;
       }
       const credentials = state.getProperty("/credentials") as CredentialRow[];
@@ -288,7 +290,7 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
       if (missing.length) {
         for (const c of credentials) c.missing = true;
         state.refresh(true);
-        MessageToast.show("Enter the missing credentials for " + missing.map((c) => c.name).join(", "));
+        MessageToast.show(t("run.missingCredentials", [missing.map((c) => c.name).join(", ")]));
         return;
       }
       Prefs.set("lastBrokers", brokerIds);

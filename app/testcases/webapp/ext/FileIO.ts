@@ -4,6 +4,7 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ExtensionAPI from "sap/fe/core/ExtensionAPI";
 import ListReportExtensionAPI from "sap/fe/templates/ListReport/ExtensionAPI";
 import Actions from "com/aem/suite/testcases/shared/Actions";
+import { textsOf, Texts } from "./i18n";
 
 /**
  * Export and import of test cases and folders as a JSON file: the browser saves / reads the file, the content
@@ -18,15 +19,15 @@ interface Counts {
 }
 
 /** "2 folders and 5 test cases" */
-function describeCounts(r: Counts): string {
+function describeCounts(r: Counts, t: Texts): string {
   const parts: string[] = [];
   if (r.folders) {
-    parts.push(r.folders + (r.folders === 1 ? " folder" : " folders"));
+    parts.push(t(r.folders === 1 ? "file.folderOne" : "file.folderMany", [r.folders]));
   }
   if (r.testCases) {
-    parts.push(r.testCases + (r.testCases === 1 ? " test case" : " test cases"));
+    parts.push(t(r.testCases === 1 ? "file.testCaseOne" : "file.testCaseMany", [r.testCases]));
   }
-  return parts.join(" and ") || "nothing";
+  return parts.join(t("file.and")) || t("file.nothing");
 }
 
 /** Lets the browser save text as a file. */
@@ -62,17 +63,16 @@ function pickJsonFile(): Promise<{ name: string; text: string } | null> {
 }
 
 /** Asks whether the checked file should be imported; resolves true or false. */
-function confirmImport(fileName: string, check: Counts & { target?: string | null }): Promise<boolean> {
+function confirmImport(fileName: string, check: Counts & { target?: string | null }, t: Texts): Promise<boolean> {
+  const importAction = t("action.import");
   return new Promise((resolve) => {
     MessageBox.confirm(
-      "Import " + describeCounts(check) + ' from "' + fileName + '" into ' +
-        (check.target ? 'the folder "' + check.target + '"' : "the top level") + "?\n\n" +
-        "They are added as new items. Existing test cases and folders are not changed.",
+      t("file.confirmImport", [describeCounts(check, t), fileName, check.target ? t("file.intoFolder", [check.target]) : t("file.intoTop")]),
       {
-        title: "Import",
-        actions: ["Import", MessageBox.Action.CANCEL],
-        emphasizedAction: "Import",
-        onClose: (action: string | null) => resolve(action === "Import")
+        title: importAction,
+        actions: [importAction, MessageBox.Action.CANCEL],
+        emphasizedAction: importAction,
+        onClose: (action: string | null) => resolve(action === importAction)
       }
     );
   });
@@ -81,9 +81,10 @@ function confirmImport(fileName: string, check: Counts & { target?: string | nul
 export default {
   /** Saves the given nodes (no ids: everything) as a JSON file. */
   exportNodes(api: ExtensionAPI, ids: string[]): Promise<void> {
+    const t = textsOf(api);
     return Actions.invokeAction<Counts & { filename: string; content: string }>(api.getModel() as ODataModel, "/exportNodes(...)", { ids }).then((result) => {
       download(result.filename, result.content);
-      MessageToast.show("Exported " + describeCounts(result) + " to " + result.filename);
+      MessageToast.show(t("file.exported", [describeCounts(result, t), result.filename]));
     });
   },
 
@@ -93,6 +94,7 @@ export default {
    */
   async importNodes(api: ListReportExtensionAPI, parentId: string | null): Promise<void> {
     const model = api.getModel() as ODataModel;
+    const t = textsOf(api);
     const file = await pickJsonFile();
     if (!file) {
       return;
@@ -100,11 +102,11 @@ export default {
     const importCall = (dryRun: boolean) =>
       Actions.invokeAction<Counts & { target?: string | null }>(model, "/importNodes(...)", { content: file.text, parentId, dryRun });
     const check = await importCall(true);
-    if (!(await confirmImport(file.name, check))) {
+    if (!(await confirmImport(file.name, check, t))) {
       return;
     }
     const result = await importCall(false);
-    MessageToast.show("Imported " + describeCounts(result));
+    MessageToast.show(t("file.imported", [describeCounts(result, t)]));
     await api.refresh();
   }
 };

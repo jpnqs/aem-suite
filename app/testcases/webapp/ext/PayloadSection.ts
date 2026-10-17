@@ -12,22 +12,24 @@ import JSONModel from "sap/ui/model/json/JSONModel";
 import Context from "sap/ui/model/odata/v4/Context";
 import { ValueState } from "sap/ui/core/library";
 import JsonTemplate from "./JsonTemplate";
+import { textsOf } from "./i18n";
 
+/** The template expressions of the help popover; the explanations are texts of the bundle (payload.help.<n>). */
 const HELP = [
-  ["{{name}}", "Your variable: test case > broker > folder > global variables"],
-  ["{{uuid}}", "UUID, same value in topic, payload and correlation ID"],
-  ["{{newUuid}}", "New UUID for every occurrence"],
-  ["{{now}}", "Current time, ISO 8601"],
-  ["{{timestamp}}", "Current time, epoch milliseconds"],
-  ["{{date}}", "Current date, YYYY-MM-DD"],
-  ["{{randomInt(1,100)}}", "Random integer between min and max (inclusive)"],
-  ["{{numberRange.ORDERS}}", "Next number of the number range ORDERS (e.g. SO-4500000001), same value everywhere in the message"],
-  ["{{numberRange.ORDERS as orderNo}}", "Takes a number and keeps it as {{orderNo}} - reuse it anywhere in the message; each alias gets its own number"],
-  ["{{faker.person.fullName}}", "Test data from faker.js: faker.<module>.<method> - names, emails, addresses, companies, dates ... (see the user guide)"],
-  ["{{faker.number.int(1,100)}}", 'faker.js with arguments; add "as name" to keep the value as {{name}}'],
-  ["{{broker.name}}", "Name of the broker the message is sent to"],
-  ["{{broker.msgVpn}}", "Message VPN of that broker"],
-  ["{{broker.id}}", "ID of that broker"]
+  "{{name}}",
+  "{{uuid}}",
+  "{{newUuid}}",
+  "{{now}}",
+  "{{timestamp}}",
+  "{{date}}",
+  "{{randomInt(1,100)}}",
+  "{{numberRange.ORDERS}}",
+  "{{numberRange.ORDERS as orderNo}}",
+  "{{faker.person.fullName}}",
+  "{{faker.number.int(1,100)}}",
+  "{{broker.name}}",
+  "{{broker.msgVpn}}",
+  "{{broker.id}}"
 ];
 /** One popover per view: it is a dependent of the view and is destroyed with it (e.g. when the app is closed in the launchpad). */
 const POPOVER = "aemPayloadHelp";
@@ -46,24 +48,25 @@ function getHelpPopover(source: Element): ResponsivePopover {
   if (existing) {
     return existing as ResponsivePopover;
   }
+  const t = textsOf(source);
   const list = new List({
     // setters: values like {{uuid}} must not be parsed as bindings
-    items: HELP.map((h) => new StandardListItem({ type: "Active" }).setTitle(h[0]).setDescription(h[1])),
+    items: HELP.map((expr, i) => new StandardListItem({ type: "Active" }).setTitle(expr).setDescription(t(`payload.help.${i + 1}`))),
     itemPress: (e: ListBase$ItemPressEvent) => {
       const expr = (e.getParameter("listItem") as StandardListItem).getTitle();
       navigator.clipboard.writeText(expr).then(
-        () => MessageToast.show(expr + " copied"),
+        () => MessageToast.show(t("payload.copied", [expr])),
         () => MessageToast.show(expr)
       );
     }
   });
   const helpPopover = new ResponsivePopover({
-    title: "Template expressions",
+    title: t("payload.helpTitle"),
     placement: "Bottom",
     contentWidth: "28rem",
     content: [
       new Text()
-        .setText('Use in topic, payload, correlation ID and user property values - also outside JSON strings, e.g. "qty": {{qty}}. Click an entry to copy it.')
+        .setText(t("payload.helpIntro"))
         .addStyleClass("sapUiSmallMargin"),
       list
     ]
@@ -73,11 +76,19 @@ function getHelpPopover(source: Element): ResponsivePopover {
   return helpPopover;
 }
 
+/** The texts of the status line - from the bundle, or passed in by the binding (the formatters have no models). */
+interface StatusTexts {
+  valid: string;
+  empty: string;
+  /** with {0} = the parser's message */
+  invalid: string;
+}
+
 /** What the status line says about a payload - decided once, for the bindings and while typing. */
-function status(text: string | null | undefined): { text: string; state: ValueState; icon: string } {
+function status(text: string | null | undefined, texts?: StatusTexts): { text: string; state: ValueState; icon: string } {
   const err = JsonTemplate.validate(text);
   return {
-    text: err ? "Invalid JSON: " + err : text && text.trim() ? "Valid JSON" : "Empty payload",
+    text: !texts ? "" : err ? texts.invalid.replace("{0}", err) : text && text.trim() ? texts.valid : texts.empty,
     state: err ? ValueState.Error : ValueState.Success,
     icon: err ? "sap-icon://error" : "sap-icon://sys-enter-2"
   };
@@ -92,9 +103,9 @@ function current(bound?: string | null, typed?: string | null): string | null | 
 }
 
 export default {
-  // formatters of the status line: parts [payload, aem>/typedPayload]
-  statusText(bound?: string | null, typed?: string | null): string {
-    return status(current(bound, typed)).text;
+  // formatters of the status line: parts [payload, aem>/typedPayload] (+ the three texts for statusText)
+  statusText(bound?: string | null, typed?: string | null, valid = "", empty = "", invalid = ""): string {
+    return status(current(bound, typed), { valid, empty, invalid }).text;
   },
 
   statusState(bound?: string | null, typed?: string | null): ValueState {
@@ -126,7 +137,7 @@ export default {
       }
       aem.setProperty("/typedPayload", formatted);
     } catch (e) {
-      MessageToast.show("Cannot format - invalid JSON: " + (e as Error).message);
+      MessageToast.show(textsOf(button)("payload.cannotFormat", [(e as Error).message]));
     }
   }
 };

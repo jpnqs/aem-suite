@@ -7,17 +7,17 @@
     width="100%">
     <OverflowToolbar style="Clear">
       <ObjectStatus
-        text="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusText'}"
+        text="{parts: ['payload', 'aem>/typedPayload', 'i18n>payload.valid', 'i18n>payload.empty', 'i18n>payload.invalid'], formatter: 'handler.statusText'}"
         state="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusState'}"
         icon="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusIcon'}" />
       <ToolbarSpacer />
       <Button
         icon="sap-icon://sys-help"
-        tooltip="Template variables and built-ins"
+        tooltip="{i18n>payload.templateVariablesAndBuiltIns}"
         type="Transparent"
         press="handler.onHelp" />
       <Button
-        text="Format"
+        text="{i18n>payload.format}"
         icon="sap-icon://indent"
         enabled="{ui>/isEditable}"
         press="handler.onFormat" />

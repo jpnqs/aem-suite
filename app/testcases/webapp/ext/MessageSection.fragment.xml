@@ -4,7 +4,7 @@
   <VBox
     core:require="{handler: 'com/aem/suite/testcases/ext/MessageSection'}"
     width="100%">
-    <Label text="Topic" required="{ui>/isEditable}" design="Bold" visible="{= !${aem>/isFolder} }" />
+    <Label text="{i18n>preview.topic}" required="{ui>/isEditable}" design="Bold" visible="{= !${aem>/isFolder} }" />
     <TextArea
       value="{topic}"
       visible="{= ${ui>/isEditable} &amp;&amp; !${aem>/isFolder} }"
@@ -12,12 +12,12 @@
       rows="2"
       growing="true"
       growingMaxLines="8"
-      placeholder="e.g. acme/orders/\{\{region\}\}/created/v1/\{\{uuid\}\}"
+      placeholder="{i18n>message.eGAcmeOrdersRegionCreated}"
       change="handler.onTopicChange" />
     <Text text="{topic}" visible="{= !${ui>/isEditable} &amp;&amp; !${aem>/isFolder} }" wrapping="true" renderWhitespace="true" />
 
     <Label
-      text="{= ${aem>/isFolder} ? 'Folder name' : 'Name' }"
+      text="{= ${aem>/isFolder} ? ${i18n>message.folderName} : ${i18n>message.name} }"
       required="{= ${ui>/isEditable} &amp;&amp; ${aem>/isFolder} }"
       design="{= ${aem>/isFolder} ? 'Bold' : 'Standard' }"
       class="sapUiSmallMarginTop" />
@@ -25,7 +25,7 @@
       value="{name}"
       visible="{ui>/isEditable}"
       width="100%"
-      placeholder="{= ${aem>/isFolder} ? 'e.g. Orders' : 'Empty = topic' }" />
+      placeholder="{= ${aem>/isFolder} ? ${i18n>message.folderPlaceholder} : ${i18n>message.namePlaceholder} }" />
     <Text text="{name}" visible="{= !${ui>/isEditable} }" wrapping="true" />
   </VBox>
 </core:FragmentDefinition>

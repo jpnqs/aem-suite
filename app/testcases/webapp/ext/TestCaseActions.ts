@@ -9,6 +9,7 @@ import Prefs from "com/aem/suite/testcases/shared/Prefs";
 import Actions from "com/aem/suite/testcases/shared/Actions";
 import RunDialog from "./RunDialog";
 import FileIO from "./FileIO";
+import { textsOf, Texts } from "./i18n";
 
 /**
  * The handlers of the custom actions in manifest.json (list report toolbar, object page header).
@@ -30,16 +31,16 @@ function copyNodes(api: ExtensionAPI, ids: string[]): Promise<Copy[]> {
   return Actions.invokeAction<{ value?: Copy[] }>(api.getModel() as ODataModel, "/copyNodes(...)", { ids }).then((result) => result.value || []);
 }
 
-function copiedMessage(copies: Copy[]): string {
-  return copies.length === 1 ? 'Copied as "' + copies[0].name + '"' : copies.length + " copies created";
+function copiedMessage(copies: Copy[], t: Texts): string {
+  return copies.length === 1 ? t("copy.one", [copies[0].name]) : t("copy.many", [copies.length]);
 }
 
 /** The selected nodes that are saved; tells the user if unsaved drafts were left out. */
-function activeContexts(contexts?: Context[]): Context[] {
+function activeContexts(contexts: Context[] | undefined, t: Texts): Context[] {
   const all = contexts || [];
   const active = all.filter((c) => c.getProperty("IsActiveEntity") !== false);
   if (active.length !== all.length) {
-    MessageToast.show("Unsaved drafts are skipped");
+    MessageToast.show(t("selection.draftsSkipped"));
   }
   return active;
 }
@@ -51,7 +52,7 @@ function idsOf(contexts: Context[]): string[] {
 export default {
   /** List report toolbar action: saves the selected test cases / folders (everything if nothing is selected) as a JSON file. */
   exportSelected(this: ListReportExtensionAPI, _context: Context, selectedContexts?: Context[]): Promise<void> | undefined {
-    const ids = idsOf(activeContexts(selectedContexts));
+    const ids = idsOf(activeContexts(selectedContexts, textsOf(this)));
     // only unsaved drafts selected: nothing to export (no ids would mean "everything")
     if ((selectedContexts || []).length && !ids.length) {
       return undefined;
@@ -77,13 +78,14 @@ export default {
 
   /** List report toolbar action (multi selection): copies the selected test cases and folders. */
   copySelected(this: ListReportExtensionAPI, _context: Context, selectedContexts?: Context[]): Promise<void> | undefined {
-    const ids = idsOf(activeContexts(selectedContexts));
+    const t = textsOf(this);
+    const ids = idsOf(activeContexts(selectedContexts, t));
     if (!ids.length) {
       return undefined;
     }
     return copyNodes(this, ids)
       .then((copies) => {
-        MessageToast.show(copiedMessage(copies));
+        MessageToast.show(copiedMessage(copies, t));
         return this.refresh();
       })
       .catch(showError);
@@ -92,18 +94,19 @@ export default {
   /** Object page header action: copies this test case or folder. */
   copyFromObjectPage(this: ExtensionAPI, context: Context): Promise<void> {
     return copyNodes(this, [context.getProperty("ID") as string])
-      .then((copies) => MessageToast.show(copiedMessage(copies) + " - find it next to the original in the list"))
+      .then((copies) => MessageToast.show(textsOf(this)("copy.fromObjectPage", [copiedMessage(copies, textsOf(this))])))
       .catch(showError);
   },
 
   /** List report toolbar action (multi selection). */
   runSelected(this: ListReportExtensionAPI, _context: Context, selectedContexts?: Context[]): Promise<void> | undefined {
-    const active = activeContexts(selectedContexts);
+    const t = textsOf(this);
+    const active = activeContexts(selectedContexts, t);
     if (!active.length) {
       return undefined;
     }
     const ids = idsOf(active);
-    const label = ids.length === 1 ? (active[0].getProperty("name") as string) : ids.length + " test cases";
+    const label = ids.length === 1 ? (active[0].getProperty("name") as string) : t("run.labelMany", [ids.length]);
     return RunDialog.open(this, ids, label).catch(showError);
   },
 
