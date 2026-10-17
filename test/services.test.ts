@@ -207,44 +207,51 @@ describe('AEM test suite services', () => {
     expect(data.message).toMatch(/Unknown variable\(s\): region/)
   })
 
-  it('runs a test case against multiple brokers', async () => {
-    published.length = 0
-    const res = await POST(
-      `/odata/v4/test/TestCases(ID=${testCase.ID},IsActiveEntity=true)/TestService.runTest`,
-      {
-        brokerIds: [goodBroker.ID, badBroker.ID],
-        credentials: [
-          { brokerId: goodBroker.ID, password: 'pw-dev' },
-          { brokerId: badBroker.ID, password: 'pw-bad' }
-        ]
-      },
-      tester
-    )
-    expect(res.status).toBe(200)
-    const { runId } = res.data
-    await waitForRun(runId)
+  describe('a run of one test case against two brokers', () => {
+    let runId: string
+    let run: Record<string, any>
 
-    const { data: run } = await GET(`/odata/v4/test/TestRuns(${runId})?$expand=results`, tester)
-    expect(run).toMatchObject({ status: 'DONE', totalCount: 2, passedCount: 1, failedCount: 1, statusCriticality: 1 })
-    const byBroker = Object.fromEntries(run.results.map((r: { brokerName: string }) => [r.brokerName, r]))
-    expect(byBroker.dev).toMatchObject({ status: 'PASSED', ackLatencyMs: 3, deliveryMode: 'PERSISTENT' })
-    expect(byBroker.dev.resolvedTopic).toMatch(/^shop\/orders\/eu\/created\//)
-    expect(byBroker.unreachable).toMatchObject({ status: 'ERROR', errorMessage: 'Connect failed: Unauthorized' })
+    beforeAll(async () => {
+      published.length = 0
+      const res = await POST(
+        `/odata/v4/test/TestCases(ID=${testCase.ID},IsActiveEntity=true)/TestService.runTest`,
+        {
+          brokerIds: [goodBroker.ID, badBroker.ID],
+          credentials: [
+            { brokerId: goodBroker.ID, password: 'pw-dev' },
+            { brokerId: badBroker.ID, password: 'pw-bad' }
+          ]
+        },
+        tester
+      )
+      expect(res.status).toBe(200)
+      runId = res.data.runId
+      await waitForRun(runId)
+      run = (await GET(`/odata/v4/test/TestRuns(${runId})?$expand=results`, tester)).data
+    })
 
-    const sent = published.find((p) => p.broker === 'dev')!.spec
-    expect(sent.userProperties).toEqual([{ name: 'qty', type: 'INT', value: '5' }])
-    expect(connectedWith.dev).toBe('pw-dev')
-    expect(run.summary).toBe('Order created → dev, unreachable')
-    // last result per test case: failed on one broker -> ERROR overall, with the reason
-    const { data: tc } = await GET(
-      `/odata/v4/test/TestCases(ID=${testCase.ID},IsActiveEntity=true)?$expand=lastResult`,
-      tester
-    )
-    expect(tc.lastResult).toMatchObject({ status: 'ERROR', criticality: 1, brokers: 'dev, unreachable' })
-    expect(tc.lastResult.message).toBe('unreachable: Connect failed: Unauthorized')
-    // the password is not part of anything persisted for the run
-    const rows = await SELECT.from('aem.suite.RunResults').where({ run_ID: runId })
-    expect(JSON.stringify(rows)).not.toContain('pw-dev')
+    it('stores one result per broker', () => {
+      expect(run).toMatchObject({ status: 'DONE', totalCount: 2, passedCount: 1, failedCount: 1, statusCriticality: 1 })
+      expect(run.summary).toBe('Order created → dev, unreachable')
+      const byBroker = Object.fromEntries(run.results.map((r: { brokerName: string }) => [r.brokerName, r]))
+      expect(byBroker.dev).toMatchObject({ status: 'PASSED', ackLatencyMs: 3, deliveryMode: 'PERSISTENT' })
+      expect(byBroker.dev.resolvedTopic).toMatch(/^shop\/orders\/eu\/created\//)
+      expect(byBroker.unreachable).toMatchObject({ status: 'ERROR', errorMessage: 'Connect failed: Unauthorized' })
+    })
+
+    it('sends the resolved message with the password entered for the run, and keeps no password', async () => {
+      const sent = published.find((p) => p.broker === 'dev')!.spec
+      expect(sent.userProperties).toEqual([{ name: 'qty', type: 'INT', value: '5' }])
+      expect(connectedWith.dev).toBe('pw-dev')
+      const rows = await SELECT.from('aem.suite.RunResults').where({ run_ID: runId })
+      expect(JSON.stringify(rows)).not.toContain('pw-dev')
+    })
+
+    it('keeps the last result per test case: failed on one broker -> ERROR overall, with the reason', async () => {
+      const { data: tc } = await GET(`/odata/v4/test/TestCases(ID=${testCase.ID},IsActiveEntity=true)?$expand=lastResult`, tester)
+      expect(tc.lastResult).toMatchObject({ status: 'ERROR', criticality: 1, brokers: 'dev, unreachable' })
+      expect(tc.lastResult.message).toBe('unreachable: Connect failed: Unauthorized')
+    })
   })
 
   it('refuses to start a run without passwords for direct brokers', async () => {

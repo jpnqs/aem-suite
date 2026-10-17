@@ -159,7 +159,9 @@ describe('AI agent service (MCP)', () => {
       expect(bad.error).toMatch(/ACK timeout must be between/)
       expect(bad.error).toMatch(/must be an integer/)
       expect(bad.error).toMatch(/Duplicate user property "n"/)
+    })
 
+    it('checks the place and the required fields, and creates nothing on a problem', async () => {
       expect((await call('createTestCase', { topic: 'x', parentId: cds.utils.uuid() })).error).toMatch(/Parent folder not found/)
       expect((await call('createTestCase', { topic: 'x', parentId: testCase.ID })).error).toMatch(/only be placed in folders/)
       expect(await call('createFolder', { name: '  ' })).toMatchObject({ ok: false, error: expect.stringMatching(/Folder name is required/) })
@@ -185,7 +187,10 @@ describe('AI agent service (MCP)', () => {
       expect(row).toMatchObject({ name: 'To change', topic: 'change/{{uuid}}', priority: 7 })
       expect(row.userProperties).toEqual([{ name: 'only' }])
       expect(row.variables).toEqual([{ name: 'region', value: 'eu' }]) // not given -> unchanged
+    })
 
+    it('refuses invalid changes, the wrong kind of node and unknown nodes', async () => {
+      const own = (await call('createTestCase', { name: 'Not to break', topic: 'keep/{{uuid}}' })).result
       const bad = await call('updateTestCase', { id: own.ID, payload: '{oops' })
       expect(bad.error).toMatch(/Payload is not valid JSON/)
       expect((await call('updateTestCase', { id: folder.ID, priority: 1 })).error).toMatch(/use updateFolder/)
