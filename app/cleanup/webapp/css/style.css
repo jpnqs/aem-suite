@@ -1,0 +1,40 @@
+/* Data Cleanup - theme aware (uses SAP theming parameters only) */
+
+.aemPage .sapFDynamicPageContent {
+  background: transparent;
+}
+
+.aemCard {
+  background: var(--sapGroup_ContentBackground);
+  border: 1px solid var(--sapGroup_ContentBorderColor);
+  border-radius: 0.75rem;
+  box-shadow: var(--sapContent_Shadow0);
+  overflow: hidden;
+}
+
+.aemHint {
+  color: var(--sapContent_LabelColor);
+  font-size: var(--sapFontSmallSize);
+}
+
+.aemError {
+  color: var(--sapNegativeTextColor);
+  font-size: var(--sapFontSmallSize);
+}
+
+.aemTitleIcon {
+  color: var(--sapContent_IconColor);
+}
+
+/* a category that is switched off shows its header only */
+.aemCategory > .sapMPanelContent {
+  padding: 0;
+}
+
+.aemCriteria {
+  padding: 0.5rem 1rem 1rem;
+}
+
+.aemCard .sapMTB .aemHint.sapMText {
+  font-weight: normal;
+}

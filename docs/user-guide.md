@@ -33,7 +33,8 @@ save messages as **test cases**, send them to one or several brokers with one cl
   - [Number ranges (Admin)](#number-ranges-admin)
   - [Test data with faker](#test-data-with-faker)
 - [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
-- [12. Tips and troubleshooting](#12-tips-and-troubleshooting)
+- [12. Clean up old data (Admin)](#12-clean-up-old-data-admin)
+- [13. Tips and troubleshooting](#13-tips-and-troubleshooting)
 
 ---
 
@@ -561,7 +562,27 @@ For **GitHub Copilot** in VS Code the repository contains `.vscode/mcp.json` wit
 
 ---
 
-## 12. Tips and troubleshooting
+## 12. Clean up old data (Admin)
+
+Runs, results and saved messages pile up over time. The app **Data Cleanup** (role Admin) deletes what is no longer needed – always in two steps: **Preview** shows what would go, **Delete…** removes it after you confirm.
+
+Switch on what you want to clean up and set how old it must be – **older than** a number of days, weeks, months or years, or **before** a date (at least one day ago). Months and years go by the calendar.
+
+| What | Removes | More criteria |
+|---|---|---|
+| **Test runs** | whole runs with all their results. Runs that are still running are never touched; the *last result* of a test case stays | result (passed / failed / stopped), started by, brokers, text in the run name, **always keep the newest N runs** |
+| **Run payloads** | only the sent payloads of the results – runs and results stay visible. Frees most space | as for test runs |
+| **Saved messages** | messages kept from the Live Subscriber, of all users | brokers, saved by, source (topics / queue), text in the topic |
+| **Subscriber setups** | saved setups not changed for a long time | users, brokers, only setups of inactive brokers |
+| **Orphans** | rows left over from deleted brokers and test cases – of any age | which kinds |
+
+**Preview** lists per kind how many rows match and from which date on; **Show** opens the newest of them. Change anything afterwards and the preview is outdated – preview again before deleting. **Delete…** lists the counts once more; above 1,000 rows you type the number to confirm. If more rows match by then than the preview showed (someone ran tests in the meantime), nothing is deleted and you are asked to preview again.
+
+Deleting cannot be undone. Every cleanup is recorded on the tab **History**: when, by whom, what and how many rows – also cleanups that failed half way (*Partly done*: the kinds finished before the error stay deleted).
+
+**Saved rules**: a selection you need again – say "payloads older than 30 days, runs older than a year" – can be kept with **Save as…** and loaded from **Saved rule** next time. Saving under an existing name updates that rule.
+
+## 13. Tips and troubleshooting
 
 | Message / situation | What to do |
 |---|---|

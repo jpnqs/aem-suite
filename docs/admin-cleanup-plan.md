@@ -1,6 +1,6 @@
 # Plan: Data Cleanup app (admin)
 
-Branch: `feat/admin-cleanup` · Status: **plan, not implemented** · 2026-10-18
+Branch: `feat/admin-cleanup` · Status: **v1 implemented** (steps 1–6 of section 6; scheduling = v2, open) · 2026-10-18
 
 ## Goal
 
@@ -127,7 +127,12 @@ Wiring (the existing consistency tests enforce most of it):
 6. Help / user guide / screenshot, e2e
 7. (v2) scheduling
 
-## 7. Open decisions
+## 7. Decisions (2026-10-18: the recommendations were taken)
+
+v1 = manual cleanup + saved rules; no test cases category; payload-only slimming yes; no soft delete; admin only.
+Deviation from the plan: the UI uses label-over-field grids (like the Live Subscriber), not SimpleForm.
+
+### Originally open
 
 1. **Scheduled automatic cleanup** – v1 manual only (recommended), or in v1 already? Timer vs. BTP Job Scheduling?
 2. **Test cases as a category** ("never run / not run since X") – recommended: no, too destructive for a bulk tool.
