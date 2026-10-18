@@ -1,6 +1,7 @@
 import cds from '@sap/cds'
 import { TestCases as TestCaseRows, TestCaseStats } from '#cds-models/aem/suite'
 import { buildPreview } from './lib/runs/preview'
+import { templateHints } from './lib/runs/template-hints'
 import { BrokerCredential, cancelRun, RunOptions, startRun, toCredentials } from './lib/runs/test-runner'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/core/defaults'
 import { copyNodes } from './lib/testcases/copy-nodes'
@@ -89,6 +90,14 @@ export default class TestService extends cds.ApplicationService {
       const tc = await selectNodeDeep(idOf(req), IsActiveEntity === false ? TestCases.drafts! : TestCases)
       if (!tc) return req.reject(404, 'Test case not found')
       return buildPreview(tc, brokerId)
+    })
+
+    // suggestions of the payload editor - for drafts too: their own variables are the ones being edited
+    this.on('templateHints', [TestCases, TestCases.drafts!], async (req) => {
+      const { IsActiveEntity } = keyOf(req)
+      const tc = await selectNodeDeep(idOf(req), IsActiveEntity === false ? TestCases.drafts! : TestCases)
+      if (!tc) return req.reject(404, 'Test case not found')
+      return templateHints(tc)
     })
 
     // copy of a test case or a folder (with everything below it), placed right after the original

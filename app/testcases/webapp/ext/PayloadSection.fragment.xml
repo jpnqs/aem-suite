@@ -31,6 +31,7 @@
       width="100%"
       lineNumbers="true"
       syntaxHints="false"
-      liveChange="handler.onLiveChange" />
+      liveChange="handler.onLiveChange"
+      modelContextChange="handler.onEditorContext" />
   </VBox>
 </core:FragmentDefinition>

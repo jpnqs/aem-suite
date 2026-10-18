@@ -1,19 +1,24 @@
 <core:FragmentDefinition
   xmlns:core="sap.ui.core"
-  xmlns="sap.m">
+  xmlns="sap.m"
+  xmlns:ce="sap.ui.codeeditor">
   <VBox
     core:require="{handler: 'com/aem/suite/testcases/ext/MessageSection'}"
     width="100%">
     <Label text="{i18n>preview.topic}" required="{ui>/isEditable}" design="Bold" visible="{= !${aem>/isFolder} }" />
-    <TextArea
+    <ce:CodeEditor
+      id="topicEditor"
+      type="text"
       value="{topic}"
       visible="{= ${ui>/isEditable} &amp;&amp; !${aem>/isFolder} }"
       width="100%"
-      rows="2"
-      growing="true"
-      growingMaxLines="8"
-      placeholder="{i18n>message.eGAcmeOrdersRegionCreated}"
-      change="handler.onTopicChange" />
+      height="auto"
+      maxLines="8"
+      lineNumbers="false"
+      syntaxHints="false"
+      class="aemTopicEditor"
+      change="handler.onTopicChange"
+      modelContextChange="handler.onTopicContext" />
     <Text text="{topic}" visible="{= !${ui>/isEditable} &amp;&amp; !${aem>/isFolder} }" wrapping="true" renderWhitespace="true" />
 
     <Label

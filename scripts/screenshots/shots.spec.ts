@@ -63,6 +63,22 @@ test('test case page', async ({ page }) => {
   await page.screenshot({ path: out('test-case') })
 })
 
+test('payload suggestions', async ({ page }) => {
+  await open(page, `AEMSuiteTestCases-manage&/TestCases(ID=${PING},IsActiveEntity=true)`)
+  await page.getByRole('button', { name: 'Edit' }).click()
+  // edit mode: the editor takes input
+  await expect(page.getByRole('button', { name: 'Format' })).toBeEnabled()
+  await settle(page)
+  const editor = page.locator('[id$="--payloadEditor"]').first()
+  await editor.click()
+  await page.keyboard.press('Control+End')
+  await page.keyboard.press('ArrowLeft')
+  await page.keyboard.type(', "customer": "{{')
+  // the popup closes when the editor loses the focus: no settle() here, just the suggestions loaded
+  await expect(page.locator('.ace_autocomplete')).toContainText('Global')
+  await page.screenshot({ path: out('payload-suggestions') })
+})
+
 test('folder variables', async ({ page }) => {
   await open(page, `AEMSuiteTestCases-manage&/TestCases(ID=${ORDERS},IsActiveEntity=true)`)
   await page.getByRole('button', { name: 'Edit' }).click()

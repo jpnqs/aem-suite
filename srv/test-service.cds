@@ -33,6 +33,12 @@ service TestService {
       /** Resolves topic, payload and properties against a broker's variables without sending anything. */
       action preview(brokerId : UUID) returns Preview;
 
+      /**
+       * What templates of this test case can use - its variables (where they come from, their value), the number
+       * ranges and the faker.js expressions - for the suggestions of the payload editor. Built-ins are not listed.
+       */
+      action templateHints() returns many TemplateHint;
+
       /** Copies this test case or folder (a folder with everything below it); the copy is placed right after the original. */
       @Core.OperationAvailable: in.IsActiveEntity
       action duplicate() returns TestCases;
@@ -40,6 +46,19 @@ service TestService {
       /** Drag & drop ordering (Hierarchy ChangeNextSiblingAction): place this node before NextSibling (null = last). */
       action moveBefore(NextSibling : SiblingKey);
     };
+
+  type TemplateHint {
+    /** what goes between {{ and }} */
+    expression : String;
+    /** VARIABLE, NUMBER_RANGE or FAKER */
+    kind       : String;
+    /** where the value comes from, e.g. 'Folder "Orders"' */
+    source     : String;
+    /** the value it resolves to, or an example; empty if it depends on the broker */
+    value      : String;
+    /** all definitions of a variable in lookup order, the description of a number range */
+    details    : String;
+  }
 
   type SiblingKey {
     ID             : UUID;

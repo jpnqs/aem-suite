@@ -104,3 +104,52 @@ export function generateFake(name: string, args: string | undefined, locale = 'e
     throw new TemplateError(`faker expression "${name}${args === undefined ? '' : `(${args})`}" failed: ${errMsg(e)}`)
   }
 }
+
+export interface FakerMethod {
+  /** e.g. faker.person.fullName */
+  expression: string
+  /** a value it generates, if it works without arguments */
+  example?: string
+}
+
+// examples are shown in a popup: long texts (lorem paragraphs, objects) are cut
+const MAX_EXAMPLE = 80
+
+let methods: FakerMethod[] | undefined
+
+/** Every expression a template may use, with an example value - for the suggestions of the payload editor. Computed once. */
+export function fakerMethods(): FakerMethod[] {
+  if (methods) return methods
+  const faker = fakerFor('en') as unknown as Record<string, object>
+  // deprecated methods announce themselves with a console warning when called: they are not suggested
+  /* eslint-disable no-console -- the warning is the only sign of a deprecated method */
+  const warn = console.warn
+  let deprecated = false
+  console.warn = (...args: unknown[]) => {
+    if (String(args[0]).includes('deprecated')) deprecated = true
+    else warn(...args)
+  }
+  try {
+    methods = MODULES.flatMap((module) =>
+      Object.getOwnPropertyNames(Object.getPrototypeOf(faker[module]))
+        .filter((name) => PATH.test(`${module}.${name}`) && name !== 'constructor' && typeof (faker[module] as Record<string, unknown>)[name] === 'function')
+        .sort()
+        .flatMap((name): FakerMethod[] => {
+          const expression = `${FAKER_PREFIX}${module}.${name}`
+          deprecated = false
+          try {
+            const example = generateFake(expression, undefined)
+            if (deprecated) return []
+            return [{ expression, example: example.length > MAX_EXAMPLE ? `${example.slice(0, MAX_EXAMPLE - 1)}…` : example }]
+          } catch {
+            // needs arguments
+            return deprecated ? [] : [{ expression }]
+          }
+        })
+    )
+  } finally {
+    console.warn = warn
+  }
+  /* eslint-enable no-console */
+  return methods
+}

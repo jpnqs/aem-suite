@@ -11,7 +11,9 @@ import View from "sap/ui/core/mvc/View";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Context from "sap/ui/model/odata/v4/Context";
 import { ValueState } from "sap/ui/core/library";
+import CodeEditor from "sap/ui/codeeditor/CodeEditor";
 import JsonTemplate from "./JsonTemplate";
+import TemplateCompleter from "./TemplateCompleter";
 import { textsOf } from "./i18n";
 
 /** The template expressions of the help popover; the explanations are texts of the bundle (payload.help.<n>). */
@@ -118,6 +120,11 @@ export default {
 
   onLiveChange(event: Event<{ value: string }>): void {
     ((event.getSource() as Control).getModel("aem") as JSONModel).setProperty("/typedPayload", event.getParameter("value"));
+  },
+
+  /** The editor got its test case: from now on {{ suggests variables, built-ins, number ranges and faker.js. */
+  onEditorContext(event: Event): void {
+    TemplateCompleter.attach(event.getSource() as CodeEditor);
   },
 
   onHelp(event: Event): void {
