@@ -29,7 +29,7 @@ A tree of folders and test cases with drag and drop, copy, cut and paste, and a 
 
 ### Design the message
 
-Topic, JSON payload with validation, formatting and suggestions (type `{{` for variables, built-ins, number ranges and faker.js), delivery mode, TTL, priority, DMQ eligibility, correlation ID and SMF user properties. Everything beyond the topic is optional and has sensible defaults.
+Topic and JSON payload with suggestions (type `{{` for variables, built-ins, number ranges and faker.js), payload validation and formatting, delivery mode, TTL, priority, DMQ eligibility, correlation ID and SMF user properties. Everything beyond the topic is optional and has sensible defaults.
 
 ![A test case](docs/images/test-case.png)
 

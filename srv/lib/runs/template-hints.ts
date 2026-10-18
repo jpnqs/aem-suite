@@ -4,7 +4,7 @@ import { nextExample, type NumberRange } from '../template/number-ranges'
 import { loadVariableScopes, type TestCaseRecord } from './test-case-spec'
 
 /**
- * What a template of a test case can use, for the suggestions of the payload editor: its variables (with where
+ * What a template of a test case can use, for the suggestions of the topic and payload editors: its variables (with where
  * they come from), the number ranges and the faker.js expressions. The built-ins are known to the UI (its help
  * popover lists them).
  */

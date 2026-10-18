@@ -236,7 +236,7 @@ Short example of a file:
 
 | Field | Notes |
 |---|---|
-| **Topic** (required) | The topic to publish to, e.g. `{{app}}/orders/{{region}}/created/v1/{{uuid}}`. Variables are allowed, wildcards (`*`, `>`) are not. |
+| **Topic** (required) | The topic to publish to, e.g. `{{app}}/orders/{{region}}/created/v1/{{uuid}}`. Variables are allowed, wildcards (`*`, `>`) are not. Type `{{` for suggestions, as in the payload. The topic is one line: **Enter** adds no line break and **Tab** moves on to the next field. |
 | **Name** | Optional. It follows the topic while you type; once you enter your own name, it stays. |
 
 ### Payload

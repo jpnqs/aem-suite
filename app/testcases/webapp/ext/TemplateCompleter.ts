@@ -5,7 +5,7 @@ import Actions from "com/aem/suite/testcases/shared/Actions";
 import { textsOf, Texts } from "./i18n";
 
 /**
- * Suggestions for template expressions in the payload editor: typing {{ (or {{te...) opens the editor's suggestion
+ * Suggestions for template expressions in the topic and payload editors: typing {{ (or {{te...) opens the suggestion
  * popup with the variables of the test case (where each comes from and its value), the built-ins, the number ranges,
  * temporary variables defined in the payload ({{... as name}}) and the faker.js expressions. Choosing one inserts
  * it with the closing }}.
@@ -117,7 +117,7 @@ function completions(hints: Hint[], document: string, closing: string, t: Texts)
 }
 
 export default {
-  /** Gives a payload editor the suggestions (once per editor). */
+  /** Gives a code editor (topic, payload) the suggestions (once per editor). */
   attach(editor: CodeEditor): void {
     if (editor.data(MARK)) {
       return;
