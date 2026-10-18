@@ -2,6 +2,7 @@ import MessageBox from "sap/m/MessageBox";
 import MessageToast from "sap/m/MessageToast";
 import Dialog from "sap/m/Dialog";
 import List from "sap/m/List";
+import { SearchField$LiveChangeEvent } from "sap/m/SearchField";
 import Event from "sap/ui/base/Event";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Filter from "sap/ui/model/Filter";
@@ -45,6 +46,7 @@ interface BrokerRow {
   name: string;
   credentialMode: string;
   username?: string | null;
+  msgVpn?: string | null;
 }
 
 interface RunRow {
@@ -242,6 +244,18 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
       brokers = event.getSource() as List;
       syncCredentials();
       updateEstimate();
+    },
+    /**
+     * Shows only the brokers whose name, user or VPN (or "BTP destination") contains the text. Hides the other
+     * items instead of filtering the binding, so the selection stays; selected brokers always stay visible.
+     */
+    onBrokerSearch(event: SearchField$LiveChangeEvent): void {
+      const query = (event.getParameter("newValue") ?? "").trim().toLowerCase();
+      for (const item of brokers?.getItems() ?? []) {
+        const b = item.getBindingContext()!.getObject() as BrokerRow;
+        const text = [b.name, b.username, b.msgVpn, b.credentialMode === "DESTINATION" ? t("run.btpDestination") : ""].join(" ").toLowerCase();
+        item.setVisible(!query || item.getSelected() || text.includes(query));
+      }
     },
     onOptionsChange(): void {
       updateEstimate();

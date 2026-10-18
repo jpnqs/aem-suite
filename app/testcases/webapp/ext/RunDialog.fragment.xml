@@ -10,6 +10,11 @@
       <VBox class="sapUiSmallMargin" visible="{= !${run>/runId} }">
         <Text text="{i18n>run.selectTheBrokersToRunAgainst}" class="sapUiTinyMarginBottom" />
         <Link text="{i18n>run.howDoRunsWorkAndWhat}" press=".onHelp" class="sapUiSmallMarginBottom" />
+        <SearchField
+          placeholder="{i18n>run.searchBrokers}"
+          liveChange=".onBrokerSearch"
+          width="100%"
+          class="sapUiTinyMarginBottom" />
         <List
           id="brokerList"
           mode="MultiSelect"
@@ -17,12 +22,24 @@
           noDataText="{i18n>run.noActiveBrokersMaintainBrokersFirst}"
           updateFinished=".onBrokersLoaded"
           selectionChange=".onBrokerSelection"
-          items="{path: '/Brokers', parameters: {$select: 'username,credentialMode'}, sorter: {path: 'name'}, templateShareable: false}">
-          <StandardListItem
-            title="{name}"
-            description="{= ${credentialMode} === 'DESTINATION' ? ${i18n>run.btpDestination} : (${username} ? ${username} + ' @ ' + ${msgVpn} : ${i18n>run.vpn} + ' ' + ${msgVpn}) }"
-            info="{lastConnectionStatus}"
-            infoState="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />
+          items="{path: '/Brokers', parameters: {$select: 'name,msgVpn,username,credentialMode'}, sorter: {path: 'name'}, templateShareable: false}">
+          <!-- small icon in front of the name: cloud = BTP destination, key = direct input (password per run) -->
+          <CustomListItem tooltip="{= ${credentialMode} === 'DESTINATION' ? ${i18n>run.btpDestination} : ${i18n>run.directInput} }">
+            <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMarginBeginEnd sapUiTinyMarginTopBottom">
+              <HBox alignItems="Center">
+                <core:Icon
+                  src="{= ${credentialMode} === 'DESTINATION' ? 'sap-icon://cloud' : 'sap-icon://key' }"
+                  size="1rem"
+                  class="sapUiSmallMarginEnd" />
+                <ObjectIdentifier
+                  title="{name}"
+                  text="{= ${credentialMode} === 'DESTINATION' ? ${i18n>run.btpDestination} : (${username} ? ${username} + ' @ ' + ${msgVpn} : ${i18n>run.vpn} + ' ' + ${msgVpn}) }" />
+              </HBox>
+              <ObjectStatus
+                text="{lastConnectionStatus}"
+                state="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />
+            </HBox>
+          </CustomListItem>
         </List>
         <VBox visible="{= ${run>/credentials}.length > 0 }" class="sapUiSmallMarginTop">
           <Title text="{i18n>run.credentialsUsedForThisRunOnly}" level="H6" />

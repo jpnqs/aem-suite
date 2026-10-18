@@ -56,3 +56,32 @@ test('the advanced settings repeat the message and show what is about to happen'
   await expect(dialog.getByText('Finished', { exact: true })).toBeVisible()
   await expect(dialog.getByText('3 / 3').first()).toBeVisible()
 })
+
+test('the search narrows the broker list and keeps the selection', async ({ page }) => {
+  await page.goto(testCaseUrl(PING_ID))
+  await expect(page).toHaveTitle(/^Ping/)
+  await page.getByRole('button', { name: 'Run…' }).click()
+  const dialog = page.getByRole('dialog', { name: /^Run Ping/ })
+  const broker = (name: string) => dialog.getByText(name, { exact: true })
+  const search = dialog.getByPlaceholder('Search brokers (name, user, VPN)')
+  await expect(broker('local-docker')).toBeVisible()
+  // an icon tells direct brokers (key: password per run) from destination brokers (cloud)
+  const direct = dialog.getByRole('listitem').filter({ hasText: 'aem-suite @' })
+  await expect(direct).toHaveAttribute('title', /Direct input/)
+  await expect(direct.locator('[data-sap-ui-icon-content]').first()).toBeVisible()
+
+  await search.fill('publisher')
+  await expect(broker('local-docker (publisher)')).toBeVisible()
+  await expect(broker('local-docker')).toBeHidden()
+  await broker('local-docker (publisher)').click()
+
+  // another search: the selected broker stays in the list (and selected), the others follow the text
+  await search.fill('subscriber')
+  await expect(broker('local-docker (subscriber)')).toBeVisible()
+  await expect(broker('local-docker (publisher)')).toBeVisible()
+  await expect(broker('local-docker')).toBeHidden()
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'aem-publisher @' }).getByRole('checkbox')).toBeChecked()
+
+  await search.fill('')
+  await expect(broker('local-docker')).toBeVisible()
+})

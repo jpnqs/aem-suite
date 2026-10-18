@@ -265,7 +265,7 @@ You can run:
 
 The **Run dialog**:
 
-1. **Select brokers** – the brokers of your last run are preselected. Each selected test case is sent once to each selected broker.
+1. **Select brokers** – the brokers of your last run are preselected. Each selected test case is sent once to each selected broker. With many brokers, type in the search field above the list (name, user or VPN): it narrows the list, and brokers you already selected stay in it. The small icon in front of each broker shows how it logs in: a **cloud** for a BTP destination (nothing to enter), a **key** for direct input (password for the run).
 2. **Credentials** – for every selected *direct* broker a password field appears ("used for this run only, not stored"). If the broker has no username maintained, a **username** field appears next to it. Destination brokers need nothing.
 3. **Advanced settings** (optional, click to open) – see below.
 4. **Run** – progress is shown live (e.g. `3 / 6`, passed / failed).
