@@ -26,6 +26,8 @@ describe('AI agent service (MCP)', () => {
   const { published, connectedAs } = fakeBroker(2)
   const dest = { ID: cds.utils.uuid() }
   const direct = { ID: cds.utils.uuid() }
+  const inactive = { ID: cds.utils.uuid() }
+  const noAi = { ID: cds.utils.uuid() }
   /** the fixture: folder "Orders" (variable domain) with the test cases "Order created" and "ping/a" */
   let folder: { ID: string }
   let testCase: { ID: string }
@@ -36,7 +38,9 @@ describe('AI agent service (MCP)', () => {
     await resetDatabase()
     await INSERT.into('aem.suite.Brokers').entries([
       { ID: dest.ID, name: 'dest', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: true },
-      { ID: direct.ID, name: 'direct', credentialMode: 'DIRECT', url: 'wss://d:443', msgVpn: 'v', username: 'u', active: true }
+      { ID: direct.ID, name: 'direct', description: 'the direct one', credentialMode: 'DIRECT', url: 'wss://direct.example:443', msgVpn: 'direct-vpn', username: 'direct-user', active: true },
+      { ID: inactive.ID, name: 'dest-off', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: false },
+      { ID: noAi.ID, name: 'dest-no-ai', credentialMode: 'DESTINATION', destinationName: 'aem-dest', active: true, agentAllowed: false }
     ])
     folder = (await call('createFolder', { name: 'Orders', variables: [{ name: 'domain', value: 'orders' }] })).result
     testCase = (
@@ -97,10 +101,52 @@ describe('AI agent service (MCP)', () => {
       expect((await GET('/odata/v4/agent/', tester)).status).toBe(404)
     })
 
-    it('does not show passwords or draft data and says which brokers need credentials', async () => {
-      const brokers = await query('SELECT name, needsCredentials from Brokers')
-      expect(Object.fromEntries(brokers.map((b) => [b.name, b.needsCredentials]))).toEqual({ dest: false, direct: true })
-      await expect(query('SELECT username from Brokers')).rejects.toThrow()
+    it('shows every broker by name and description only, and which ones an agent can use', async () => {
+      const brokers = await query('SELECT * from Brokers')
+      expect(Object.fromEntries(brokers.map((b) => [b.name, b.canRun]))).toEqual({ dest: true, direct: false, 'dest-off': false, 'dest-no-ai': false })
+      for (const b of brokers) expect(Object.keys(b).sort()).toEqual(['ID', 'canRun', 'description', 'name'])
+      expect(JSON.stringify(brokers)).not.toMatch(/direct\.example|direct-vpn|direct-user|aem-dest/)
+      for (const column of ['url', 'msgVpn', 'username', 'destinationName', 'credentialMode', 'active', 'lastConnectionMessage'])
+        await expect(query(`SELECT ${column} from Brokers`)).rejects.toThrow()
+    })
+  })
+
+  describe('no personal data, links instead', () => {
+    it('does not show who created or ran something', async () => {
+      await expect(query('SELECT createdBy from TestNodes')).rejects.toThrow()
+      await expect(query('SELECT createdBy from TestRuns')).rejects.toThrow()
+      const [node] = await query(`SELECT * from TestNodes where ID = '${testCase.ID}'`)
+      expect(Object.keys(node)).not.toEqual(expect.arrayContaining(['createdBy']))
+      expect(JSON.stringify(node)).not.toMatch(/"(created|modified)By"/)
+    })
+
+    it('links test cases and runs into the apps, at the launchpad the user opens', async () => {
+      const caseHash = `#AEMSuiteTestCases-manage&/TestCases(ID=${testCase.ID},IsActiveEntity=true)`
+      const [node] = await query(`SELECT appUrl from TestNodes where ID = '${testCase.ID}'`)
+      // the host the request came to (behind the approuter: its forwarded host), locally the dev launchpad
+      const launchpad = node.appUrl.slice(0, node.appUrl.indexOf('#'))
+      expect(launchpad).toMatch(/^http:\/\/localhost:\d+\/launchpad\.html$/)
+      expect(node.appUrl).toBe(launchpad + caseHash)
+      const created = await call('createTestCase', { topic: 'link/me' })
+      expect(created.result.url).toBe(`${launchpad}#AEMSuiteTestCases-manage&/TestCases(ID=${created.result.ID},IsActiveEntity=true)`)
+
+      const run = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [dest.ID] })
+      const summary = await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
+      expect(summary.result.url).toBe(`${launchpad}#AEMSuiteTestRuns-display&/TestRuns(${run.result.runId})`)
+      const [listed] = await query(`SELECT appUrl from TestRuns where ID = '${run.result.runId}'`)
+      expect(listed.appUrl).toBe(summary.result.url)
+
+      // a central launchpad (Work Zone) is configured - the env variable wins over the cds setting
+      await withAemSuiteConfig({ mcp: { launchpadUrl: 'https://wz.example/site' } }, async () => {
+        const appUrl = async () => (await query(`SELECT appUrl from TestNodes where ID = '${testCase.ID}'`))[0].appUrl
+        expect(await appUrl()).toBe(`https://wz.example/site${caseHash}`)
+        process.env.AEM_SUITE_LAUNCHPAD_URL = 'https://env.example/launchpad'
+        try {
+          expect(await appUrl()).toBe(`https://env.example/launchpad${caseHash}`)
+        } finally {
+          delete process.env.AEM_SUITE_LAUNCHPAD_URL
+        }
+      })
     })
   })
 
@@ -347,33 +393,57 @@ describe('AI agent service (MCP)', () => {
       expect((await call('getRunSummary', { runId: cds.utils.uuid() })).error).toMatch(/Run not found/)
     })
 
-    it('does not let an agent handle broker credentials', async () => {
+    it('previews and runs only on active destination brokers available for agents - and has no way to take a password', async () => {
       delete connectedAs.direct
-      const r = await call('runTests', {
-        testCaseIds: [testCase.ID],
-        brokerIds: [direct.ID],
-        credentials: [{ brokerId: direct.ID, password: 'secret' }]
-      })
-      expect(r.ok).toBe(false)
-      expect(r.error).toMatch(/Broker\(s\) direct need credentials that a person enters/)
-      expect(r.error).not.toContain('secret')
+      for (const id of [direct.ID, inactive.ID, noAi.ID]) {
+        const run = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [dest.ID, id] })
+        expect(run.error).toMatch(/cannot be used by AI agents \(canRun = false\)/)
+        const preview = await call('previewTestCase', { testCaseId: testCase.ID, brokerId: id })
+        expect(preview.error).toMatch(/cannot be used by AI agents/)
+      }
+      // there is no parameter for a password, not even for a destination broker
+      const runTests = cds.model!.definitions['TestAgentService.runTests'] as unknown as { params: object }
+      expect(Object.keys(runTests.params)).toEqual(['testCaseIds', 'brokerIds'])
+      for (const id of [direct.ID, dest.ID]) {
+        const r = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [id], credentials: [{ brokerId: id, password: 'secret' }] })
+        expect(r.ok).toBe(false)
+        expect(r.error).not.toContain('secret')
+      }
       expect(connectedAs.direct).toBeUndefined()
     })
 
-    it('can be configured (development) to accept credentials', () =>
-      withAemSuiteConfig({ agent: { allowDirectCredentials: true } }, async () => {
-        const missing = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [direct.ID] })
-        expect(missing.error).toMatch(/Password required for broker/)
-        const run = await call('runTests', {
-          testCaseIds: [testCase.ID],
-          brokerIds: [direct.ID],
-          credentials: [{ brokerId: direct.ID, password: 'pw' }]
-        })
+    it('hides connection data in error messages and cannot be asked about it by a filter', async () => {
+      const id = cds.utils.uuid()
+      const error = 'Connection to wss://direct.example:443 refused (VPN direct-vpn, user direct-user); Destination "aem-dest": host mr-x.messaging.solace.cloud:55443 down'
+      await INSERT.into('aem.suite.TestRuns').entries({ ID: id, summary: 'x', status: 'DONE', totalCount: 1, failedCount: 1, createdBy: 'tester' })
+      await INSERT.into('aem.suite.RunResults').entries({ ID: cds.utils.uuid(), run_ID: id, testCase_ID: testCase.ID, testCaseName: 'Order created', brokerName: 'direct', status: 'ERROR', sequence: 1, errorMessage: error })
+      await UPSERT.into('aem.suite.TestCaseStats').entries({ testCase_ID: testCase.ID, status: 'ERROR', run_ID: id, brokers: 'direct', message: error })
+      const hidden = 'Connection to <hidden> refused (VPN <hidden>, user <hidden>); Destination "<hidden>": host <hidden> down'
+      try {
+        expect((await call('getRunSummary', { runId: id })).result.failures[0].error).toBe(hidden)
+        expect((await query(`SELECT errorMessage from RunResults where run_ID = '${id}'`))[0].errorMessage).toBe(hidden)
+        expect((await query(`SELECT message from TestNodeLastResults where testCase_ID = '${testCase.ID}'`))[0].message).toBe(hidden)
+        // a filter would confirm a guess
+        await expect(query(`SELECT ID from RunResults where errorMessage like '%direct-vpn%'`)).rejects.toThrow(/cannot be filtered by errorMessage/)
+        await expect(query(`SELECT testCase_ID from TestNodeLastResults where message like '%aem-dest%'`)).rejects.toThrow(/cannot be filtered by message/)
+      } finally {
+        await DELETE.from('aem.suite.TestCaseStats').where({ testCase_ID: testCase.ID })
+        await DELETE.from('aem.suite.RunResults').where({ run_ID: id })
+        await DELETE.from('aem.suite.TestRuns').where({ ID: id })
+      }
+    })
+
+    it('limits the runs one user starts within an hour', async () => {
+      await withAemSuiteConfig({ agent: { maxRunsPerHour: 1000 } }, async () => {
+        const run = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [dest.ID] })
         expect(run.ok).toBe(true)
-        const summary = await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
-        expect(summary.result).toMatchObject({ finished: true, passed: 1 })
-        expect(connectedAs.direct).toBe('u')
-      }))
+        await call('getRunSummary', { runId: run.result.runId, waitSeconds: 10 })
+      })
+      await withAemSuiteConfig({ agent: { maxRunsPerHour: 1 } }, async () => {
+        const refused = await call('runTests', { testCaseIds: [testCase.ID], brokerIds: [dest.ID] })
+        expect(refused.error).toMatch(/runs within the last hour \(limit 1\)\. Try again in \d+ min/)
+      })
+    })
 
     it('limits the size of a run and the number of parallel runs', () =>
       withAemSuiteConfig({ agent: { maxRunResults: 1, maxActiveRuns: 1 } }, async () => {

@@ -92,7 +92,7 @@ To test against a real broker locally, start the Solace container from [local/RE
 
 ## Use it with an AI assistant
 
-The suite offers an MCP endpoint (`/mcp/agent`). Connect GitHub Copilot, Claude Code or any MCP client, and ask for things like *"Create a folder Inventory with a test case for acme/inventory/updated/v1/{{sku}} and show me how it looks for broker aem-dev"* or *"Run all tests in Orders on aem-dev and tell me what failed."* The assistant can plan, preview and run tests, but cannot delete anything and never receives broker passwords. Setup for Copilot and others: [Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp).
+The suite offers an MCP endpoint (`/mcp/agent`). Connect GitHub Copilot, Claude Code or any MCP client, and ask for things like *"Create a folder Inventory with a test case for acme/inventory/updated/v1/{{sku}} and show me how it looks for broker aem-dev"* or *"Run all tests in Orders on aem-dev and tell me what failed."* The assistant can plan, preview and run tests, but cannot delete anything, sees brokers by name and description only, and runs tests only on brokers with a BTP destination – no password ever passes through the AI. Setup for Copilot and others: [Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp).
 
 ## Documentation
 
