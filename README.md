@@ -217,7 +217,7 @@ The data lives in memory and is reset on every restart. `cds watch` does not res
 destinations='[{"name":"aem-dev","url":"wss://mr-xyz.messaging.solace.cloud:443","username":"solace-cloud-client","password":"…","msgVpn":"dev-vpn"}]'
 ```
 
-You can also bind a real destination service with `cds bind`.
+You can also bind a real destination service with `cds bind`. How to create the destinations in BTP (cockpit fields and an import file): [Brokers from a BTP destination](docs/user-guide.md#brokers-from-a-btp-destination).
 
 ```sh
 npm test               # jest: unit + service integration tests (broker connection stubbed)

@@ -322,7 +322,7 @@ Single place that opens publishing connections (`connect(conn)`). Tests replace 
 
 - `resolveConnection(broker, jwt, password, username)` → `{ url, vpnName, userName, password, clientName, connectTimeoutMs }`.
   - **DIRECT**: URL/VPN from the broker, **password from the current request** (`MissingPasswordError` if absent). The username is the maintained one; only if the broker has none, the one from the request is used (`MissingUsernameError` if neither). `needsUsername(broker)` tells the UIs whether to ask.
-  - **DESTINATION**: `getDestination({ destinationName, jwt })`. Expected destination: type HTTP, URL `wss://host:443` (`https://` is mapped to `wss://`), user/password, additional property **`msgVpn`** (required), optional `smfUrl` (e.g. `tcps://host:55443`).
+  - **DESTINATION**: `getDestination({ destinationName, jwt })`. Expected destination: type HTTP, URL `wss://host:443` (`https://` is mapped to `wss://`), user/password, additional property **`msgVpn`** (required), optional `smfUrl` (e.g. `tcps://host:55443`). Cockpit fields and an import file: [user guide, "Brokers from a BTP destination"](user-guide.md#brokers-from-a-btp-destination).
 - `toSmfUrl()` maps `http(s)` → `ws(s)` and rejects other schemes.
 - `listDestinations()` merges the bound destination service (`getAllDestinationsFromDestinationService`) and env `destinations` (local).
 
@@ -555,7 +555,7 @@ npm run deploy:dev # dev/test spaces: cf deploy mta_archives/aem-suite.mtar -e d
 
 **One space per subaccount** (section 9): the role collections have fixed names, so do not deploy a second copy into another space of the same subaccount.
 
-After deployment: assign role collections, create destinations for DESTINATION brokers (layout in 7.3). `test/data` is not part of the build; `db/data` (code lists) is.
+After deployment: assign role collections, create destinations for DESTINATION brokers (layout in 7.3, example in the [user guide](user-guide.md#brokers-from-a-btp-destination)). `test/data` is not part of the build; `db/data` (code lists) is.
 
 **HTML5 apps.** All apps (incl. the sandbox launchpad) are listed in the BTP cockpit under *HTML5 Applications*. From there they open through the managed approuter; the standalone approuter URL keeps working as before.
 

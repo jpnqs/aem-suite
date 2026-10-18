@@ -9,6 +9,7 @@ save messages as **test cases**, send them to one or several brokers with one cl
 
 - [1. Getting started](#1-getting-started)
 - [2. Set up brokers (Admin)](#2-set-up-brokers-admin)
+  - [Brokers from a BTP destination](#brokers-from-a-btp-destination)
 - [3. Global variables (Admin)](#3-global-variables-admin)
 - [4. Organize test cases in folders](#4-organize-test-cases-in-folders)
   - [Export and import](#export-and-import)
@@ -77,7 +78,7 @@ Open **Brokers** → **Create**.
 | **URL** (direct) | The host is enough, e.g. `mr-xyz.messaging.solace.cloud`. It is completed automatically: no port → `wss://…:443`, port `55443` → `tcps://`, port `55555` → `tcp://`. |
 | **Message VPN** (direct) | e.g. `dev-vpn` |
 | **Username** (direct) | optional (the AEM standard is `solace-cloud-client`). If it is empty, the username is asked for together with the password whenever you run tests, test the connection or subscribe. |
-| **Destination** (destination mode) | choose from the list (shows URL and VPN) |
+| **Destination** (destination mode) | choose from the list (shows URL and VPN); how to create one: [Brokers from a BTP destination](#brokers-from-a-btp-destination) |
 | **Active** | inactive brokers are hidden in run and subscribe dialogs |
 | Advanced | client name prefix, connect timeout |
 
@@ -88,6 +89,53 @@ Open **Brokers** → **Create**.
 **Broker variables**: on the broker page, section *Broker Variables* – values that apply only when sending to this broker (e.g. `region = eu` for the EU broker). See [section 10](#10-variables-and-templates).
 
 Where do I find the connection data? In the AEM console: *Cluster Manager → your service → Connect → Solace Web Messaging / Solace Messaging* (host, port, message VPN, username).
+
+### Brokers from a BTP destination
+
+With a destination, the broker's technical user and its password are kept in BTP. Nobody enters a password: runs, connection tests, live subscriptions and the AI assistant all log in as that user. Create one destination per broker (message VPN) in the BTP cockpit: *your subaccount → Connectivity → Destinations → Create Destination*.
+
+| Field | Value | Example |
+|---|---|---|
+| **Name** | any name – you pick it in the broker later | `aem-dev` |
+| **Type** | `HTTP` | |
+| **URL** | the web messaging endpoint of the broker. The cockpit only accepts `https://`, the app connects with `wss://` | `https://mr-xyz.messaging.solace.cloud:443` |
+| **Proxy Type** | `Internet` | |
+| **Authentication** | `BasicAuthentication` | |
+| **User**, **Password** | the technical user of the broker (client username) | `solace-cloud-client` |
+| Additional property **`msgVpn`** | the message VPN – required | `dev-vpn` |
+| Additional property **`smfUrl`** | optional: connect with this URL instead, e.g. SMF over TLS | `tcps://mr-xyz.messaging.solace.cloud:55443` |
+
+Additional properties are added with **New Property** in the destination. Instead of typing everything, you can save the following as a file and import it with **Import Destination** (then enter the password):
+
+```properties
+Name=aem-dev
+Description=AEM dev broker for the AEM Test Suite
+Type=HTTP
+URL=https\://mr-xyz.messaging.solace.cloud\:443
+ProxyType=Internet
+Authentication=BasicAuthentication
+User=solace-cloud-client
+Password=<password of the technical user>
+msgVpn=dev-vpn
+```
+
+A broker reached through SMF over TLS instead of websockets gets the same destination plus the `smfUrl` property:
+
+```properties
+Name=aem-qa-tcps
+Type=HTTP
+URL=https\://mr-abc.messaging.solace.cloud\:443
+ProxyType=Internet
+Authentication=BasicAuthentication
+User=aem-suite-tester
+Password=<password of the technical user>
+msgVpn=qa-vpn
+smfUrl=tcps\://mr-abc.messaging.solace.cloud\:55443
+```
+
+Then, in the app: **Brokers → Create**, *Credentials* **BTP Destination**, and pick the destination from the value help. It lists the destinations of the subaccount with URL and message VPN (only those whose URL can be a broker). Saving tests the connection right away.
+
+> **The technical user decides what the tests may do.** Every run through this destination publishes as that user, so give it an ACL profile that allows the topics you test – and nothing more on production brokers. Who may *use* the destination is decided by the app's roles (Tester runs, Admin maintains brokers).
 
 ---
 
