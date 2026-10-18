@@ -6,10 +6,6 @@ using {aem.suite as db} from '../db/schema';
 service AdminService {
 
   @odata.draft.enabled
-  @Common.SideEffects #connection: {
-    SourceEntities  : ['/AdminService.EntityContainer/Brokers'],
-    TargetProperties: ['lastConnectionStatus', 'lastConnectionAt', 'lastConnectionMessage']
-  }
   entity Brokers as
     projection on db.Brokers {
       *,
@@ -27,16 +23,15 @@ service AdminService {
        * The username is only needed if none is maintained on the broker.
        */
       @Core.OperationAvailable: in.IsActiveEntity
-      @Common.SideEffects     : {TargetProperties: [
-        'in/lastConnectionStatus',
-        'in/lastConnectionAt',
-        'in/lastConnectionMessage',
-        'in/connectionCriticality'
-      ]}
-      action testConnection(username : String @Common.Label: 'Username (only if not maintained on the broker)',
-                            password : String @UI.Masked
-                                              @Common.Label: 'Password (direct mode only, not stored)') returns ConnectionResult;
+      action testConnection(username : String, password : String) returns ConnectionResult;
     };
+
+  // written by the connection test only
+  annotate Brokers with {
+    lastConnectionStatus  @readonly;
+    lastConnectionAt      @readonly;
+    lastConnectionMessage @readonly;
+  };
 
   entity BrokerVariables as projection on db.Variables;
 
@@ -47,11 +42,11 @@ service AdminService {
   @readonly
   @cds.persistence.skip
   entity Destinations {
-    key name           : String(200) @title: 'Destination';
-        url            : String(500) @title: 'URL';
-        msgVpn         : String(100) @title: 'Message VPN';
-        authentication : String(50)  @title: 'Authentication';
-        source         : String(3)   @title: 'Source';
+    key name           : String(200) @title: '{i18n>Destination}';
+        url            : String(500) @title: '{i18n>URL}';
+        msgVpn         : String(100) @title: '{i18n>MessageVPN}';
+        authentication : String(50)  @title: '{i18n>Authentication}';
+        source         : String(3)   @title: '{i18n>Source}';
   }
 
   @odata.draft.enabled
@@ -62,20 +57,23 @@ service AdminService {
   entity NumberRanges as
     projection on db.NumberRanges {
       *,
-      virtual lastNumber : String,
-      virtual nextNumber : String
+      virtual lastNumber : String @title: '{i18n>LastIssued}',
+      virtual nextNumber : String @title: '{i18n>NextNumber}'
     }
     actions {
       /**
        * Sets the range back (or forward): the number given is the next one issued. Empty = the start of the range.
        */
       @Core.OperationAvailable: in.IsActiveEntity
-      @Common.SideEffects     : {TargetProperties: [
-        'in/current',
-        'in/lastNumber',
-        'in/nextNumber'
-      ]}
-      action reset(nextNumber : Integer64 @Common.Label: 'Next number (empty = start of the range)');
+      action reset(nextNumber : Integer64);
+
+      /** Issues the next number, as a run does - to try the range out. */
+      @Core.OperationAvailable: in.IsActiveEntity
+      action countUp();
+
+      /** Gives the last issued number back: the next number issued is that one again. */
+      @Core.OperationAvailable: in.IsActiveEntity
+      action countDown();
     };
 
   type ConnectionResult {

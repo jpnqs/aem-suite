@@ -5,6 +5,7 @@ This folder spins up a local Solace PubSub+ event broker via Docker Compose, use
 ## Prerequisites
 
 - Docker Desktop (with the WSL2 backend on Windows)
+- PowerShell for the provisioning script `terragrunt/tg.ps1` (Windows PowerShell 5.1, or PowerShell 7 `pwsh` on macOS / Linux)
 
 ## Setup
 
@@ -55,13 +56,9 @@ the Docker host's open-file limit is too low. This is fixed via the `ulimits.nof
 | AMQP                                | `localhost:5672`        |                                        |
 | WebSocket (SMF over WS)             | `ws://localhost:8008`   |                                        |
 
-**Admin credentials** (from `environment` in [docker-compose.yml](docker-compose.yml)):
+**Admin credentials** (from `environment` in [docker-compose.yml](docker-compose.yml)): username `admin`, password `admin` (or the value of `SOLACE_ADMIN_PASSWORD` when the container was created). They are for PubSub+ Manager and the SEMP API, which `terragrunt/tg.ps1` uses (`SOLACE_SEMP_PASSWORD`, default `admin`) - not for the app.
 
-- Username: `admin`
-- Password: `admin`
-- Message VPN: `default`
-
-Use these credentials/host values when configuring the Solace connection in the service's environment (e.g. `default-env.json` or local `.env`).
+The app does not read any broker settings from the environment: it connects with the demo brokers of `test/data` (Message VPN `aem-local`, the users below), which `cds watch` loads. Passwords are entered in the app for each run, connection test or subscription.
 
 ## Provisioning users and queues (Terragrunt)
 

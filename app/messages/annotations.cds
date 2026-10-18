@@ -1,9 +1,11 @@
 using SubscribeService as service from '../../srv/subscribe-service';
 
+// field titles: db/schema.cds - here only the layout
+
 annotate service.ReceivedMessages with @(
   UI.HeaderInfo        : {
-    TypeName      : 'Saved Message',
-    TypeNamePlural: 'Saved Messages',
+    TypeName      : '{i18n>SavedMessage}',
+    TypeNamePlural: '{i18n>SavedMessages}',
     Title         : {Value: topic},
     Description   : {Value: brokerName}
   },
@@ -31,13 +33,13 @@ annotate service.ReceivedMessages with @(
     {
       $Type : 'UI.DataFieldForAction',
       Action: 'SubscribeService.createTestCase',
-      Label : 'Create Test Case'
+      Label : '{i18n>CreateTestCase}'
     }
   ],
   UI.Identification    : [{
     $Type : 'UI.DataFieldForAction',
     Action: 'SubscribeService.createTestCase',
-    Label : 'Create Test Case'
+    Label : '{i18n>CreateTestCase}'
   }],
   UI.FieldGroup #Message: {Data: [
     {Value: brokerName},
@@ -59,32 +61,22 @@ annotate service.ReceivedMessages with @(
       $Type : 'UI.ReferenceFacet',
       ID    : 'Message',
       Target: '@UI.FieldGroup#Message',
-      Label : 'Message'
+      Label : '{i18n>Message}'
     },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Payload',
       Target: '@UI.FieldGroup#Payload',
-      Label : 'Payload'
+      Label : '{i18n>Payload}'
     }
   ]
 ) {
-  brokerName     @title: 'Broker';
-  topic          @title: 'Topic'  @UI.MultiLineText;
-  source         @title: 'Subscription / Queue';
-  sourceType     @title: 'Source Type';
-  payload        @title: 'Payload'  @UI.MultiLineText;
-  contentType    @title: 'Content Type';
-  userProperties @title: 'User Properties'  @UI.MultiLineText;
-  correlationId  @title: 'Correlation ID';
-  deliveryMode   @title: 'Delivery Mode';
-  receivedAt     @title: 'Received At';
-  createdBy      @title: 'Saved By';
+  topic          @UI.MultiLineText;
+  payload        @UI.MultiLineText;
+  userProperties @UI.MultiLineText;
   broker         @UI.Hidden;
 };
 
 // messages are created by the subscriber app only - hide "Create" in the list report
-annotate service.ReceivedMessages with @(
-  UI.CreateHidden                          : true,
-  Capabilities.UpdateRestrictions.Updatable: false
-);
+// (not updatable: srv/subscribe-service.cds)
+annotate service.ReceivedMessages with @(UI.CreateHidden: true);

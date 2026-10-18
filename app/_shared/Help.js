@@ -1,7 +1,7 @@
 sap.ui.define(["module", "./Navigation"], function (module, Navigation) {
   "use strict";
 
-  // app this copy belongs to, e.g. "brokers" (see scripts/sync-shared-ui.js)
+  // the app this module is loaded for, e.g. "brokers" (see scripts/ui5/shared-ui.js)
   var APP = /([^/]+)\/shared\/[^/]+$/.exec(module.id)[1];
 
   /** Sections of the user guide (docs/user-guide.md) per app - test/help.test.ts checks that they exist. */
@@ -19,7 +19,7 @@ sap.ui.define(["module", "./Navigation"], function (module, Navigation) {
 
   /** Opens a section of the user guide in a new tab, so nothing being edited here is lost. */
   function openSection(key) {
-    Navigation.toApp({ app: "help", intent: "AEMSuiteHelp-display", path: SECTIONS[key], newTab: true });
+    Navigation.toApp({ app: "help", path: SECTIONS[key], newTab: true });
   }
 
   return {

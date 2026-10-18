@@ -6,6 +6,6 @@
     src="{= ${kind} === 'FOLDER' ? 'sap-icon://folder-blank' : 'sap-icon://lab' }"
     size="1rem"
     color="{= ${kind} === 'FOLDER' ? 'Default' : 'Neutral' }"
-    tooltip="{= ${kind} === 'FOLDER' ? 'Folder' : 'Test Case' }"
-    alt="{= ${kind} === 'FOLDER' ? 'Folder' : 'Test Case' }" />
+    tooltip="{kindText}"
+    alt="{kindText}" />
 </core:FragmentDefinition>

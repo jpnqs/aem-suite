@@ -1,7 +1,7 @@
-sap.ui.define(["module"], function (module) {
+sap.ui.define(["module", "./Apps"], function (module, Apps) {
   "use strict";
 
-  // namespace of the app this copy belongs to, e.g. "com/aem/suite/brokers" (see scripts/sync-shared-ui.js)
+  // namespace of the app this module is loaded for, e.g. "com/aem/suite/brokers" (see scripts/ui5/shared-ui.js)
   var APP_NAMESPACE = module.id.replace(/\/shared\/[^/]+$/, "");
 
   function inLaunchpad() {
@@ -27,14 +27,13 @@ sap.ui.define(["module"], function (module) {
     /**
      * Shows another app of the suite.
      * @param {object} target
-     * @param {string} target.app app name, e.g. "runs" (the HTML5 app is "comaemsuiteruns")
-     * @param {string} target.intent launchpad intent, e.g. "AEMSuiteTestRuns-display"
+     * @param {string} target.app app key (Apps.js), e.g. "runs" (the HTML5 app is "comaemsuiteruns")
      * @param {string} target.path route inside the app, e.g. "TestRuns(<id>)"
      * @param {boolean} [target.newTab] open in a new tab, so nothing being edited here is lost
      */
     toApp: function (target) {
       if (inLaunchpad()) {
-        var hash = "#" + target.intent + "&/" + target.path;
+        var hash = "#" + Apps.get(target.app).intent + "&/" + target.path;
         if (target.newTab) {
           window.open(window.location.pathname + window.location.search + hash, "_blank", "noopener");
         } else {

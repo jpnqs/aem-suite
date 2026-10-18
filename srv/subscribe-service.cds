@@ -17,6 +17,26 @@ service SubscribeService {
     }
     where active = true;
 
+  /**
+   * Saved messages: every tester sees all of them and can turn any into a test case, but only deletes their own.
+   * Created by the live view's "Save"; never changed afterwards.
+   */
+  @restrict: [
+    {
+      grant: ['READ', 'CREATE', 'createTestCase'],
+      to   : 'Tester'
+    },
+    {
+      grant: 'DELETE',
+      to   : 'Tester',
+      where: 'createdBy = $user'
+    },
+    {
+      grant: 'DELETE',
+      to   : 'Admin'
+    }
+  ]
+  @Capabilities.UpdateRestrictions.Updatable: false
   entity ReceivedMessages as projection on db.ReceivedMessages
     actions {
       /** Creates a new test case from this message (topic, payload, user properties). */
@@ -50,7 +70,18 @@ service SubscribeService {
 
   action stop(subscriptionId : UUID not null);
 
+  /**
+   * Called regularly by the page that started the subscription: keeps it from being closed by the idle timeout.
+   * Only this one subscription - one left behind by a closed tab still times out. active = false: it ended on the server.
+   */
+  action heartbeat(subscriptionId : UUID not null) returns HeartbeatResult;
+
+  /** The user's subscriptions (read only - does not keep them alive). */
   function activeSubscriptions()        returns many SubscriptionInfo;
+
+  type HeartbeatResult {
+    active : Boolean;
+  }
 
   type SubscriptionRef {
     subscriptionId : UUID;

@@ -19,7 +19,11 @@ modules:
       # live subscriptions are held in memory -> keep a single instance (see README)
       instances: 1
       memory: 512M
+      disk-quota: 1024M
       buildpack: nodejs_buildpack
+      # CAP's /health answers without login; a hanging process is restarted, not only a crashed one
+      health-check-type: http
+      health-check-http-endpoint: /health
     build-parameters:
       builder: npm-ci
     provides:
@@ -36,6 +40,8 @@ modules:
     path: gen/db
     parameters:
       buildpack: nodejs_buildpack
+      memory: 256M
+      disk-quota: 512M
     requires:
       - name: aem-suite-db
 
@@ -44,7 +50,7 @@ modules:
     type: approuter.nodejs
     path: app/router
     build-parameters:
-      builder: npm
+      builder: npm-ci
       ignore:
         - default-env.json
     parameters:
@@ -264,10 +270,12 @@ resources:
         xsappname: aem-suite-${org}-${space}
         tenant-mode: dedicated
         oauth2-configuration:
+          # only the standalone approuter's own route (Work Zone logs in with its own XSUAA and exchanges the token).
+          # The callback of local AI clients (http://localhost:8765/**) is added by dev.mtaext only.
           redirect-uris:
-            - https://*.${default-domain}/**
-            # OAuth callback of local AI clients (e.g. claude mcp add ... --callback-port 8765)
-            - http://localhost:8765/**
+            - ~{app-api/app-protocol}://~{app-api/app-uri}/**
+    requires:
+      - name: app-api
   - name: aem-suite-db
     type: com.sap.xs.hdi-container
     parameters:

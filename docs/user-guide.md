@@ -7,33 +7,33 @@ save messages as **test cases**, send them to one or several brokers with one cl
 
 ## Contents
 
-- [AEM Test Suite – User Guide](#aem-test-suite--user-guide)
-  - [Contents](#contents)
-  - [1. Getting started](#1-getting-started)
-  - [2. Set up brokers (Admin)](#2-set-up-brokers-admin)
-  - [3. Global variables (Admin)](#3-global-variables-admin)
-  - [4. Organize test cases in folders](#4-organize-test-cases-in-folders)
-    - [Export and import](#export-and-import)
-  - [5. Create and edit a test case](#5-create-and-edit-a-test-case)
-    - [Message](#message)
-    - [Payload](#payload)
-    - [Advanced (click *Show more*)](#advanced-click-show-more)
-    - [User Properties](#user-properties)
-    - [Variables](#variables)
-    - [Preview](#preview)
-  - [6. Run tests](#6-run-tests)
-    - [What do the results mean?](#what-do-the-results-mean)
-  - [7. Check results](#7-check-results)
-  - [8. Watch messages live (Live Subscriber)](#8-watch-messages-live-live-subscriber)
-  - [9. Saved messages](#9-saved-messages)
-  - [10. Variables and templates](#10-variables-and-templates)
-    - [Where values come from (first match wins)](#where-values-come-from-first-match-wins)
-    - [Built-ins](#built-ins)
-    - [Example](#example)
-    - [Number ranges (Admin)](#number-ranges-admin)
-    - [Test data with faker](#test-data-with-faker)
-  - [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
-  - [12. Tips and troubleshooting](#12-tips-and-troubleshooting)
+- [1. Getting started](#1-getting-started)
+- [2. Set up brokers (Admin)](#2-set-up-brokers-admin)
+  - [Brokers from a BTP destination](#brokers-from-a-btp-destination)
+- [3. Global variables (Admin)](#3-global-variables-admin)
+- [4. Organize test cases in folders](#4-organize-test-cases-in-folders)
+  - [Export and import](#export-and-import)
+- [5. Create and edit a test case](#5-create-and-edit-a-test-case)
+  - [Message](#message)
+  - [Payload](#payload)
+  - [Advanced (click *Show more*)](#advanced-click-show-more)
+  - [User Properties](#user-properties)
+  - [Variables](#variables)
+  - [Preview](#preview)
+- [6. Run tests](#6-run-tests)
+  - [Advanced settings](#advanced-settings)
+  - [What do the results mean?](#what-do-the-results-mean)
+- [7. Check results](#7-check-results)
+- [8. Watch messages live (Live Subscriber)](#8-watch-messages-live-live-subscriber)
+- [9. Saved messages](#9-saved-messages)
+- [10. Variables and templates](#10-variables-and-templates)
+  - [Where values come from (first match wins)](#where-values-come-from-first-match-wins)
+  - [Built-ins](#built-ins)
+  - [Example](#example)
+  - [Number ranges (Admin)](#number-ranges-admin)
+  - [Test data with faker](#test-data-with-faker)
+- [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
+- [12. Tips and troubleshooting](#12-tips-and-troubleshooting)
 
 ---
 
@@ -78,7 +78,7 @@ Open **Brokers** → **Create**.
 | **URL** (direct) | The host is enough, e.g. `mr-xyz.messaging.solace.cloud`. It is completed automatically: no port → `wss://…:443`, port `55443` → `tcps://`, port `55555` → `tcp://`. |
 | **Message VPN** (direct) | e.g. `dev-vpn` |
 | **Username** (direct) | optional (the AEM standard is `solace-cloud-client`). If it is empty, the username is asked for together with the password whenever you run tests, test the connection or subscribe. |
-| **Destination** (destination mode) | choose from the list (shows URL and VPN) |
+| **Destination** (destination mode) | choose from the list (shows URL and VPN); how to create one: [Brokers from a BTP destination](#brokers-from-a-btp-destination) |
 | **Active** | inactive brokers are hidden in run and subscribe dialogs |
 | Advanced | client name prefix, connect timeout |
 
@@ -89,6 +89,53 @@ Open **Brokers** → **Create**.
 **Broker variables**: on the broker page, section *Broker Variables* – values that apply only when sending to this broker (e.g. `region = eu` for the EU broker). See [section 10](#10-variables-and-templates).
 
 Where do I find the connection data? In the AEM console: *Cluster Manager → your service → Connect → Solace Web Messaging / Solace Messaging* (host, port, message VPN, username).
+
+### Brokers from a BTP destination
+
+With a destination, the broker's technical user and its password are kept in BTP. Nobody enters a password: runs, connection tests, live subscriptions and the AI assistant all log in as that user. Create one destination per broker (message VPN) in the BTP cockpit: *your subaccount → Connectivity → Destinations → Create Destination*.
+
+| Field | Value | Example |
+|---|---|---|
+| **Name** | any name – you pick it in the broker later | `aem-dev` |
+| **Type** | `HTTP` | |
+| **URL** | the web messaging endpoint of the broker. The cockpit only accepts `https://`, the app connects with `wss://` | `https://mr-xyz.messaging.solace.cloud:443` |
+| **Proxy Type** | `Internet` | |
+| **Authentication** | `BasicAuthentication` | |
+| **User**, **Password** | the technical user of the broker (client username) | `solace-cloud-client` |
+| Additional property **`msgVpn`** | the message VPN – required | `dev-vpn` |
+| Additional property **`smfUrl`** | optional: connect with this URL instead, e.g. SMF over TLS | `tcps://mr-xyz.messaging.solace.cloud:55443` |
+
+Additional properties are added with **New Property** in the destination. Instead of typing everything, you can save the following as a file and import it with **Import Destination** (then enter the password):
+
+```properties
+Name=aem-dev
+Description=AEM dev broker for the AEM Test Suite
+Type=HTTP
+URL=https\://mr-xyz.messaging.solace.cloud\:443
+ProxyType=Internet
+Authentication=BasicAuthentication
+User=solace-cloud-client
+Password=<password of the technical user>
+msgVpn=dev-vpn
+```
+
+A broker reached through SMF over TLS instead of websockets gets the same destination plus the `smfUrl` property:
+
+```properties
+Name=aem-qa-tcps
+Type=HTTP
+URL=https\://mr-abc.messaging.solace.cloud\:443
+ProxyType=Internet
+Authentication=BasicAuthentication
+User=aem-suite-tester
+Password=<password of the technical user>
+msgVpn=qa-vpn
+smfUrl=tcps\://mr-abc.messaging.solace.cloud\:55443
+```
+
+Then, in the app: **Brokers → Create**, *Credentials* **BTP Destination**, and pick the destination from the value help. It lists the destinations of the subaccount with URL and message VPN (only those whose URL can be a broker). Saving tests the connection right away.
+
+> **The technical user decides what the tests may do.** Every run through this destination publishes as that user, so give it an ACL profile that allows the topics you test – and nothing more on production brokers. Who may *use* the destination is decided by the app's roles (Tester runs, Admin maintains brokers).
 
 ---
 
@@ -218,7 +265,7 @@ You can run:
 
 The **Run dialog**:
 
-1. **Select brokers** – the brokers of your last run are preselected. Each selected test case is sent once to each selected broker.
+1. **Select brokers** – the brokers of your last run are preselected. Each selected test case is sent once to each selected broker. With many brokers, type in the search field above the list (name, user or VPN): it narrows the list, and brokers you already selected stay in it. The small icon in front of each broker shows how it logs in: a **cloud** for a BTP destination (nothing to enter), a **key** for direct input (password for the run).
 2. **Credentials** – for every selected *direct* broker a password field appears ("used for this run only, not stored"). If the broker has no username maintained, a **username** field appears next to it. Destination brokers need nothing.
 3. **Advanced settings** (optional, click to open) – see below.
 4. **Run** – progress is shown live (e.g. `3 / 6`, passed / failed).
@@ -240,7 +287,7 @@ For repeating a message, simulating traffic or watching a flow over time:
 
 The dialog shows what you are about to start, for example *"30 or more messages … the pauses alone take about 2 min"* (a folder sends everything below it). Your settings are remembered for the next run.
 
-**Stop run** ends a run early (the user who started it, or an administrator): messages not sent yet get the status **SKIPPED**. A message that is already on its way is finished.
+**Stop run** ends a run early (the user who started it, or an administrator): messages not sent yet get the status **SKIPPED**. A message that is already on its way is finished. The run itself then ends **STOPPED** (shown as a warning), not as passed.
 
 A run is limited (`cds.aemSuite.runs`): at most 1000 repetitions and 5000 messages (test cases × brokers × repetitions) per run.
 
@@ -252,6 +299,8 @@ A run is limited (`cds.aemSuite.runs`): at most 1000 repetitions and 5000 messag
 | **FAILED** | The broker rejected the message, or no acknowledgement arrived in time. |
 | **ERROR** | The message could not be sent at all – e.g. unknown variable, invalid JSON, wrong password, broker not reachable. |
 | **SKIPPED** | Not sent: the run was stopped, or an earlier message to this broker failed and *Stop at the first failure* was on. Skipped messages are not counted as failed. |
+
+The **result of a whole run** is PASSED (all sent messages passed), FAILED (at least one failed, or the run was aborted on the server), STOPPED (you or an administrator stopped it and nothing failed before) or RUNNING.
 
 PASSED means the broker accepted the message. It does not check whether a consumer received or processed it – use the Live Subscriber or saved messages for that.
 
@@ -377,7 +426,9 @@ Real SAP messages carry identifiers such as sales order `SO-000042` or a deliver
 | **First Number**, **Step** | where the range starts and by how much it grows (e.g. start `4500000000`, step `1`) |
 | **Last Allowed Number** | optional end of the range. When it is reached (or the number no longer fits into the digits), runs stop with an error |
 
-The page shows what the **next number** will look like, the **last number issued** and when a run used the range last. **Reset** sets the next number (empty = back to the first number) – for example to start a new test series from the beginning.
+The page shows what the **next number** will look like, the **last number issued** and when a run used the range last. **Reset** sets the next number (empty = back to the first number) – for example to start a new test series from the beginning. **Count Up** issues the next number just like a run would, **Count Down** gives the last issued number back so the next run gets it again – handy to try out a new range without sending a message.
+
+The counter is stored in the database: every message of a run that uses the range takes its own number, also when the broker later rejects the message, and a number is never handed out twice. A run that cannot connect to a broker sends nothing and takes no numbers. The Preview shows the next number without using it up.
 
 Use the range in topic, payload, correlation ID or user properties:
 
@@ -476,6 +527,8 @@ The address is `<your app>/mcp/agent` (the same host as the launchpad); you need
 
    The command asks for the client secret.
 3. Start the assistant and log in: in Claude Code run `/mcp`, choose `aem-suite` and **Authenticate**. A browser window opens with the BTP login; after you sign in, the assistant is connected. The login is renewed automatically; when it has expired, authenticate again the same way.
+
+This needs a space deployed for development and testing (with `dev.mtaext`); productive spaces do not accept the local callback. Ask your administrator if the login fails with a redirect error.
 
 Other assistants work the same way if they support MCP with OAuth: enter the address, client ID, client secret and the callback address `http://localhost:8765/callback`.
 

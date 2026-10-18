@@ -11,7 +11,7 @@ service HomeService {
     summary     : String(500);
     startedAt   : Timestamp;
     startedBy   : String(255);
-    /** RUNNING, PASSED or FAILED (as TestRuns.outcome) */
+    /** RUNNING, PASSED, FAILED or STOPPED (as TestRuns.outcome) */
     outcome     : String(10);
     totalCount  : Integer;
     passedCount : Integer;

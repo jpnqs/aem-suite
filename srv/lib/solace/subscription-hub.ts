@@ -1,13 +1,15 @@
 import cds from '@sap/cds'
 import type solace from 'solclientjs'
-import { config } from '../config'
-import { BrokerConnection, loadBroker, resolveConnection } from '../credentials/resolve'
-import { errMsg, httpError } from '../errors'
+import { config } from '../core/config'
+import { BrokerConnection, loadBroker, resolveConnection } from '../broker/resolve'
+import { errMsg, httpError } from '../core/errors'
+import { emitLive } from '../core/live'
 import { readMessage, SolaceSession, sol } from './session'
 
 const LOG = cds.log('aem-subscribe')
 
-export type SourceType = 'TOPIC' | 'QUEUE_BROWSE' | 'QUEUE_CONSUME'
+export type { SourceType } from '#cds-models/aem/suite'
+import type { SourceType } from '#cds-models/aem/suite'
 
 export interface StartRequest {
   brokerId: string
@@ -46,7 +48,7 @@ export interface SubscriptionInfo {
   subscriptionId: string
   brokerId: string
   brokerName: string
-  sourceType: string
+  sourceType: SourceType
   source: string
   startedAt: string
   messageCount: number
@@ -113,13 +115,16 @@ function sourcesOf(req: StartRequest): string[] {
 
 async function open(req: StartRequest, sources: string[]): Promise<string> {
   const broker = await loadBroker(req.brokerId)
-  let conn
+  // same rule as for runs
+  if (broker.active === false) throw httpError(400, `Broker "${broker.name}" is inactive`)
+  // a wrong password or an unreachable broker is the user's to fix: 400 with the broker's reason
+  // (CAP would hide the message of a 5xx in production)
+  let session
   try {
-    conn = await resolveConnection(broker, req.jwt, req.password, req.username)
+    session = await openSession(await resolveConnection(broker, req.jwt, req.password, req.username))
   } catch (e) {
     throw httpError(400, errMsg(e))
   }
-  const session = await openSession(conn)
 
   const sub: Subscription = {
     id: cds.utils.uuid(),
@@ -230,7 +235,7 @@ function forward(sub: Subscription, m: solace.Message) {
     // cut at the byte limit; a multi-byte character split there becomes U+FFFD, so drop it
     payload = Buffer.from(payload).subarray(0, maxPayloadBytes).toString('utf8').replace(/�$/, '') + '\n... [truncated]'
 
-  void emit('message', {
+  void emitLive('message', {
     subscriptionId: sub.id,
     brokerId: sub.brokerId,
     topic: msg.topic,
@@ -262,16 +267,7 @@ async function close(sub: Subscription, state: string, message: string) {
 }
 
 function status(sub: Subscription, state: string, message: string) {
-  return emit('subscriptionStatus', { subscriptionId: sub.id, status: state, message })
-}
-
-async function emit(event: string, data: Record<string, unknown>) {
-  try {
-    const live = await cds.connect.to('LiveService')
-    await live.emit(event, data)
-  } catch (e) {
-    LOG.debug(`emit ${event} failed`, e)
-  }
+  return emitLive('subscriptionStatus', { subscriptionId: sub.id, status: state, message })
 }
 
 function ensureSweeper() {

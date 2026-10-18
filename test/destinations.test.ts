@@ -1,5 +1,5 @@
 import { getAllDestinationsFromDestinationService, getServiceBinding } from '@sap-cloud-sdk/connectivity'
-import { listDestinations } from '../srv/lib/credentials/destinations'
+import { listDestinations } from '../srv/lib/broker/destinations'
 
 // The value help for broker destinations: BTP Destination Service and the env variable "destinations".
 
@@ -11,8 +11,10 @@ const binding = getServiceBinding as jest.Mock
 const fromService = getAllDestinationsFromDestinationService as jest.Mock
 
 describe('listDestinations', () => {
+  const before = process.env.destinations
   afterEach(() => {
-    delete process.env.destinations
+    if (before === undefined) delete process.env.destinations
+    else process.env.destinations = before
     jest.resetAllMocks()
   })
 

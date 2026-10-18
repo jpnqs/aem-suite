@@ -24,7 +24,7 @@ service LiveService {
     seq            : Integer;
   }
 
-  /** Subscription state changes (UP, DOWN, ERROR). */
+  /** Subscription state changes: STOPPED (by the user, idle timeout, shutdown), DOWN (dropped by the broker), THROTTLED / RESUMED (message rate). */
   event subscriptionStatus {
     @ws.context
     subscriptionId : UUID;

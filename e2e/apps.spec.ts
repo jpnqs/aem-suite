@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { apps, openApp, expectAppOpen } from './launchpad'
+import { apps, openApp, expectAppOpen, PING_ID, testCaseUrl } from './launchpad'
 
 // Every app loads through the launchpad and shows the demo data from test/data
 // (OData goes through the app-relative odata/ path, like in the HTML5 repo).
@@ -13,18 +13,34 @@ test.describe('apps (admin)', () => {
     await expect(page.getByText('{{app}}/ping/{{broker.name}}').first()).toBeVisible()
   })
 
+  test('Test Cases offers a folder or a test case to create (labels from the i18n bundle)', async ({ page }) => {
+    await openApp(page, apps.testCases)
+    await expectAppOpen(page, apps.testCases)
+    await page.getByRole('button', { name: 'Create' }).first().click()
+    await expect(page.getByRole('menuitem', { name: 'Folder' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Test Case' })).toBeVisible()
+  })
+
   test('Test Cases opens a test case by deep link', async ({ page }) => {
-    // demo test case "Ping" (test/data/aem.suite-TestCases.csv)
-    await page.goto(`/launchpad.html#${apps.testCases.intent}&/TestCases(ID=c1000000-0000-4000-8000-000000000002,IsActiveEntity=true)`)
+    await page.goto(testCaseUrl(PING_ID))
     await expect(page).toHaveTitle('Ping ({{app}}/ping/{{broker.name}}) - Test Case')
     await expect(page.getByText('Valid JSON').first()).toBeVisible()
     await expect(page.getByText('"broker": "{{broker.name}}"').first()).toBeVisible()
   })
 
-  test('Test Runs opens (no runs yet)', async ({ page }) => {
+  test('a folder page has no payload and no Preview', async ({ page }) => {
+    // demo folder "Orders" (test/data/aem.suite-TestCases.csv)
+    await page.goto(testCaseUrl('f1000000-0000-4000-8000-000000000001'))
+    await expect(page.getByRole('button', { name: 'Run…' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Preview' })).toHaveCount(0)
+    await expect(page.getByText('Valid JSON')).toHaveCount(0)
+  })
+
+  test('Test Runs opens', async ({ page }) => {
+    // not "no runs yet": the run dialog specs start runs on the same server in parallel
     await openApp(page, apps.runs)
     await expectAppOpen(page, apps.runs)
-    await expect(page.getByText('No results found').first()).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Test Case', exact: true }).first()).toBeVisible()
   })
 
   test('Saved Messages opens', async ({ page }) => {
@@ -53,5 +69,8 @@ test.describe('apps (admin)', () => {
     await expect(page.getByText('AEM Test Suite – User Guide').first()).toBeVisible()
     await page.getByText('11. Use an AI assistant (MCP)', { exact: true }).first().click()
     await expect(page.getByText('claude mcp add', { exact: false }).first()).toBeVisible()
+    // the search says how many sections mention the text (a text of the app's i18n bundle)
+    await page.getByPlaceholder('Search the help').fill('faker')
+    await expect(page.getByText(/^\d+ of \d+ sections mention "faker"$/)).toBeVisible()
   })
 })

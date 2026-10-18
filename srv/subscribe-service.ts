@@ -1,11 +1,14 @@
 import cds from '@sap/cds'
-import { currentJwt } from './lib/credentials/resolve'
-import { detectContentType } from './lib/defaults'
-import { truncate } from './lib/errors'
-import { createNode } from './lib/nodes'
-import type { NodeData } from './lib/node-validation'
-import { inferPropertyType } from './lib/property-types'
-import { keyOf } from './lib/request'
+import { Brokers, ReceivedMessages as ReceivedMessageRows } from '#cds-models/aem/suite'
+import { currentJwt } from './lib/broker/resolve'
+import { detectContentType } from './lib/core/defaults'
+import { truncate } from './lib/core/errors'
+import { columnLength } from './lib/core/model'
+import { createNode } from './lib/testcases/nodes'
+import type { NodeData } from './lib/testcases/node-validation'
+import { inferPropertyType } from './lib/testcases/property-types'
+import { idOf } from './lib/core/request'
+import { nameTaken } from './lib/core/unique-name'
 import { listSubscriptions, SourceType, startSubscription, stopSubscription, touch } from './lib/solace/subscription-hub'
 
 interface ReceivedMessage {
@@ -53,17 +56,17 @@ export default class SubscribeService extends cds.ApplicationService {
       await stopSubscription(subscriptionId, req.user.id)
     })
 
-    // also serves as heartbeat of the subscriber UI (prevents idle timeout)
-    this.on('activeSubscriptions', (req) => {
-      const list = listSubscriptions(req.user.id)
-      list.forEach((s) => touch(s.subscriptionId, req.user.id))
-      return list
+    this.on('heartbeat', (req) => {
+      const { subscriptionId } = req.data as { subscriptionId: string }
+      return { active: touch(subscriptionId, req.user.id) }
     })
+
+    this.on('activeSubscriptions', (req) => listSubscriptions(req.user.id))
 
     this.before('CREATE', ReceivedMessages, async (req) => {
       const d = req.data as { broker_ID?: string; brokerName?: string; receivedAt?: string }
       if (d.broker_ID && !d.brokerName) {
-        const b = await SELECT.one.from('aem.suite.Brokers').columns('name').where({ ID: d.broker_ID })
+        const b = await SELECT.one.from(Brokers).columns('name').where({ ID: d.broker_ID })
         d.brokerName = (b as { name?: string } | undefined)?.name
       }
       d.receivedAt ??= new Date().toISOString()
@@ -71,8 +74,8 @@ export default class SubscribeService extends cds.ApplicationService {
 
     // same rules and placement as a test case created in the UI or by an agent
     this.on('createTestCase', ReceivedMessages, async (req) => {
-      const m = (await SELECT.one.from('aem.suite.ReceivedMessages', keyOf(req).ID)) as ReceivedMessage | null
-      if (!m) return req.error(404, 'Message not found')
+      const m = (await SELECT.one.from(ReceivedMessageRows, idOf(req))) as ReceivedMessage | null
+      if (!m) return req.reject(404, 'Message not found')
       const { ID } = await createNode(testCaseFrom(m))
       req.info(200, 'Test case created')
       return { ID }
@@ -99,8 +102,8 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
     ID: cds.utils.uuid(),
     kind: 'TEST',
     parent_ID: null,
-    name: truncate(`From ${m.topic}`, 200),
-    description: truncate(`Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`, 1000),
+    name: truncate(`From ${m.topic}`, columnLength('TestCases', 'name')),
+    description: truncate(`Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`, columnLength('TestCases', 'description')),
     topic: m.topic,
     payload,
     contentType: m.contentType || detectContentType(payload),
@@ -114,22 +117,19 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
   }
 }
 
-const SOURCE_TYPES = ['TOPIC', 'QUEUE_BROWSE', 'QUEUE_CONSUME']
 const MAX_PRESET_TOPICS = 50
 
-/** Name (unique per user), source type and topics of a saved setup. */
+/** Name (unique per user), source type and topics of a saved setup. Column lengths are checked by CAP (OData input). */
 async function validatePreset(req: cds.Request): Promise<void> {
   const d = req.data as { name?: string; sourceType?: string; topics?: string | null; queue?: string | null; username?: string | null; ID?: string }
   const creating = req.event === 'CREATE'
   if (creating || d.name !== undefined) {
     const name = (d.name ?? '').trim()
     if (!name) return req.reject(400, 'Give the setup a name', 'in/name')
-    if (name.length > 100) return req.reject(400, 'The name may have at most 100 characters', 'in/name')
     d.name = name
-    const same = (await SELECT.from('aem.suite.SubscriberPresets').columns('ID').where({ name, createdBy: req.user.id })) as { ID: string }[]
-    if (same.some((p) => p.ID !== d.ID)) return req.reject(400, `A setup named "${name}" exists already`, 'in/name')
+    if (await nameTaken('SubscriberPresets', name, d.ID, { createdBy: req.user.id })) return req.reject(400, `A setup named "${name}" exists already`, 'in/name')
   }
-  if (d.sourceType !== undefined && !SOURCE_TYPES.includes(d.sourceType)) return req.reject(400, `sourceType must be ${SOURCE_TYPES.join(', ')}`, 'in/sourceType')
+  // sourceType: @assert.range in db/schema.cds
   if (d.topics) {
     let list: unknown
     try {
@@ -140,6 +140,4 @@ async function validatePreset(req: cds.Request): Promise<void> {
     if (!Array.isArray(list) || list.length > MAX_PRESET_TOPICS || list.some((t) => typeof t !== 'string' || !t.trim() || t.length > 500))
       return req.reject(400, `topics must be a list of at most ${MAX_PRESET_TOPICS} topic names`, 'in/topics')
   }
-  if (d.queue && d.queue.length > 500) return req.reject(400, 'The queue name may have at most 500 characters', 'in/queue')
-  if (d.username && d.username.length > 100) return req.reject(400, 'The username may have at most 100 characters', 'in/username')
 }

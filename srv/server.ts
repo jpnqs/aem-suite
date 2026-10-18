@@ -1,7 +1,7 @@
 import cds from '@sap/cds'
 import { registerMcpOAuth } from './lib/mcp-oauth'
 import { stopAll } from './lib/solace/subscription-hub'
-import { failRuns } from './lib/test-runner'
+import { failRuns } from './lib/runs/test-runner'
 
 // AI clients log in against XSUAA themselves (OAuth discovery for /mcp/agent).
 cds.on('bootstrap', (app) => registerMcpOAuth(app))

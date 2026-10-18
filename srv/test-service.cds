@@ -1,4 +1,5 @@
 using {aem.suite as db} from '../db/schema';
+using {aem.suite.api as api} from './common';
 
 /** Test case maintenance and execution. */
 @path    : '/odata/v4/test'
@@ -7,7 +8,13 @@ using {aem.suite as db} from '../db/schema';
 @cds.server.body_parser.limit: '5mb'
 service TestService {
 
+  // a node stays a folder or a test case
+  annotate TestCases with {
+    kind @Core.Immutable;
+  };
+
   @odata.draft.enabled
+  @singular: 'TestCase' // cds-typer would derive "TestCas" (the annotation of db.TestCases is not inherited)
   entity TestCases as
     projection on db.TestCases {
       *,
@@ -90,16 +97,19 @@ service TestService {
   entity TestRuns as
     projection on db.TestRuns {
       *,
-      // keep in sync with runOutcome() in srv/lib/test-runner.ts
+      // keep in sync with runOutcome() in srv/lib/runs/test-runner.ts
       case
         when status = 'RUNNING' then 'RUNNING'
         when status = 'FAILED'  then 'FAILED'
         when failedCount > 0    then 'FAILED'
+        when status = 'STOPPED' then 'STOPPED'
         else 'PASSED'
-      end as outcome : String(10),
+      end as outcome : String(10) @title: '{i18n>Result}',
+      // PASSED 3, FAILED 1, RUNNING and STOPPED 2 (warning)
       case status
-        when 'DONE'   then (case when failedCount > 0 then 1 else 3 end)
-        when 'FAILED' then 1
+        when 'DONE'    then (case when failedCount > 0 then 1 else 3 end)
+        when 'FAILED'  then 1
+        when 'STOPPED' then (case when failedCount > 0 then 1 else 2 end)
         else 2
       end as statusCriticality : Integer
     };
@@ -109,7 +119,9 @@ service TestService {
     projection on db.RunResults {
       *,
       // run data, so the result list can be filtered and sorted by it
+      @title: '{i18n>RunStartedAt}'
       run.createdAt as runStartedAt,
+      @title: '{i18n>StartedBy}'
       run.createdBy as runStartedBy,
       // navigation targets (launchpad intents) for the link columns
       '#AEMSuiteTestCases-manage&/TestCases(ID=' || testCase.ID || ',IsActiveEntity=true)' as testCaseLink : String,
@@ -159,13 +171,7 @@ service TestService {
    */
   action exportNodes(ids : many UUID) returns ExportResult;
 
-  type ExportResult {
-    /** suggested file name */
-    filename  : String;
-    content   : LargeString;
-    folders   : Integer;
-    testCases : Integer;
-  }
+  type ExportResult : api.ExportResult;
 
   /**
    * Imports the content of an export file as new test cases and folders below parentId (empty = top level).
@@ -174,22 +180,7 @@ service TestService {
    */
   action importNodes(content : LargeString not null, parentId : UUID, dryRun : Boolean) returns ImportResult;
 
-  type ImportRoot {
-    ID   : UUID;
-    name : String;
-    kind : String;
-  }
-
-  type ImportResult {
-    dryRun         : Boolean;
-    folders        : Integer;
-    testCases      : Integer;
-    userProperties : Integer;
-    variables      : Integer;
-    roots          : many ImportRoot;
-    /** name of the target folder, empty = top level */
-    target         : String;
-  }
+  type ImportResult : api.ImportResult;
 
   /** ID of the logged-in user - used to prefill "Created by" / "Started by" filters. */
   function currentUser() returns String;
@@ -217,26 +208,7 @@ service TestService {
     stopOnFailure : Boolean;
   }
 
-  /**
-   * Password of a DIRECT broker for one run - used in memory only, never stored.
-   * The username is only needed if none is maintained on the broker.
-   */
-  type BrokerCredential {
-    brokerId : UUID;
-    username : String;
-    password : String;
-  }
-
-  type RunRef {
-    runId : UUID;
-  }
-
-  type Preview {
-    topic          : String;
-    payload        : LargeString;
-    correlationId  : String;
-    userProperties : LargeString;
-    valid          : Boolean;
-    message        : String;
-  }
+  type BrokerCredential : api.BrokerCredential;
+  type RunRef : api.RunRef;
+  type Preview : api.Preview;
 }

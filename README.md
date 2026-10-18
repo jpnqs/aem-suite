@@ -1,5 +1,8 @@
 # AEM Test Suite
 
+[![CI](https://github.com/jpnqs/aem-suite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jpnqs/aem-suite/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjpnqs%2Faem-suite%2Fbadges%2Fcoverage.json)](https://github.com/jpnqs/aem-suite/actions/workflows/ci.yml)
+
 **Test your SAP Advanced Event Mesh (Solace) brokers without writing code.**
 Save messages as test cases, send them to several brokers at once, see immediately which broker accepted them, and watch topics and queues live. Built on SAP CAP and SAP Fiori, ready for SAP BTP (Cloud Foundry).
 
@@ -76,7 +79,7 @@ The user guide is rendered from Markdown with navigation, search and links to ev
 
 ## Quick start
 
-Requires **Node.js 22.12 or newer**.
+Requires **Node.js 24** (`.nvmrc`).
 
 ```sh
 npm install
@@ -118,15 +121,15 @@ npm run docs:screenshots
 ## Architecture
 
 ```
-Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe}  OData V4
+Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,subscribe,help,home}  OData V4
                                            ├─ /mcp/agent                        MCP for AI assistants (OAuth login via XSUAA)
                                            └─ /ws/live                          WebSocket (run progress, live messages)
 CAP srv (TypeScript)
   srv/lib/solace/session.ts            solclientjs session wrapper: connect, publish + ACK, subscribe, queue flows
   srv/lib/solace/subscription-hub.ts   live subscriptions (in memory, per user, heartbeat-based idle timeout)
-  srv/lib/test-runner.ts               async multi-broker runs, results + websocket progress
+  srv/lib/runs/test-runner.ts               async multi-broker runs, results + websocket progress
   srv/lib/template/resolve.ts          {{variable}} resolver
-  srv/lib/credentials/                 destination / direct connection data, destination value help
+  srv/lib/broker/                 destination / direct connection data, destination value help
 HANA Cloud · Destination service · XSUAA
 ```
 
@@ -181,7 +184,7 @@ Placeholders work outside JSON strings too, for example `"qty": {{qty}}`. The JS
 
 ## Local development
 
-Requires **Node.js 22.12+** (CAP 10; the MCP plugin needs `require` of ES modules).
+Requires **Node.js 24** (`engines` `^24`, `.nvmrc`; CAP 10 itself needs 22+, the MCP plugin 22.12+ for `require` of ES modules).
 
 ```sh
 npm install
@@ -192,7 +195,7 @@ Open http://localhost:4004/launchpad.html (redirects to `/comaemsuitelaunchpad/i
 
 **Local demo setup** (`test/data/`, loaded by `cds watch` only, never deployed):
 
-- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md) (`docker compose up -d`, then `local/terragrunt/tg.ps1 apply`).
+- Broker `local-docker`: `tcp://localhost:55555`, VPN `aem-local`, user `aem-suite` (password `aemsuite`). Start the broker and provision the VPN, users and queues as described in [local/README.md](local/README.md): `docker compose up -d` in the folder `local/`, then `.\tg.ps1 apply` in `local/terragrunt/` (PowerShell).
 - Brokers `local-docker (publisher)` (user `aem-publisher`/`publisher`, may only publish below `aem/`) and `local-docker (subscriber)` (user `aem-subscriber`/`subscriber`, may not publish) – the same broker, to compare ACLs.
 - Broker `local-docker (ask for user)`: the same broker without a username, to try the username prompt.
 - Broker `aem-dev (destination)`: an inactive example for DESTINATION mode.
@@ -214,17 +217,28 @@ The data lives in memory and is reset on every restart. `cds watch` does not res
 destinations='[{"name":"aem-dev","url":"wss://mr-xyz.messaging.solace.cloud:443","username":"solace-cloud-client","password":"…","msgVpn":"dev-vpn"}]'
 ```
 
-You can also bind a real destination service with `cds bind`.
+You can also bind a real destination service with `cds bind`. How to create the destinations in BTP (cockpit fields and an import file): [Brokers from a BTP destination](docs/user-guide.md#brokers-from-a-btp-destination).
 
 ```sh
 npm test               # jest: unit + service integration tests (broker connection stubbed)
 npm run e2e            # Playwright: the UI apps in a browser (starts its own dev server on port 4005)
 npm run e2e:ui         # interactive Playwright runner
 npm run e2e:headed     # watch the browser while the tests run
-npm run typecheck      # backend + subscriber app + e2e tests
+npm run typecheck      # backend + tests + subscriber app + e2e tests
 ```
 
 On Windows the e2e tests use the installed Edge. Elsewhere install Chromium once (`npx playwright install chromium`); `PW_CHANNEL=chrome` / `msedge` picks another installed browser. A failed test leaves a trace: `npm run e2e:trace -- test-results/<test>/trace.zip`.
+
+### Development workflow
+
+- Run **`npm run verify`** (typecheck, lint, Jest) before you push; CI (`.github/workflows/ci.yml`) runs it and the e2e tests on every pull request.
+- UI code shared by the apps lives in **`app/_shared`** - edit it there. The UI5 build and the dev server put the modules an app uses into the app (`scripts/ui5`); there are no copies to keep in sync.
+- After changing CDS, `npm run typer` regenerates the cds-typer models.
+- The UI5 tooling is installed once at the root; the apps' `package.json` files only name the UI5 custom tasks.
+- Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`).
+- A release: `npm run set-version -- 1.1.0` writes the version into `mta.yaml`, every `package.json` and every manifest (a test checks they agree); add its entries to [CHANGELOG.md](CHANGELOG.md).
+
+More in the [technical documentation](docs/technical-documentation.md#development-workflow).
 
 ## BTP destination layout
 
@@ -241,12 +255,16 @@ Use one destination per broker:
 ## Deployment (Cloud Foundry)
 
 ```sh
-npm i -g mbt
-mbt build
-cf deploy mta_archives/aem-suite_1.0.0.mtar
+npm run build          # mbt build -> mta_archives/aem-suite.mtar
+npm run deploy         # cf deploy mta_archives/aem-suite.mtar
+npm run deploy:dev     # dev/test spaces: cf deploy mta_archives/aem-suite.mtar -e dev.mtaext
 ```
 
+`dev.mtaext` adds the OAuth callback of local AI clients (`http://localhost:8765/**`) to the XSUAA redirect URIs. `mta.yaml` alone allows only the approuter's own route, so **local MCP clients (e.g. Claude Code) can only log in to spaces deployed with `-e dev.mtaext`**.
+
 Then assign the role collections **AEM_Suite_Admin** and/or **AEM_Suite_Tester** in the BTP cockpit.
+
+**One space per subaccount**: the role collection names are fixed and unique per subaccount, so deploy the suite to only one space of a subaccount. A second space (e.g. dev and test side by side) needs its own subaccount; deploying it into the same subaccount fails or takes over the role collections of the first one.
 
 The MTA build runs `cds build --production` (which compiles the TypeScript), `node scripts/build-docs.js` (copies the user guide next to the server for the Help app). Every UI app is an `html5` module: `ui5 build` writes a zip (`ui5-task-zipper`), and `aem-suite-app-deployer` uploads all zips to the HTML5 Application Repository. `node scripts/build-ui.js` runs the same builds locally.
 

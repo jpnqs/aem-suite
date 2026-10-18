@@ -127,7 +127,7 @@
                   "actions": {
                     "help": {
                       "press": "com.aem.suite.runs.shared.Help.open",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     }
                   }
                 }
@@ -162,7 +162,7 @@
                   "actions": {
                     "help": {
                       "press": "com.aem.suite.runs.shared.Help.open",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     }
                   }
                 }
@@ -183,7 +183,7 @@
                   "actions": {
                     "help": {
                       "press": "com.aem.suite.runs.shared.Help.open",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     }
                   }
                 }
@@ -211,7 +211,7 @@
                   "actions": {
                     "help": {
                       "press": "com.aem.suite.runs.shared.Help.open",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     }
                   }
                 }

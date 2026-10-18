@@ -114,7 +114,7 @@
                   "actions": {
                     "help": {
                       "press": "com.aem.suite.numberranges.shared.Help.open",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     }
                   }
                 }
@@ -149,7 +149,7 @@
                   "actions": {
                     "help": {
                       "press": "com.aem.suite.numberranges.shared.Help.open",
-                      "text": "Help"
+                      "text": "{{action.help}}"
                     }
                   }
                 }

@@ -1,4 +1,5 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig } from '@playwright/test'
+import { baseConfig } from './playwright.base'
 
 /**
  * End-to-end tests of the UI apps in a real browser (e2e/*.spec.ts), against the CAP dev server
@@ -6,12 +7,13 @@ import { defineConfig, devices } from '@playwright/test'
  *
  *   npm run e2e            (e2e:ui = interactive runner, e2e:headed = visible browser, e2e:trace -- <trace.zip>)
  *
- * Browser: Windows uses the installed Edge; elsewhere run `npx playwright install chromium` once.
- * PW_CHANNEL=chrome / msedge picks another installed browser.
+ * Browser and server: see playwright.base.ts.
  */
 const port = Number(process.env.E2E_PORT ?? 4005)
+const base = baseConfig(port, { reuseExistingServer: !process.env.CI })
 
 export default defineConfig({
+  ...base,
   testDir: './e2e',
   timeout: 60_000,
   // UI5 and Fiori elements load from the CDN and render asynchronously
@@ -21,24 +23,5 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
-  use: {
-    baseURL: `http://localhost:${port}`,
-    locale: 'en-US',
-    httpCredentials: { username: 'admin', password: 'admin' },
-    trace: 'retain-on-failure'
-  },
-  // Windows: the installed Edge, no browser download needed; elsewhere Playwright's Chromium
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'], channel: process.env.PW_CHANNEL ?? (process.platform === 'win32' ? 'msedge' : undefined) }
-    }
-  ],
-  webServer: {
-    command: 'npx cds-tsx serve all --with-mocks --in-memory',
-    url: `http://localhost:${port}/`,
-    env: { PORT: String(port) },
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  }
+  use: { ...base.use, trace: 'retain-on-failure' }
 })

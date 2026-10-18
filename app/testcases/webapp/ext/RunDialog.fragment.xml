@@ -2,30 +2,47 @@
   xmlns:core="sap.ui.core"
   xmlns="sap.m">
   <Dialog
-    title="Run {run>/label}"
+    title="{i18n>run.title} {run>/label}"
     contentWidth="38rem"
     resizable="true"
     draggable="true">
     <content>
       <VBox class="sapUiSmallMargin" visible="{= !${run>/runId} }">
-        <Text text="Select the brokers to run against. Each selected test case is published once per broker." class="sapUiTinyMarginBottom" />
-        <Link text="How do runs work, and what do the results mean?" press=".onHelp" class="sapUiSmallMarginBottom" />
+        <Text text="{i18n>run.selectTheBrokersToRunAgainst}" class="sapUiTinyMarginBottom" />
+        <Link text="{i18n>run.howDoRunsWorkAndWhat}" press=".onHelp" class="sapUiSmallMarginBottom" />
+        <SearchField
+          placeholder="{i18n>run.searchBrokers}"
+          liveChange=".onBrokerSearch"
+          width="100%"
+          class="sapUiTinyMarginBottom" />
         <List
           id="brokerList"
           mode="MultiSelect"
           includeItemInSelection="true"
-          noDataText="No active brokers - maintain brokers first"
+          noDataText="{i18n>run.noActiveBrokersMaintainBrokersFirst}"
           updateFinished=".onBrokersLoaded"
           selectionChange=".onBrokerSelection"
-          items="{path: '/Brokers', parameters: {$select: 'username,credentialMode'}, sorter: {path: 'name'}, templateShareable: false}">
-          <StandardListItem
-            title="{name}"
-            description="{= ${credentialMode} === 'DESTINATION' ? 'BTP destination' : (${username} ? ${username} + ' @ ' + ${msgVpn} : 'VPN ' + ${msgVpn}) }"
-            info="{lastConnectionStatus}"
-            infoState="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />
+          items="{path: '/Brokers', parameters: {$select: 'name,msgVpn,username,credentialMode'}, sorter: {path: 'name'}, templateShareable: false}">
+          <!-- small icon in front of the name: cloud = BTP destination, key = direct input (password per run) -->
+          <CustomListItem tooltip="{= ${credentialMode} === 'DESTINATION' ? ${i18n>run.btpDestination} : ${i18n>run.directInput} }">
+            <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMarginBeginEnd sapUiTinyMarginTopBottom">
+              <HBox alignItems="Center">
+                <core:Icon
+                  src="{= ${credentialMode} === 'DESTINATION' ? 'sap-icon://cloud' : 'sap-icon://key' }"
+                  size="1rem"
+                  class="sapUiSmallMarginEnd" />
+                <ObjectIdentifier
+                  title="{name}"
+                  text="{= ${credentialMode} === 'DESTINATION' ? ${i18n>run.btpDestination} : (${username} ? ${username} + ' @ ' + ${msgVpn} : ${i18n>run.vpn} + ' ' + ${msgVpn}) }" />
+              </HBox>
+              <ObjectStatus
+                text="{lastConnectionStatus}"
+                state="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />
+            </HBox>
+          </CustomListItem>
         </List>
         <VBox visible="{= ${run>/credentials}.length > 0 }" class="sapUiSmallMarginTop">
-          <Title text="Credentials (used for this run only, not stored)" level="H6" />
+          <Title text="{i18n>run.credentialsUsedForThisRunOnly}" level="H6" />
           <List items="{path: 'run>/credentials', templateShareable: false}" showSeparators="None">
             <CustomListItem>
               <HBox alignItems="Center" class="sapUiTinyMarginTopBottom">
@@ -35,7 +52,7 @@
                   value="{run>enteredUsername}"
                   valueLiveUpdate="true"
                   valueState="{= ${run>missing} &amp;&amp; !${run>enteredUsername} ? 'Error' : 'None' }"
-                  placeholder="Username"
+                  placeholder="{i18n>run.username}"
                   width="11rem"
                   class="sapUiTinyMarginEnd"
                   submit=".onPrimary" />
@@ -44,7 +61,7 @@
                   value="{run>password}"
                   valueLiveUpdate="true"
                   valueState="{= ${run>missing} &amp;&amp; !${run>password} ? 'Error' : 'None' }"
-                  placeholder="Password"
+                  placeholder="{i18n>run.password}"
                   width="11rem"
                   submit=".onPrimary" />
               </HBox>
@@ -52,33 +69,33 @@
           </List>
         </VBox>
         <Panel
-          headerText="Advanced settings"
+          headerText="{i18n>run.advancedSettings}"
           expandable="true"
           expanded="false"
           class="sapUiNoContentPadding sapUiSmallMarginTop">
           <content>
             <VBox class="sapUiSmallMargin">
               <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-                <Label text="Repetitions" width="14rem" tooltip="How often every test case is sent to every selected broker" />
+                <Label text="{i18n>run.repetitions}" width="14rem" tooltip="{i18n>run.howOftenEveryTestCaseIs}" />
                 <StepInput value="{run>/repetitions}" min="1" max="1000" width="9rem" change=".onOptionsChange" />
               </HBox>
               <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-                <Label text="Pause between messages" width="14rem" tooltip="Wait between two messages to the same broker (not before the first)" />
-                <StepInput value="{run>/delayMs}" min="0" max="60000" step="100" largerStep="1000" displayValuePrecision="0" description="ms" fieldWidth="60%" width="11rem" change=".onOptionsChange" />
+                <Label text="{i18n>run.pauseBetweenMessages}" width="14rem" tooltip="{i18n>run.waitBetweenTwoMessagesToThe}" />
+                <StepInput value="{run>/delayMs}" min="0" max="60000" step="100" largerStep="1000" displayValuePrecision="0" description="{i18n>run.ms}" fieldWidth="60%" width="11rem" change=".onOptionsChange" />
               </HBox>
               <HBox alignItems="Center" class="sapUiTinyMarginBottom" visible="{= ${run>/repetitions} > 1 }">
-                <Label text="Order" width="14rem" tooltip="Whole selection: a b c, a b c, ...   Each test case: a a a, b b b, ..." />
+                <Label text="{i18n>run.order}" width="14rem" tooltip="{i18n>run.wholeSelectionABCA}" />
                 <SegmentedButton selectedKey="{run>/order}" width="20rem">
                   <items>
-                    <SegmentedButtonItem key="ROUND" text="Whole selection" />
-                    <SegmentedButtonItem key="EACH" text="Each test case" />
+                    <SegmentedButtonItem key="ROUND" text="{i18n>run.wholeSelection}" />
+                    <SegmentedButtonItem key="EACH" text="{i18n>run.eachTestCase}" />
                   </items>
                 </SegmentedButton>
               </HBox>
               <CheckBox
-                text="Stop at the first failure"
+                text="{i18n>run.stopAtTheFirstFailure}"
                 selected="{run>/stopOnFailure}"
-                tooltip="After a message failed, the rest of that broker is skipped. Other brokers go on." />
+                tooltip="{i18n>run.afterAMessageFailedTheRest}" />
               <Text text="{run>/estimate}" class="sapUiTinyMarginTop" />
             </VBox>
           </content>
@@ -87,12 +104,12 @@
       <VBox class="sapUiSmallMargin" visible="{= !!${run>/runId} }">
         <MessageStrip
           visible="{= ${run>/connectionLost} &amp;&amp; !${run>/finished} }"
-          text="Live progress connection lost - reconnecting. The result is checked every few seconds meanwhile."
+          text="{i18n>run.liveProgressConnectionLostReconnectingMeanwhile}"
           type="Warning"
           showIcon="true"
           class="sapUiSmallMarginBottom" />
         <ObjectStatus
-          text="{= ${run>/finished} ? (${run>/aborted} ? 'Aborted - see the problems below' : (${run>/skipped} > 0 ? 'Finished - ' + ${run>/skipped} + ' not sent' : 'Finished')) : (${run>/stopping} ? 'Stopping…' : 'Running…') }"
+          text="{= ${run>/finished} ? (${run>/aborted} ? ${i18n>run.aborted} : (${run>/stopped} ? ${i18n>run.stopped} + ' - ' + ${run>/skipped} + ' ' + ${i18n>run.notSent} : (${run>/skipped} > 0 ? ${i18n>run.finished} + ' - ' + ${run>/skipped} + ' ' + ${i18n>run.notSent} : ${i18n>run.finished}))) : (${run>/stopping} ? ${i18n>run.stopping} : ${i18n>run.running}) }"
           state="{= ${run>/finished} ? (${run>/failed} > 0 ? 'Error' : (${run>/skipped} > 0 ? 'Warning' : 'Success')) : 'Information' }"
           icon="{= ${run>/finished} ? (${run>/failed} > 0 ? 'sap-icon://error' : 'sap-icon://sys-enter-2') : 'sap-icon://pending' }"
           class="sapMObjectStatusLarge sapUiSmallMarginBottom" />
@@ -102,23 +119,23 @@
           state="{= ${run>/failed} > 0 ? 'Error' : 'Success' }"
           showValue="true" />
         <HBox class="sapUiSmallMarginTop">
-          <ObjectNumber number="{run>/passed}" unit="passed" state="Success" class="sapUiMediumMarginEnd" />
-          <ObjectNumber number="{run>/failed}" unit="failed / error" state="{= ${run>/failed} > 0 ? 'Error' : 'None' }" class="sapUiMediumMarginEnd" />
-          <ObjectNumber number="{run>/skipped}" unit="not sent" state="Warning" visible="{= ${run>/skipped} > 0 }" />
+          <ObjectNumber number="{run>/passed}" unit="{i18n>run.passed}" state="Success" class="sapUiMediumMarginEnd" />
+          <ObjectNumber number="{run>/failed}" unit="{i18n>run.failedError}" state="{= ${run>/failed} > 0 ? 'Error' : 'None' }" class="sapUiMediumMarginEnd" />
+          <ObjectNumber number="{run>/skipped}" unit="{i18n>run.notSent}" state="Warning" visible="{= ${run>/skipped} > 0 }" />
         </HBox>
         <Button
-          text="Stop run"
+          text="{i18n>run.stopRun}"
           icon="sap-icon://stop"
           type="Reject"
           class="sapUiSmallMarginTop"
           visible="{= !${run>/finished} }"
           enabled="{= !${run>/stopping} }"
-          tooltip="Stops the run: messages not sent yet are skipped"
+          tooltip="{i18n>run.stopsTheRunMessagesNotSent}"
           press=".onStop" />
         <List
           visible="{= ${run>/problems}.length > 0 }"
           items="{path: 'run>/problems', templateShareable: false}"
-          headerText="Problems"
+          headerText="{i18n>run.problems}"
           class="sapUiSmallMarginTop">
           <StandardListItem
             title="{run>testCaseName} @ {run>brokerName}"
@@ -127,17 +144,21 @@
             infoState="Error"
             wrapping="true" />
         </List>
+        <Text
+          visible="{= ${run>/moreProblems} > 0 }"
+          text="{i18n>run.moreProblemsBefore} {run>/moreProblems} {i18n>run.moreProblemsAfter}"
+          class="sapUiTinyMarginTop" />
       </VBox>
     </content>
     <beginButton>
       <Button
-        text="{= ${run>/runId} ? 'Open Results' : 'Run' }"
+        text="{= ${run>/runId} ? ${i18n>run.openResults} : ${i18n>run.run} }"
         type="Emphasized"
         enabled="{= !${run>/starting} }"
         press=".onPrimary" />
     </beginButton>
     <endButton>
-      <Button text="Close" press=".onClose" />
+      <Button text="{i18n>preview.close}" press=".onClose" />
     </endButton>
   </Dialog>
 </core:FragmentDefinition>

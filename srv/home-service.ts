@@ -1,15 +1,15 @@
 import cds from '@sap/cds'
+import { Brokers, ReceivedMessages, TestCases, TestRuns } from '#cds-models/aem/suite'
 import { listSubscriptions } from './lib/solace/subscription-hub'
-import { runOutcome } from './lib/test-runner'
+import { runOutcome } from './lib/runs/test-runner'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RECENT_DAYS = 7
 const LAST_RUNS = 5
 
-type RunRow = { ID: string; summary: string | null; startedAt: string | null; createdBy: string | null; status: string; totalCount: number; passedCount: number; failedCount: number }
-
-const count = async (entity: string, where?: Record<string, unknown>): Promise<number> => {
-  const query = SELECT.one.from(entity).columns('count(1) as n')
+/** count(1) of an entity (the typed query API has no overload for a union of entities, hence the cast) */
+const count = async (entity: typeof TestCases | typeof TestRuns | typeof ReceivedMessages, where?: Record<string, unknown>): Promise<number> => {
+  const query = SELECT.one.from(entity as typeof TestCases).columns('count(1) as n')
   const row = (await (where ? query.where(where) : query)) as { n: number } | undefined
   return Number(row?.n ?? 0)
 }
@@ -25,21 +25,16 @@ export default class HomeService extends cds.ApplicationService {
 
       const since = new Date(Date.now() - RECENT_DAYS * DAY_MS).toISOString()
       const [testCases, folders, myTestCases, savedMessages, recent, lastRuns, brokers] = await Promise.all([
-        count('aem.suite.TestCases', { kind: 'TEST' }),
-        count('aem.suite.TestCases', { kind: 'FOLDER' }),
-        count('aem.suite.TestCases', { kind: 'TEST', createdBy: user }),
-        count('aem.suite.ReceivedMessages'),
-        (async () => (await SELECT.from('aem.suite.TestRuns').columns('status', 'passedCount', 'failedCount').where({ startedAt: { '>=': since } })) as RunRow[])(),
-        (async () =>
-          (await SELECT.from('aem.suite.TestRuns')
-            .columns('ID', 'summary', 'startedAt', 'createdBy', 'status', 'totalCount', 'passedCount', 'failedCount')
-            .orderBy('startedAt desc')
-            .limit(LAST_RUNS)) as RunRow[])(),
-        (async () =>
-          (await SELECT.from('aem.suite.Brokers').columns('name', 'lastConnectionStatus').where({ active: true }).orderBy('name')) as {
-            name: string
-            lastConnectionStatus: string | null
-          }[])()
+        count(TestCases, { kind: 'TEST' }),
+        count(TestCases, { kind: 'FOLDER' }),
+        count(TestCases, { kind: 'TEST', createdBy: user }),
+        count(ReceivedMessages),
+        SELECT.from(TestRuns).columns('status', 'passedCount', 'failedCount').where({ startedAt: { '>=': since } }),
+        SELECT.from(TestRuns)
+          .columns('ID', 'summary', 'startedAt', 'createdBy', 'status', 'totalCount', 'passedCount', 'failedCount')
+          .orderBy('startedAt desc')
+          .limit(LAST_RUNS),
+        SELECT.from(Brokers).columns('name', 'lastConnectionStatus').where({ active: true }).orderBy('name')
       ])
 
       const resultsPassed = recent.reduce((s, r) => s + (r.passedCount ?? 0), 0)
@@ -53,7 +48,7 @@ export default class HomeService extends cds.ApplicationService {
         folders,
         myTestCases,
         runsLast7Days: recent.length,
-        runningRuns: await count('aem.suite.TestRuns', { status: 'RUNNING' }),
+        runningRuns: await count(TestRuns, { status: 'RUNNING' }),
         resultsPassed,
         resultsFailed,
         passRate: finished ? Math.round((resultsPassed / finished) * 100) : null,

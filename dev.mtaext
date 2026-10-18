@@ -1,0 +1,15 @@
+# Extension descriptor for dev/test spaces: cf deploy mta_archives/aem-suite.mtar -e dev.mtaext (npm run deploy:dev)
+# Adds the OAuth callback of local AI clients (e.g. claude mcp add ... --callback-port 8765) to the XSUAA redirect URIs.
+# Lists are replaced, not merged: the approuter's route of mta.yaml is repeated here.
+_schema-version: 3.3.0
+ID: aem-suite.dev
+extends: aem-suite
+
+resources:
+  - name: aem-suite-auth
+    parameters:
+      config:
+        oauth2-configuration:
+          redirect-uris:
+            - ~{app-api/app-protocol}://~{app-api/app-uri}/**
+            - http://localhost:8765/**

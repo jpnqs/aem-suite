@@ -1,14 +1,16 @@
 import cds from '@sap/cds'
-import { buildPreview } from './lib/preview'
-import { BrokerCredential, cancelRun, RunOptions, startRun, toCredentials } from './lib/test-runner'
-import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/defaults'
-import { copyNodes } from './lib/copy-nodes'
-import { exportNodes, importNodes } from './lib/export-import'
-import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/node-validation'
-import { selectNodeDeep } from './lib/nodes'
-import { keyOf } from './lib/request'
-import type { TestCaseRecord } from './lib/test-case-spec'
-import { moveBefore } from './lib/tree'
+import { TestCases as TestCaseRows, TestCaseStats } from '#cds-models/aem/suite'
+import { buildPreview } from './lib/runs/preview'
+import { BrokerCredential, cancelRun, RunOptions, startRun, toCredentials } from './lib/runs/test-runner'
+import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/core/defaults'
+import { copyNodes } from './lib/testcases/copy-nodes'
+import { exportNodes, importNodes } from './lib/testcases/export-import'
+import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/testcases/node-validation'
+import { selectNodeDeep } from './lib/testcases/nodes'
+import { columnLength } from './lib/core/model'
+import { idOf, keyOf } from './lib/core/request'
+import type { TestCaseRecord } from './lib/runs/test-case-spec'
+import { moveBefore } from './lib/testcases/tree'
 
 export default class TestService extends cds.ApplicationService {
   async init() {
@@ -32,10 +34,10 @@ export default class TestService extends cds.ApplicationService {
         .columns('name', 'topic', 'kind')
         .where({ ID: d.ID ?? keyOf(req).ID })) as { name?: string | null; topic?: string | null; kind?: string } | undefined
       if (draft?.kind === 'FOLDER') return
-      if (!draft?.name || draft.name === draft.topic) d.name = (d.topic ?? '').slice(0, 200)
+      if (!draft?.name || draft.name === draft.topic) d.name = (d.topic ?? '').slice(0, columnLength('TestCases', 'name'))
     })
 
-    // the rules live in lib/node-validation.ts - the AI agent service, the import and the live view apply the same ones:
+    // the rules live in lib/testcases/node-validation.ts - the AI agent service, the import and the live view apply the same ones:
     // parent must be a folder and must not be the node itself or below it; new nodes go to the end
     this.before(['CREATE', 'UPDATE'], TestCases, async (req) => {
       const d = req.data as NodeData
@@ -45,15 +47,21 @@ export default class TestService extends cds.ApplicationService {
       validateNode(d, req.event, reject)
     })
 
+    // the latest outcome of a test case is an association (not part of the draft): remove the stats of deleted nodes
+    // (a folder deletes everything below it)
+    this.after('DELETE', TestCases, async () => {
+      await DELETE.from(TestCaseStats).where({ testCase_ID: { 'not in': SELECT('ID').from(TestCaseRows) } })
+    })
+
     // drag & drop: place the node before NextSibling (null = at the end)
     this.on('moveBefore', TestCases, async (req) => {
       const nextId = (req.data as { NextSibling?: { ID?: string } | null }).NextSibling?.ID ?? null
-      await moveBefore(keyOf(req).ID, nextId)
+      await moveBefore(idOf(req), nextId)
     })
 
     this.on('runTest', TestCases, async (req) => {
       const { brokerIds, credentials, options } = req.data as { brokerIds: string[]; credentials?: BrokerCredential[]; options?: RunOptions }
-      return runFromUi(req, [keyOf(req).ID], brokerIds, credentials, options)
+      return runFromUi(req, [idOf(req)], brokerIds, credentials, options)
     })
 
     this.on('currentUser', (req) => req.user.id)
@@ -76,16 +84,16 @@ export default class TestService extends cds.ApplicationService {
 
     // preview works on saved test cases and on drafts (lean draft routes draft calls to TestCases.drafts)
     this.on('preview', [TestCases, TestCases.drafts!], async (req) => {
-      const { ID, IsActiveEntity } = keyOf(req)
+      const { IsActiveEntity } = keyOf(req)
       const { brokerId } = req.data as { brokerId?: string }
-      const tc = await selectNodeDeep(ID, IsActiveEntity === false ? TestCases.drafts! : TestCases)
-      if (!tc) return req.error(404, 'Test case not found')
+      const tc = await selectNodeDeep(idOf(req), IsActiveEntity === false ? TestCases.drafts! : TestCases)
+      if (!tc) return req.reject(404, 'Test case not found')
       return buildPreview(tc, brokerId)
     })
 
     // copy of a test case or a folder (with everything below it), placed right after the original
     this.on('duplicate', TestCases, async (req) => {
-      const [copy] = await copyNodes([keyOf(req).ID])
+      const [copy] = await copyNodes([idOf(req)])
       return SELECT.one.from(TestCases, copy.ID)
     })
 
@@ -103,7 +111,7 @@ export default class TestService extends cds.ApplicationService {
 }
 
 async function runFromUi(req: cds.Request, testCaseIds: string[], brokerIds: string[], credentials?: BrokerCredential[], options?: RunOptions) {
-  const runId = await startRun(req, testCaseIds, brokerIds, toCredentials(credentials), options)
+  const run = await startRun(req, testCaseIds, brokerIds, toCredentials(credentials), options)
   req.info(200, 'Test run started - see "Test Runs" for results')
-  return { runId }
+  return run
 }

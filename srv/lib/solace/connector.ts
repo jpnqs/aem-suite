@@ -1,4 +1,4 @@
-import type { BrokerConnection } from '../credentials/resolve'
+import type { BrokerConnection } from '../broker/resolve'
 import { Publisher, SolaceSession } from './session'
 
 /** Opens a publishing connection. Replaceable in tests (no broker needed). */

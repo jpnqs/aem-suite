@@ -1,8 +1,16 @@
+import { defineConfig } from 'eslint/config'
 import cds from '@sap/cds/eslint.config.mjs'
 import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
-export default tseslint.config(
+// A committed .only silently skips the rest of a suite (Jest has no forbidOnly, Playwright only on CI)
+const noFocusedTests = ['error',
+  { selector: "MemberExpression[property.name='only'][object.name=/^(describe|it|test)$/]", message: 'Remove .only before committing.' },
+  { selector: "MemberExpression[property.name='only'][object.property.name='describe']", message: 'Remove .only before committing.' },
+  { selector: 'CallExpression[callee.name=/^(fdescribe|fit)$/]', message: 'Remove the focused test before committing.' }
+]
+
+export default defineConfig(
   // build output, generated code and the per-app copies of app/_shared (linted at the source)
   { ignores: ['**/dist/**', 'gen/**', '@cds-models/**', 'resources/**', 'test-results/**', 'playwright-report/**', 'app/*/webapp/shared/**'] },
 
@@ -25,9 +33,18 @@ export default tseslint.config(
     files: ['app/*/webapp/**/*.{js,ts}', 'app/_shared/**/*.js'],
     languageOptions: { globals: { ...globals.browser, sap: 'readonly' } }
   },
+  // Jest provides describe/it/expect as globals; Playwright specs import them from @playwright/test
   {
-    files: ['test/**/*.ts', 'e2e/**/*.ts'],
+    files: ['test/**/*.ts'],
     languageOptions: { globals: { ...globals.jest } }
+  },
+  {
+    files: ['e2e/**/*.ts', 'scripts/screenshots/**/*.ts'],
+    languageOptions: { globals: { ...globals.node } }
+  },
+  {
+    files: ['test/**/*.ts', 'e2e/**/*.ts', 'scripts/screenshots/**/*.ts'],
+    rules: { 'no-restricted-syntax': noFocusedTests }
   },
   {
     files: ['scripts/**/*.js', '*.config.{js,ts,mjs}', 'test/**/*.js'],
