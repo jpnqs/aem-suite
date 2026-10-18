@@ -246,6 +246,7 @@ A JSON editor with:
 - **Valid JSON / Invalid JSON** indicator – placeholders like `{{qty}}` are allowed, also outside strings (`"qty": {{qty}}`).
 - **Format** – pretty-prints the JSON (placeholders are kept).
 - **(?)** – list of all template expressions; click one to copy it.
+- **Suggestions** – type `{{` and a list opens with everything the payload can use: the variables of this test case, its folders, the brokers and the global variables (with where each value comes from – point at an entry to see the value and all places it is defined), temporary variables of this payload (`as name`), the built-ins, the number ranges (with their next number) and the faker.js expressions (with an example). Keep typing to narrow the list – `{{faker.person.` shows the person methods – and press **Enter** or click an entry to insert it with the closing `}}`.
 
 New test cases start with a small sample payload.
 

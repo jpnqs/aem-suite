@@ -85,7 +85,7 @@ srv/
     template/                 template engine, faker data, number ranges
     testcases/                tree, node reads/writes and validation, copy, export/import, fields, property types
     config/                   rules of number ranges and brokers, export/import of brokers, global variables, number ranges
-    runs/                     test runner, test case -> publish spec, preview
+    runs/                     test runner, test case -> publish spec, preview, template hints for the payload editor
     help-content.ts, mcp-oauth.ts   Help app content, MCP OAuth discovery
   types/solclientjs.d.ts      typings for solclientjs (the package ships none)
 test/
@@ -161,6 +161,7 @@ The rules of saving a number range or a broker live in `srv/lib/config/checks.ts
 | `TestCases` (draft, **hierarchy**) | Folder/test case tree. Computed columns `LimitedDescendantCount`, `DistanceFromRoot`, `DrillState`, `LimitedRank` and `@Aggregation.RecursiveHierarchy #TestTree` / `@Hierarchy.RecursiveHierarchy #TestTree` enable CAP hierarchy queries for the Fiori tree table. `kindText` is a display text for `kind`. |
 | `TestCases.runTest(brokerIds, credentials, options)` | Runs one node (a folder runs its subtree). `options`: the advanced settings (section 7.6). |
 | `TestCases.preview(brokerId)` | Resolves topic, payload, correlation ID and properties without sending. Works on drafts. |
+| `TestCases.templateHints()` | What the templates of the test case can use, for the suggestions of the payload editor (`app/testcases/webapp/ext/TemplateCompleter.ts`): one entry per variable name with the winning value, its source and all definitions in lookup order (test case > broker > folder, inner first > global; a broker variable wins for its broker only, so a name several brokers define "depends on the broker"), the number ranges with their next number, and the faker.js expressions with an example (`fakerMethods()`: the methods of the allowed modules, deprecated ones left out, computed once). Built-ins are known to the UI. Works on drafts: their own variables are the ones being edited (`srv/lib/runs/template-hints.ts`). |
 | `TestCases.duplicate()` | Copies a test case or a folder with everything below it (`srv/lib/testcases/copy-nodes.ts`); the copy is named "… (Copy)" and placed right after the original. |
 | `exportNodes(ids)` | Returns `{ filename, content, folders, testCases }`: the JSON file for the given nodes (folders with everything below them; without ids the whole tree). The browser saves `content` as a file. |
 | `importNodes(content, parentId, dryRun)` | Creates the nodes of an export file below `parentId` (empty = top level) as **new** nodes; with `dryRun` it only checks and counts. All or nothing, see "Export and import file" below. The service accepts request bodies up to 5 MB (`@cds.server.body_parser.limit`). |
