@@ -95,24 +95,47 @@ async function peek(name: string, count: number): Promise<string[]> {
 }
 
 /**
- * Takes the numbers with a compare-and-set update of `current` in a transaction of its own (committed at once,
- * independent of the run), so parallel runs never get the same number.
+ * Takes the numbers with a compare-and-set update of `current`, so parallel runs never get the same number.
+ * ownTx: in a transaction of its own (committed at once, independent of the run); otherwise in the caller's.
  */
-async function consume(name: string, count: number): Promise<string[]> {
+async function consume(name: string, count: number, ownTx = true): Promise<string[]> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const done = await cds.tx({}, async () => {
-      const r = await load(name)
-      const { values, last } = numbersFrom(r, count)
-      const where = r.current === null || r.current === undefined ? { ID: r.ID, current: null } : { ID: r.ID, current: r.current }
-      // by name: cds-typer types Integer64 as number, `current` is written as text (no precision lost)
-      const changed = await UPDATE('aem.suite.NumberRanges')
-        .set({ current: String(last), lastUsedAt: new Date().toISOString() })
-        .where(where)
-      return changed ? values : undefined
-    })
+    const done = ownTx ? await cds.tx({}, () => takeOnce(name, count)) : await takeOnce(name, count)
     if (done) return done
   }
   throw new TemplateError(`Number range "${name}" is busy - try again`)
+}
+
+/** One compare-and-set attempt; undefined when someone else moved the range meanwhile. */
+async function takeOnce(name: string, count: number): Promise<string[] | undefined> {
+  const r = await load(name)
+  const { values, last } = numbersFrom(r, count)
+  const where = r.current === null || r.current === undefined ? { ID: r.ID, current: null } : { ID: r.ID, current: r.current }
+  // by name: cds-typer types Integer64 as number, `current` is written as text (no precision lost)
+  const changed = await UPDATE('aem.suite.NumberRanges')
+    .set({ current: String(last), lastUsedAt: new Date().toISOString() })
+    .where(where)
+  return changed ? values : undefined
+}
+
+/**
+ * Issues the next number of the range by name, as a run does ("Count Up" in the Number Ranges app). Runs in the
+ * caller's transaction: the action request commits it.
+ */
+export async function issueNext(name: string): Promise<string> {
+  return (await consume(name, 1, false))[0]
+}
+
+/**
+ * `current` after giving the last issued number back ("Count Down"): the next number issued is that one again.
+ * null = nothing issued any more; undefined = nothing was issued, so there is nothing to give back.
+ */
+export function currentBeforeLast(r: NumberRange): string | null | undefined {
+  const current = big(r.current)
+  const start = big(r.start) ?? 1n
+  if (current === null || current < start) return undefined
+  const previous = current - stepOf(r)
+  return previous < start ? null : String(previous)
 }
 
 /** Sets the range so that `next` is the next number issued (default: the start of the range). */

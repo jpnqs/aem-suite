@@ -66,6 +66,14 @@ service AdminService {
        */
       @Core.OperationAvailable: in.IsActiveEntity
       action reset(nextNumber : Integer64);
+
+      /** Issues the next number, as a run does - to try the range out. */
+      @Core.OperationAvailable: in.IsActiveEntity
+      action countUp();
+
+      /** Gives the last issued number back: the next number issued is that one again. */
+      @Core.OperationAvailable: in.IsActiveEntity
+      action countDown();
     };
 
   type ConnectionResult {

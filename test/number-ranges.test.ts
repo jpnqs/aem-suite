@@ -151,6 +151,40 @@ describe('number ranges (service and runs)', () => {
     expect(await current(orders.ID)).toMatchObject({ lastNumber: 'SO-000100' })
   })
 
+  it('count up issues the next number like a run, count down gives the last one back', async () => {
+    const action = (name: string, id = orders.ID) => POST(`${rangeUrl(id)}/AdminService.${name}`, {}, admin)
+    // nothing issued yet: nothing to give back
+    let res = await action('countDown')
+    expect(res.status).toBe(400)
+    expect(res.data.error.message).toBe('No number of this range has been issued yet')
+
+    res = await action('countUp')
+    expect(res.status).toBeLessThan(300)
+    await action('countUp')
+    expect(await current(orders.ID)).toMatchObject({ lastNumber: 'SO-000101', nextNumber: 'SO-000102' })
+    expect((await current(orders.ID)).lastUsedAt).toBeTruthy()
+
+    res = await action('countDown')
+    expect(res.status).toBeLessThan(300)
+    expect(await current(orders.ID)).toMatchObject({ lastNumber: 'SO-000100', nextNumber: 'SO-000101' })
+    // the next run gets the number given back
+    await run(testCase.ID)
+    expect(published.map((p) => p.spec.topic)).toEqual(['o/SO-000101'])
+
+    // back to the start: nothing issued any more
+    await action('countDown')
+    await action('countDown')
+    expect(await current(orders.ID)).toMatchObject({ lastNumber: '', nextNumber: 'SO-000100' })
+    expect((await action('countDown')).status).toBe(400)
+
+    const small = await create({ name: 'TINY', length: 1, start: 9 })
+    expect((await action('countUp', small.ID)).status).toBeLessThan(300)
+    res = await action('countUp', small.ID)
+    expect(res.status).toBe(400)
+    expect(res.data.error.message).toMatch(/exhausted/)
+    expect((await action('countUp', '00000000-0000-4000-8000-000000000000')).status).toBe(404)
+  })
+
   it('reset: an unknown range is 404, a negative number 400', async () => {
     const unknown = await POST(`${rangeUrl('00000000-0000-4000-8000-000000000000')}/AdminService.reset`, { nextNumber: 1 }, admin)
     expect(unknown.status).toBe(404)

@@ -27,15 +27,37 @@ annotate service.NumberRanges with @(
     {Value: lastUsedAt},
     {
       $Type : 'UI.DataFieldForAction',
+      Action: 'AdminService.countUp',
+      Label : '{i18n>CountUp}'
+    },
+    {
+      $Type : 'UI.DataFieldForAction',
+      Action: 'AdminService.countDown',
+      Label : '{i18n>CountDown}'
+    },
+    {
+      $Type : 'UI.DataFieldForAction',
       Action: 'AdminService.reset',
       Label : '{i18n>Reset}'
     }
   ],
-  UI.Identification  : [{
-    $Type : 'UI.DataFieldForAction',
-    Action: 'AdminService.reset',
-    Label : '{i18n>Reset}'
-  }],
+  UI.Identification  : [
+    {
+      $Type : 'UI.DataFieldForAction',
+      Action: 'AdminService.countUp',
+      Label : '{i18n>CountUp}'
+    },
+    {
+      $Type : 'UI.DataFieldForAction',
+      Action: 'AdminService.countDown',
+      Label : '{i18n>CountDown}'
+    },
+    {
+      $Type : 'UI.DataFieldForAction',
+      Action: 'AdminService.reset',
+      Label : '{i18n>Reset}'
+    }
+  ],
   UI.FieldGroup #Status : {Data: [
     {Value: nextNumber},
     {Value: lastNumber},
@@ -92,4 +114,15 @@ annotate service.NumberRanges actions {
     'in/nextNumber'
   ]}
   (nextNumber @Common.Label: '{i18n>NextNumberEmptyStartOfTheRange}');
+  countUp @Common.SideEffects: {TargetProperties: [
+    'in/current',
+    'in/lastNumber',
+    'in/nextNumber',
+    'in/lastUsedAt'
+  ]};
+  countDown @Common.SideEffects: {TargetProperties: [
+    'in/current',
+    'in/lastNumber',
+    'in/nextNumber'
+  ]};
 };

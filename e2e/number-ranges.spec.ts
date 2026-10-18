@@ -28,6 +28,30 @@ test.describe('Number Ranges', () => {
     for (const r of saved.value) track(rangeUrl(r.ID))
   })
 
+  test('count up and count down move the range and the page shows it at once', async ({ page }) => {
+    const name = uniqueName('E2E_COUNT')
+    const range = await (await page.request.post('/odata/v4/admin/NumberRanges', { data: { name, prefix: 'CU-', length: 4, start: 7 } })).json()
+    expect((await page.request.post(`/odata/v4/admin/NumberRanges(ID=${range.ID},IsActiveEntity=false)/AdminService.draftActivate`, { data: {} })).ok()).toBe(true)
+    track(rangeUrl(range.ID))
+
+    await openApp(page, apps.numberRanges)
+    await expectAppOpen(page, apps.numberRanges)
+    await page.getByRole('link', { name }).or(page.getByText(name, { exact: true })).first().click()
+    const visible = (text: string) => expect(page.getByText(text, { exact: true }).locator('visible=true').first()).toBeVisible()
+    await visible('CU-0007')
+
+    await page.getByRole('button', { name: 'Count Up' }).click()
+    await page.getByRole('button', { name: 'Count Up' }).click()
+    // side effects: next and last number refresh without reloading the page
+    await visible('CU-0009')
+    await visible('CU-0008')
+
+    await page.getByRole('button', { name: 'Count Down' }).click()
+    await visible('CU-0007')
+    const { current } = await (await page.request.get(rangeUrl(range.ID))).json()
+    expect(Number(current)).toBe(7)
+  })
+
   test('a test case preview shows the next number without using it up', async ({ request }) => {
     // its own range, so the test does not depend on the one the other test creates (tests run in parallel)
     const name = uniqueName('E2E_PREVIEW')

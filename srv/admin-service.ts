@@ -8,7 +8,8 @@ import { currentJwt, needsPassword } from './lib/broker/resolve'
 import { validateVariables, VAR_NAME, VAR_NAME_RULE } from './lib/testcases/node-validation'
 import { idOf, keyOf, keyValue } from './lib/core/request'
 import { nameTaken } from './lib/core/unique-name'
-import { currentForNext, formatNumber, MAX_LENGTH, nextExample, RANGE_NAME } from './lib/template/number-ranges'
+import { currentBeforeLast, currentForNext, formatNumber, issueNext, MAX_LENGTH, nextExample, RANGE_NAME } from './lib/template/number-ranges'
+import { TemplateError } from './lib/template/resolve'
 import { errMsg } from './lib/core/errors'
 
 /** Connection check on save is capped so saving never blocks long. */
@@ -63,6 +64,31 @@ export default class AdminService extends cds.ApplicationService {
       // by name: cds-typer types Integer64 as number, `current` is written as text (no precision lost)
       await UPDATE('aem.suite.NumberRanges').set({ current }).where({ ID })
       req.info(200, 'Number range reset')
+    })
+
+    // try a range out without a run: issue the next number, or give the last one back (success = a toast, no dialog)
+    this.on('countUp', NumberRanges, async (req) => {
+      const range = (await SELECT.one.from(NumberRangeRows).columns('name').where({ ID: idOf(req) })) as NumberRangeRow | undefined
+      if (!range) return req.reject(404, 'Number range not found')
+      try {
+        req.notify(200, `Number ${await issueNext(range.name!)} issued`)
+      } catch (e) {
+        // exhausted or busy
+        if (e instanceof TemplateError) return req.reject(400, e.message)
+        throw e
+      }
+    })
+
+    this.on('countDown', NumberRanges, async (req) => {
+      const ID = idOf(req)
+      const range = (await SELECT.one.from(NumberRangeRows).where({ ID })) as NumberRangeRow | undefined
+      if (!range) return req.reject(404, 'Number range not found')
+      const current = currentBeforeLast(range)
+      if (current === undefined) return req.reject(400, 'No number of this range has been issued yet')
+      // compare-and-set like a run: a number a run took meanwhile is not given back by mistake
+      const changed = await UPDATE('aem.suite.NumberRanges').set({ current }).where({ ID, current: range.current })
+      if (!changed) return req.reject(409, 'A run used the number range meanwhile - try again')
+      req.notify(200, `Number ${formatNumber(range, BigInt(range.current!))} given back, it is the next number again`)
     })
 
     // complete URLs while editing, so the user sees the result right away

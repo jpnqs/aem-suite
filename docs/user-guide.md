@@ -378,7 +378,9 @@ Real SAP messages carry identifiers such as sales order `SO-000042` or a deliver
 | **First Number**, **Step** | where the range starts and by how much it grows (e.g. start `4500000000`, step `1`) |
 | **Last Allowed Number** | optional end of the range. When it is reached (or the number no longer fits into the digits), runs stop with an error |
 
-The page shows what the **next number** will look like, the **last number issued** and when a run used the range last. **Reset** sets the next number (empty = back to the first number) – for example to start a new test series from the beginning.
+The page shows what the **next number** will look like, the **last number issued** and when a run used the range last. **Reset** sets the next number (empty = back to the first number) – for example to start a new test series from the beginning. **Count Up** issues the next number just like a run would, **Count Down** gives the last issued number back so the next run gets it again – handy to try out a new range without sending a message.
+
+The counter is stored in the database: every message of a run that uses the range takes its own number, also when the broker later rejects the message, and a number is never handed out twice. A run that cannot connect to a broker sends nothing and takes no numbers. The Preview shows the next number without using it up.
 
 Use the range in topic, payload, correlation ID or user properties:
 
