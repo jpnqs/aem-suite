@@ -1,5 +1,8 @@
 # AEM Test Suite
 
+[![CI](https://github.com/jpnqs/aem-suite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jpnqs/aem-suite/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjpnqs%2Faem-suite%2Fbadges%2Fcoverage.json)](https://github.com/jpnqs/aem-suite/actions/workflows/ci.yml)
+
 **Test your SAP Advanced Event Mesh (Solace) brokers without writing code.**
 Save messages as test cases, send them to several brokers at once, see immediately which broker accepted them, and watch topics and queues live. Built on SAP CAP and SAP Fiori, ready for SAP BTP (Cloud Foundry).
 

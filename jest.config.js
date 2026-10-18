@@ -7,5 +7,8 @@ module.exports = {
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json', diagnostics: { ignoreCodes: [151002] } }]
   },
-  testTimeout: 30000
+  testTimeout: 30000,
+  // npm run test:coverage (CI): coverage/coverage-summary.json feeds the README badge
+  collectCoverageFrom: ['<rootDir>/srv/**/*.ts', '!<rootDir>/srv/**/*.d.ts'],
+  coverageReporters: ['json-summary', 'text-summary', 'lcov']
 }

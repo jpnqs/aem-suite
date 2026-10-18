@@ -11,6 +11,8 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write # push of the coverage badge to the branch "badges"
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +24,29 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run verify
+      # npm run verify, with coverage for the README badge
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:coverage
+
+      # Line coverage as a shields.io endpoint JSON on the single-commit branch "badges"
+      # (README: img.shields.io/endpoint?url=.../badges/coverage.json). Only for main.
+      - name: Publish the coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir "$RUNNER_TEMP/badges"
+          node -e "
+            const pct = require('./coverage/coverage-summary.json').total.lines.pct
+            const color = pct >= 90 ? 'brightgreen' : pct >= 80 ? 'green' : pct >= 70 ? 'yellowgreen' : pct >= 60 ? 'yellow' : 'red'
+            console.log(JSON.stringify({ schemaVersion: 1, label: 'coverage', message: pct.toFixed(1) + '%', color }))
+          " > "$RUNNER_TEMP/badges/coverage.json"
+          cd "$RUNNER_TEMP/badges"
+          git init -q -b badges
+          git add coverage.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "coverage badge for $GITHUB_SHA"
+          git push -qf "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
 
       - name: Install the Playwright browser
         run: npx playwright install --with-deps chromium
