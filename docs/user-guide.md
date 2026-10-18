@@ -80,6 +80,7 @@ Open **Brokers** → **Create**.
 | **Username** (direct) | optional (the AEM standard is `solace-cloud-client`). If it is empty, the username is asked for together with the password whenever you run tests, test the connection or subscribe. |
 | **Destination** (destination mode) | choose from the list (shows URL and VPN); how to create one: [Brokers from a BTP destination](#brokers-from-a-btp-destination) |
 | **Active** | inactive brokers are hidden in run and subscribe dialogs |
+| **Available for AI Agents** (destination mode) | on by default: an AI assistant may preview and run tests on this broker. Switch it off for brokers the assistant must not use, e.g. production. Direct brokers are never available to it |
 | Advanced | client name prefix, connect timeout |
 
 > **Passwords are never saved.** For direct brokers you enter the password when you run tests, test the connection or start a subscription. It is used only for that action.
@@ -491,7 +492,7 @@ The suite can be connected to an AI assistant (for example Claude Code or anothe
 
 | | |
 |---|---|
-| Look | read test cases, folders, variables of folders, brokers (without credentials), runs and results |
+| Look | read test cases, folders, variables of folders, brokers (name and description only), runs and results |
 | Plan | create and change folders and test cases, move and copy them – with the same checks as in the apps (e.g. the payload must be valid JSON) |
 | Check | **preview** a message exactly as it would be sent to a broker |
 | Run | run test cases or whole folders, wait for the result, list what failed and why |
@@ -499,8 +500,11 @@ The suite can be connected to an AI assistant (for example Claude Code or anothe
 **What it cannot do (on purpose)**
 
 - **No deleting**, and no access to global variables, broker variables or saved messages.
-- **No runs on direct brokers.** For those you enter a password for every run, and a password typed into an AI chat would be stored in logs. The assistant can run tests on brokers that use a **BTP destination** (*Credentials: BTP Destination*). For direct brokers it tells you to run the tests in the app.
-- At most 100 results (test cases × brokers) per run and 2 runs at a time per user.
+- **No passwords, ever – so no runs on direct brokers.** For those you enter a password for every run, and a password typed into an AI chat would be stored in logs. The assistant sees all brokers, but can only preview and run tests on active brokers that use a **BTP destination** (*Credentials: BTP Destination*). For direct brokers it tells you to run the tests in the app; never give it a password.
+- **No connection data.** The assistant sees brokers by name and description only. URLs, hosts, message VPNs, users and destination names are shown to it as `<hidden>`, also inside error messages.
+- **Only brokers you allow.** Destination brokers with *Available for AI Agents* switched off (Brokers app) cannot be used by it.
+- **No personal data.** It does not see who created a test case or started a run. When you want to see more, it gives you a **link**: it opens the test case or the run in the app, in your browser, where you are logged in.
+- At most 100 results (test cases × brokers) per run, 2 runs at a time and 30 runs per hour per user.
 
 **How it works**
 
@@ -539,6 +543,8 @@ The assistant acts as **you**: it sees and may do exactly what your roles allow,
 ```sh
 claude mcp add --transport http aem-suite http://localhost:4004/mcp/agent --header "Authorization: Basic dGVzdGVyOnRlc3Rlcg=="
 ```
+
+For **GitHub Copilot** in VS Code the repository contains `.vscode/mcp.json` with the same address and demo login. Start `npm run watch`, open the file and click **Start** above the server (or *MCP: List Servers*), then switch Copilot Chat to **Agent** mode – `aem-suite` appears under the tools.
 
 **Things you can ask**
 

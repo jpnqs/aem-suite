@@ -62,7 +62,10 @@ annotate service.Brokers with @(
     {Value: credentialMode},
     {Value: active}
   ]},
-  UI.FieldGroup #Destination   : {Data: [{Value: destinationName}]},
+  UI.FieldGroup #Destination   : {Data: [
+    {Value: destinationName},
+    {Value: agentAllowed}
+  ]},
   UI.FieldGroup #Direct        : {Data: [
     {Value: url},
     {Value: msgVpn},

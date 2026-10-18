@@ -24,8 +24,8 @@ export interface AemSuiteConfig {
     maxRunResults: number
     /** runs of one user that may be RUNNING at the same time */
     maxActiveRuns: number
-    /** development only: accept broker passwords in runTests (they would pass through the AI conversation) */
-    allowDirectCredentials: boolean
+    /** runs one user may start through an agent within an hour (a runaway agent loop stops here) */
+    maxRunsPerHour: number
   }
   runs: {
     /** upper limit of the repetitions in the Run dialog */
@@ -44,6 +44,8 @@ export interface AemSuiteConfig {
     publicUrl?: string
     /** authorization server advertised to MCP clients; default: XSUAA credentials.url */
     authorizationServer?: string
+    /** launchpad address for the links an agent hands out (e.g. a Work Zone site); default: the app's own launchpad */
+    launchpadUrl?: string
   }
 }
 
@@ -51,7 +53,7 @@ export const DEFAULTS: AemSuiteConfig = {
   autoTestConnection: true,
   subscriptions: { maxPerUser: 5, idleTimeoutMs: 5 * 60 * 1000, maxMessagesPerSecond: 100, maxPayloadBytes: 512 * 1024 },
   help: { file: 'docs/user-guide.md' },
-  agent: { maxRunResults: 100, maxActiveRuns: 2, allowDirectCredentials: false },
+  agent: { maxRunResults: 100, maxActiveRuns: 2, maxRunsPerHour: 30 },
   runs: { maxRepetitions: 1000, maxDelayMs: 60_000, maxResults: 5000 },
   faker: { locale: 'en' },
   mcp: {}

@@ -124,6 +124,8 @@ entity Brokers : cuid, managed {
   clientNamePrefix       : String(60) default 'aem-suite';
   connectTimeoutMs       : Integer default 10000 @assert.range: [1000, 120000];
   active                 : Boolean default true;
+  /** AI agents (MCP) may preview and run tests here - only effective for DESTINATION brokers (no password via AI) */
+  agentAllowed           : Boolean default true;
   lastConnectionStatus   : ConnectionStatus;
   lastConnectionAt       : Timestamp;
   lastConnectionMessage  : String(1000);
@@ -323,6 +325,8 @@ annotate Brokers with {
   clientNamePrefix      @title: '{i18n>ClientNamePrefix}';
   connectTimeoutMs      @title: '{i18n>ConnectTimeoutMs}';
   active                @title: '{i18n>Active}';
+  agentAllowed          @title: '{i18n>AvailableForAIAgents}'
+                        @Common.QuickInfo: '{i18n>InfoAIAssistantsMCPMayPreviewAndRunTests}';
   lastConnectionStatus  @title: '{i18n>Status}';
   lastConnectionAt      @title: '{i18n>TestedAt}';
   lastConnectionMessage @title: '{i18n>Message}';

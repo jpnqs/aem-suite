@@ -9,13 +9,22 @@ import { createNode, NodeRow, selectNodeDeep } from './lib/testcases/nodes'
 import { TEST_FIELDS as FIELDS } from './lib/testcases/test-fields'
 import type { PropertyType } from './lib/testcases/property-types'
 import { buildPreview } from './lib/runs/preview'
-import { BrokerCredential, runOutcome, startRun, toCredentials } from './lib/runs/test-runner'
+import { runOutcome, startRun, toCredentials } from './lib/runs/test-runner'
+import { brokerRedactor } from './lib/broker/redact'
+import { appLinks } from './lib/core/public-url'
 import { loadTree } from './lib/testcases/tree'
 
 const LOG = cds.log('aem-agent')
 const MAX_WAIT_SECONDS = 30
 const MAX_FAILURES = 25
 const POLL_INTERVAL_MS = 500
+const HOUR_MS = 60 * 60 * 1000
+
+/**
+ * Start times of the agent runs of the last hour per user (cds.aemSuite.agent.maxRunsPerHour). In memory like the
+ * live subscriptions: the backend runs as one instance (mta.yaml); a restart forgets the count.
+ */
+const recentRuns = new Map<string, number[]>()
 
 interface PropertyInput {
   name: string
@@ -35,6 +44,43 @@ export default class TestAgentService extends cds.ApplicationService {
     // ---------------------------------------------------------------- audit: who asked for what (no payloads, no secrets)
     this.before(['createFolder', 'createTestCase', 'updateTestCase', 'updateFolder', 'moveNode', 'copyNodes', 'importNodes', 'runTests'], (req) => {
       LOG.info('audit', { user: req.user.id, action: req.event, ...auditData(req.data as Record<string, unknown>) })
+    })
+
+    // ---------------------------------------------------------------- no connection data in texts an agent reads
+    // error messages can name the endpoint, VPN, user or destination of a broker: hidden in the answer, and the
+    // columns cannot be filtered on (a filter would tell whether a guess is right)
+    const texts: [string, string][] = [
+      ['RunResults', 'errorMessage'],
+      ['TestNodeLastResults', 'message']
+    ]
+    for (const [entity, column] of texts) {
+      this.before('READ', entity, (req) => {
+        const { where, having } = (req.query as { SELECT?: { where?: unknown; having?: unknown } }).SELECT ?? {}
+        if (JSON.stringify([where ?? [], having ?? []]).includes(`"${column}"`)) return req.reject(400, `${entity} cannot be filtered by ${column}`)
+      })
+      this.after('READ', entity, async (rows) => {
+        const list = (Array.isArray(rows) ? rows : [rows]) as Record<string, string | null | undefined>[]
+        if (!list.some((r) => r?.[column])) return
+        const redact = await brokerRedactor()
+        for (const r of list) if (r?.[column]) r[column] = redact(r[column])
+      })
+    }
+
+    // ---------------------------------------------------------------- links into the apps instead of more data
+    for (const [entity, link] of [
+      ['TestNodes', appLinks.testCase],
+      ['TestRuns', appLinks.run]
+    ] as const) {
+      this.before('READ', entity, (req) => {
+        const columns = (req.query as { SELECT?: { columns?: { ref?: string[] }[] } }).SELECT?.columns
+        if (columns?.some((c) => c.ref?.[0] === 'appUrl') && !columns.some((c) => c.ref?.[0] === 'ID')) columns.push({ ref: ['ID'] })
+      })
+      this.after('READ', entity, (rows) => {
+        for (const r of (Array.isArray(rows) ? rows : [rows]) as { ID?: string; appUrl?: string | null }[]) if (r?.ID) r.appUrl = link(r.ID)
+      })
+    }
+    this.after(['createFolder', 'createTestCase', 'updateTestCase', 'updateFolder', 'moveNode', 'copyNodes'], (result) => {
+      for (const r of (Array.isArray(result) ? result : [result]) as { ID?: string; url?: string | null }[]) if (r?.ID) r.url = appLinks.testCase(r.ID)
     })
 
     // ---------------------------------------------------------------- plan: create and change
@@ -136,37 +182,31 @@ export default class TestAgentService extends cds.ApplicationService {
       const tc = await loadNode(testCaseId)
       if (!tc) return req.reject(404, 'Test case not found')
       if (tc.kind !== 'TEST') return req.reject(400, 'Folders have no message - preview a test case')
+      if (brokerId) await assertAgentBrokers(req, [brokerId])
       return buildPreview(tc, brokerId)
     })
 
     // ---------------------------------------------------------------- execute
     this.on('runTests', async (req) => {
-      const { testCaseIds, brokerIds, credentials } = req.data as {
-        testCaseIds: string[]
-        brokerIds: string[]
-        credentials?: BrokerCredential[]
-      }
+      const { testCaseIds, brokerIds } = req.data as { testCaseIds: string[]; brokerIds: string[] }
       const max = config().agent
-
-      // secrets stay out of AI conversations: only brokers whose credentials come from a BTP destination
-      const brokers = (await SELECT.from(Brokers)
-        .columns('ID', 'name', 'credentialMode')
-        .where({ ID: { in: [...new Set(brokerIds)] } })) as { ID: string; name: string; credentialMode: string }[]
-      const needCredentials = brokers.filter((b) => b.credentialMode !== 'DESTINATION').map((b) => b.name)
-      if (needCredentials.length && !max.allowDirectCredentials)
-        return req.reject(
-          403,
-          `Broker(s) ${needCredentials.join(', ')} need credentials that a person enters (password is never stored). ` +
-            'Agents can only run tests on brokers that use a BTP destination - run these tests in the UI, or use another broker.'
-        )
+      await assertAgentBrokers(req, brokerIds)
 
       // limits: parallel runs of this user here, the size of the run (and unknown test cases) in startRun
       const active = await SELECT.from(TestRuns).columns('ID').where({ createdBy: req.user.id, status: 'RUNNING' })
       if (active.length >= max.maxActiveRuns)
         return req.reject(429, `You already have ${active.length} runs in progress (limit ${max.maxActiveRuns}). Wait for one to finish (getRunSummary).`)
+      const now = Date.now()
+      const lastHour = (recentRuns.get(req.user.id) ?? []).filter((t) => t > now - HOUR_MS)
+      if (lastHour.length >= max.maxRunsPerHour) {
+        const minutes = Math.ceil((lastHour[0] + HOUR_MS - now) / 60000)
+        return req.reject(429, `You started ${lastHour.length} runs within the last hour (limit ${max.maxRunsPerHour}). Try again in ${minutes} min, or run the tests in the app.`)
+      }
 
-      const entered = max.allowDirectCredentials ? toCredentials(credentials) : toCredentials([])
-      return startRun(req, testCaseIds, brokerIds, entered, null, max.maxRunResults)
+      // never credentials: destination brokers log in with what the BTP destination holds
+      const run = await startRun(req, testCaseIds, brokerIds, toCredentials([]), null, max.maxRunResults)
+      recentRuns.set(req.user.id, [...lastHour, now])
+      return run
     })
 
     // ---------------------------------------------------------------- check the result
@@ -189,9 +229,11 @@ export default class TestAgentService extends cds.ApplicationService {
           .orderBy('brokerName', 'sequence')
           .limit(MAX_FAILURES)
       )) as { testCaseName: string; brokerName: string; status: string; resolvedTopic: string; errorMessage: string }[]
+      const redact = await brokerRedactor()
       const finished = run.status !== 'RUNNING'
       return {
         runId,
+        url: appLinks.run(runId),
         status: run.status,
         outcome: runOutcome(run),
         finished,
@@ -200,7 +242,7 @@ export default class TestAgentService extends cds.ApplicationService {
         failed: run.failedCount,
         skipped: run.skippedCount ?? 0,
         summary: run.summary,
-        failures: failures.map((f) => ({ testCase: f.testCaseName, broker: f.brokerName, status: f.status, topic: f.resolvedTopic, error: f.errorMessage }))
+        failures: failures.map((f) => ({ testCase: f.testCaseName, broker: f.brokerName, status: f.status, topic: f.resolvedTopic, error: redact(f.errorMessage) }))
       }
     })
 
@@ -209,6 +251,23 @@ export default class TestAgentService extends cds.ApplicationService {
 }
 
 // ------------------------------------------------------------------ helpers
+
+/**
+ * Agents preview and run only on active brokers with a BTP destination that are "Available for AI Agents": no
+ * password ever passes through an AI conversation (there is no parameter for one). Unknown IDs are left to the caller (startRun reports them).
+ */
+async function assertAgentBrokers(req: cds.Request, brokerIds: string[]): Promise<void> {
+  const brokers = (await SELECT.from(Brokers)
+    .columns('name', 'credentialMode', 'active', 'agentAllowed')
+    .where({ ID: { in: [...new Set(brokerIds)] } })) as { name: string; credentialMode: string; active: boolean | null; agentAllowed: boolean | null }[]
+  const refused = brokers.filter((b) => b.credentialMode !== 'DESTINATION' || b.active === false || b.agentAllowed === false).map((b) => b.name)
+  if (refused.length)
+    req.reject(
+      403,
+      `Broker(s) ${refused.join(', ')} cannot be used by AI agents (canRun = false): only active brokers with a BTP destination that an administrator made available to AI agents. ` +
+        'The others need a password that a person enters - ask the user to run these tests in the app.'
+    )
+}
 
 async function saveChanges(
   id: string,

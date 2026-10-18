@@ -1,6 +1,7 @@
 import cds from '@sap/cds'
 import type { Application, Request, Response, NextFunction } from 'express'
 import { config } from './core/config'
+import { publicBase } from './core/public-url'
 
 /**
  * OAuth discovery for the MCP endpoint (MCP authorization spec, RFC 9728 / RFC 8414), so AI clients
@@ -22,16 +23,6 @@ function authServerUrl(): string | undefined {
   const own = config().mcp.authorizationServer
   const auth = cds.env.requires?.auth as { credentials?: { url?: string } } | undefined
   return (own ?? auth?.credentials?.url)?.replace(/\/+$/, '')
-}
-
-/** The URL the client used: configured, or derived from the approuter's forwarded headers. */
-function publicBase(req: Request): string {
-  const configured = config().mcp.publicUrl
-  if (configured) return configured.replace(/\/+$/, '')
-  const first = (h: string | string[] | undefined) => String(Array.isArray(h) ? h[0] : (h ?? '')).split(',')[0].trim()
-  const proto = first(req.headers['x-forwarded-proto']) || req.protocol
-  const host = first(req.headers['x-forwarded-host']) || req.headers.host
-  return `${proto}://${host}`
 }
 
 function protectedResource(req: Request, res: Response) {

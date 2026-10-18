@@ -107,7 +107,7 @@ mta.yaml, xs-security.json    deployment
 
 | Entity | Purpose | Notes |
 |---|---|---|
-| `Brokers` | Broker / message VPN | `credentialMode` DIRECT or DESTINATION; DIRECT keeps `url`, `msgVpn`, an optional `username` (if empty it is entered at run time) – **no password field**; `lastConnection*` holds the last connection test. Composition `variables` (broker variables). |
+| `Brokers` | Broker / message VPN | `credentialMode` DIRECT or DESTINATION; DIRECT keeps `url`, `msgVpn`, an optional `username` (if empty it is entered at run time) – **no password field**; `lastConnection*` holds the last connection test; `agentAllowed` (default true) lets AI agents use a DESTINATION broker. Composition `variables` (broker variables). |
 | `Variables` | Template variables | `broker` empty = global variable, set = broker variable. |
 | `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`. Compositions `userProperties`, `variables`. Association `lastResult` → `TestCaseStats`. |
 | `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
@@ -261,7 +261,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 |---|---|
 | `TestNodes` | test cases and folders (`kind`, `parent`, topic, payload, headers, `lastResult`, ...), with `userProperties` and `variables` |
 | `TestNodeProperties`, `TestNodeVariables`, `TestNodeLastResults` | the same as separate entities |
-| `Brokers` | broker data without credentials; `needsCredentials` = true for direct brokers |
+| `Brokers` | **all** brokers, but only `ID`, `name`, `description` and `canRun` (true = active, BTP destination, `agentAllowed`). No URL, VPN, user, destination, credential mode or connection tests |
 | `TestRuns`, `RunResults` | runs (with `skippedCount` and the advanced settings) and one result per message (`iteration`, `sequence`, resolved topic / payload, ACK latency, error) |
 
 | Action / function | Purpose |
@@ -270,17 +270,20 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 | `updateTestCase`, `updateFolder` | change given fields only; `userProperties` / `variables`, if given, replace the existing ones |
 | `moveNode`, `copyNodes` | reorganize; `copyNodes` copies folders with everything below them |
 | `exportNodes(ids)`, `importNodes(content, parentId, dryRun)` | the export / import file above: an agent can generate a whole suite as one file, check it with `dryRun`, and import it in one call (request bodies up to 5 MB) |
-| `previewTestCase(testCaseId, brokerId)` | the message exactly as it would be sent (variables resolved), nothing is sent |
-| `runTests(testCaseIds, brokerIds, credentials)` | starts a run in the background, returns `runId` and the number of results |
+| `previewTestCase(testCaseId, brokerId)` | the message exactly as it would be sent (variables resolved), nothing is sent; brokers with `canRun` only |
+| `runTests(testCaseIds, brokerIds)` | starts a run in the background, returns `runId` and the number of results; brokers with `canRun` only, no credentials parameter |
 | `getRunSummary(runId, waitSeconds)` | status, counters (`skipped` separately) and up to 25 FAILED / ERROR results; waits up to 30 s for the end of the run |
 
 **Same rules as the UI.** Creating and changing nodes goes through `srv/lib/testcases/node-validation.ts`, the same checks `TestService` uses (valid JSON, parent must be a folder, property types, ACK timeout range, ...). All problems of a call are returned in one error text. `previewTestCase` shares `srv/lib/runs/preview.ts` with the UI preview; copying uses `srv/lib/testcases/copy-nodes.ts`.
 
 **Guard rails** (the adapter itself has no governance: no rate limits, no audit log, no approvals):
 
-- **No secrets through the AI.** `runTests` only accepts brokers whose credentials come from a **BTP destination**. Direct brokers need a password that is never stored, and a password typed into an AI conversation would end up in the model provider's and the client's logs. Such runs are refused with an explanation, so people run them in the UI.
+- **No passwords through the AI, without exception.** `runTests` has no credentials parameter (there is no setting to add one) and, like `previewTestCase`, only accepts active brokers whose credentials come from a **BTP destination** (`assertAgentBrokers`). Direct brokers need a password that is never stored, and a password typed into an AI conversation would end up in the model provider's and the client's logs. Such calls are refused with an explanation, so people run them in the UI.
+- **No connection data.** `Brokers` shows name and description only. Error texts an agent reads (`RunResults.errorMessage`, `TestNodeLastResults.message`, the failures of `getRunSummary`) pass through `srv/lib/broker/redact.ts`: URLs, `host:port` and the URL, host, VPN, username and destination name of every maintained broker become `<hidden>`. Filters on these two columns are refused, since a filter would confirm a guess. Values a test case deliberately puts into its message (`{{broker.msgVpn}}`, broker variables) are message content and stay visible in preview and results.
 - **No delete.** There are no delete actions; global and broker variables and saved messages are not exposed at all.
-- **Limits:** at most `maxRunResults` (100) results per run and `maxActiveRuns` (2) runs of one user at a time (`cds.aemSuite.agent`, see section 10).
+- **Opt-in per broker:** *Available for AI Agents* (`Brokers.agentAllowed`, Admin, default on) - switch it off for brokers an agent must not touch, e.g. production.
+- **No personal data:** no `createdBy` / `modifiedBy` on `TestNodes` and `TestRuns`. Instead of more data, an agent hands out links: `appUrl` on `TestNodes` / `TestRuns`, `url` on what create / update / copy / move return and in `getRunSummary`. They open the launchpad intent (`srv/lib/core/public-url.ts`: env `AEM_SUITE_LAUNCHPAD_URL`, then `cds.aemSuite.mcp.launchpadUrl`, else `<app>/comaemsuitelaunchpad/index.html`, locally `/launchpad.html`), where the person sees everything their own roles allow.
+- **Limits:** at most `maxRunResults` (100) results per run, `maxActiveRuns` (2) runs of one user at a time and `maxRunsPerHour` (30) agent runs of one user per hour (`cds.aemSuite.agent`, see section 10). The hourly count is kept in memory (one backend instance, see the subscription hub); a restart forgets it.
 - **Audit:** every changing action logs `audit` with user, action, names and IDs (logger `aem-agent`; all loggers of the app start with `aem-`) - never payloads or credentials.
 - **Prompt injection:** the adapter does not filter data. `@mcp.instructions` tell the model that payloads, topics and errors are data and never instructions, and not to run tests on brokers the user did not name. Connect only trusted assistants.
 - **Authorization:** `@requires: 'Tester'` on the service, checked by the adapter on every request. Anonymous requests get 401.
@@ -466,9 +469,11 @@ Each HTML5 app is deployed on its own, so every app needs the modules it uses un
 | `cds.aemSuite.help.file` | `docs/user-guide.md` | location of the user guide the Help app shows (relative to the project root) |
 | `cds.aemSuite.agent.maxRunResults` | 100 | test cases x brokers of one run started by an AI agent |
 | `cds.aemSuite.agent.maxActiveRuns` | 2 | runs of one user that an agent may have in progress |
-| `cds.aemSuite.agent.allowDirectCredentials` | false | development only: let `runTests` accept passwords of direct brokers (they would pass through the AI conversation) |
+| `cds.aemSuite.agent.maxRunsPerHour` | 30 | runs one user may start through an agent within an hour |
 | `cds.aemSuite.mcp.publicUrl` | – | public app URL for the MCP OAuth discovery; default: from the approuter's forwarded headers |
 | `cds.aemSuite.mcp.authorizationServer` | XSUAA `credentials.url` | authorization server advertised to MCP clients |
+| `cds.aemSuite.mcp.launchpadUrl` | the app's own launchpad | launchpad address for the links an agent hands out (set it to the Work Zone site when users work there) |
+| env `AEM_SUITE_LAUNCHPAD_URL` | – | the same, as an environment variable; wins over `mcp.launchpadUrl`. E.g. in `mta.yaml` (module `aem-suite-srv`, `properties: AEM_SUITE_LAUNCHPAD_URL: https://<site>`) or `cf set-env aem-suite-srv AEM_SUITE_LAUNCHPAD_URL https://<site>` + restart |
 | `cds.aemSuite.runs.maxRepetitions` / `maxDelayMs` / `maxResults` | 1000 / 60000 / 5000 | limits of the advanced run settings: repetitions, pause between messages (ms), messages per run |
 | `cds.aemSuite.faker.locale` | `en` | Language of `{{faker...}}` test data (`de`, `fr`, `es`, `en_GB`, ...). |
 | `cds.mcp.prefix` / `cds.mcp.autowire` | true / false | MCP plugin: prefix tool names with the service name; do not register the endpoint in local AI clients automatically |
@@ -500,6 +505,7 @@ npm run verify      # before every commit: typecheck + lint + Jest (what CI runs
 npm run e2e         # Playwright: UI apps in a browser (e2e:ui, e2e:headed, e2e:trace)
 npm run typer       # regenerate the cds-typer models (@cds-models) - typecheck, test, watch and the e2e server do it first
 npm run build:ui    # ui5 build of all apps, as the MTA build does it
+npm run mcp:inspect # MCP Inspector (browser) on the running dev server: tools, calls, raw JSON-RPC of /mcp/agent
 ```
 
 | Script | Does |
