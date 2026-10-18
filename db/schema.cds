@@ -307,6 +307,40 @@ entity NumberRanges : cuid, managed {
   lastUsedAt  : Timestamp;
 }
 
+@assert.range
+type CleanupStatus : String(10) enum {
+  DONE;
+  /** some categories were cleaned up, then an error stopped the cleanup */
+  PARTIAL;
+  FAILED;
+}
+
+/** Every cleanup of the Data Cleanup app: who deleted what, with which selection (audit trail). */
+entity CleanupLogs : cuid, managed {
+  /** e.g. "Test runs 120, Saved messages 14" */
+  summary      : String(500);
+  status       : CleanupStatus;
+  /** the CleanupService.CleanupRequest as JSON */
+  request      : LargeString;
+  /** JSON array of { category, count, cutoff } */
+  counts       : LargeString;
+  totalCount   : Integer default 0;
+  durationMs   : Integer;
+  /** the saved rule the cleanup was started from, if any (a name, so the log survives deleting the rule) */
+  ruleName     : String(100);
+  errorMessage : String(1000);
+}
+
+/** Saved selections of the Data Cleanup app, to repeat a cleanup with one click. */
+@assert.unique: {name: [name]}
+entity CleanupRules : cuid, managed {
+  name        : String(100) @mandatory;
+  description : String(500);
+  /** the CleanupService.CleanupRequest as JSON */
+  request     : LargeString @mandatory;
+  lastRunAt   : Timestamp;
+}
+
 // ---------------------------------------------------------------------------------------------- field titles
 // Titles and tooltips of the fields, for every app and service (CAP passes them on to the projections).
 // The apps (app/*/annotations.cds) only add their layout. Timestamps are worded "<what> At".
@@ -428,4 +462,23 @@ annotate NumberRanges with {
   step        @title: '{i18n>Step}'  @Common.QuickInfo: '{i18n>InfoIncrementBetweenTwoNumbers}';
   maximum     @title: '{i18n>LastAllowedNumber}'  @Common.QuickInfo: '{i18n>InfoEmptyUntilTheNumberNoLongerFitsIntoT}';
   lastUsedAt  @title: '{i18n>LastUsedAt}'  @Common.QuickInfo: '{i18n>InfoWhenARunTookANumberLast}';
+};
+
+annotate CleanupLogs with {
+  createdAt    @title: '{i18n>CleanedUpAt}';
+  createdBy    @title: '{i18n>CleanedUpBy}';
+  summary      @title: '{i18n>Summary}';
+  status       @title: '{i18n>Status}';
+  totalCount   @title: '{i18n>Deleted}';
+  durationMs   @title: '{i18n>DurationMs}';
+  ruleName     @title: '{i18n>CleanupRule}';
+  errorMessage @title: '{i18n>Error}';
+};
+
+annotate CleanupRules with {
+  name        @title: '{i18n>Name}';
+  description @title: '{i18n>Description}';
+  lastRunAt   @title: '{i18n>LastRunAt}';
+  modifiedAt  @title: '{i18n>ChangedAt}';
+  modifiedBy  @title: '{i18n>ChangedBy}';
 };
