@@ -10,9 +10,10 @@ import { checkBroker, checkNumberRange } from './checks'
  * a setup from one system to another or keep it in Git:
  *   { "format": "aem-suite.number-ranges", "version": 1, "exportedAt": "...", "numberRanges": [ { "name": "ORDERS", ... } ] }
  *
- * Entries are matched by name (ignoring case): a new name is created, an existing one is updated with the fields
- * of the file; nothing is deleted. What belongs to one system stays out of the file: IDs, authors, the counter of a
- * number range, the connection status of a broker. There are no passwords to export (they are never stored).
+ * Import only adds: every entry of the file becomes a new entry, existing ones are never changed. A name that is
+ * taken (ignoring case) gets a number - "ORDERS_2", "aem-dev (2)" - and can be renamed afterwards. What belongs to one
+ * system stays out of the file: IDs, authors, the counter of a number range, the connection status of a broker.
+ * There are no passwords to export (they are never stored).
  * Import applies the rules of the apps and either imports everything or - if anything is wrong - nothing.
  */
 
@@ -40,8 +41,10 @@ interface KindSpec {
   fields: Record<string, FieldType>
   /** broker variables travel with the broker */
   variables?: boolean
-  /** the rules of the app; d is the complete entity */
-  check(d: Row, event: 'CREATE' | 'UPDATE', reject: Reject): void
+  /** the name for a taken one: number n >= 2 appended in a way the name rules allow */
+  numbered(name: string, n: number): string
+  /** the rules of the app for a new entry */
+  check(d: Row, reject: Reject): void
 }
 
 export const KINDS: Record<ConfigKind, KindSpec> = {
@@ -53,7 +56,8 @@ export const KINDS: Record<ConfigKind, KindSpec> = {
     one: 'number range',
     many: 'number ranges',
     fields: { description: 'text', prefix: 'text', suffix: 'text', length: 'int', start: 'int64', step: 'int', maximum: 'int64' },
-    check: (d, _event, reject) => checkNumberRange(d, true, reject)
+    numbered: (name, n) => `${name}_${n}`,
+    check: (d, reject) => checkNumberRange(d, true, reject)
   },
   BROKERS: {
     entity: 'Brokers',
@@ -75,7 +79,8 @@ export const KINDS: Record<ConfigKind, KindSpec> = {
       agentAllowed: 'bool'
     },
     variables: true,
-    check: (d, event, reject) => checkBroker(d as Parameters<typeof checkBroker>[0], event, reject)
+    numbered: (name, n) => `${name} (${n})`,
+    check: (d, reject) => checkBroker(d as Parameters<typeof checkBroker>[0], 'CREATE', reject)
   },
   VARIABLES: {
     entity: 'Variables',
@@ -86,7 +91,8 @@ export const KINDS: Record<ConfigKind, KindSpec> = {
     one: 'global variable',
     many: 'global variables',
     fields: { value: 'text' },
-    check: (d, _event, reject) => {
+    numbered: (name, n) => `${name}_${n}`,
+    check: (d, reject) => {
       if (!VAR_NAME.test(String(d.name ?? ''))) reject(400, VAR_NAME_RULE, 'in/name')
     }
   }
@@ -108,7 +114,8 @@ export interface ExportResult {
 export interface ImportResult {
   dryRun: boolean
   created: number
-  updated: number
+  /** entries whose name was taken: the name in the file and the one they get */
+  renamed: { name: string; newName: string }[]
 }
 
 export const isConfigKind = (kind: unknown): kind is ConfigKind => typeof kind === 'string' && Object.hasOwn(KINDS, kind)
@@ -151,42 +158,32 @@ interface Entry {
   where: string
   /** the fields of the file, as they will be stored */
   d: Row
-  existing?: Row
 }
 
-/**
- * Checks a file and, unless dryRun, creates and updates its entries. All or nothing.
- * `isDraft` tells which saved entries are being edited in the app - they are not changed underneath the user.
- */
-export async function importConfig(
-  kind: ConfigKind,
-  content: string,
-  opts: { dryRun?: boolean; isDraft?: (ids: string[]) => Promise<string[]> } = {}
-): Promise<ImportResult> {
+/** Checks a file and, unless dryRun, adds its entries - existing ones are never changed. All or nothing. */
+export async function importConfig(kind: ConfigKind, content: string, opts: { dryRun?: boolean } = {}): Promise<ImportResult> {
   const spec = KINDS[kind]
   const list = parseDocument(spec, content)
   const problems: string[] = []
   const entries = readEntries(spec, list, problems)
 
-  // match by name; a name twice in the file or in the system cannot be matched
-  const byName = new Map<string, Row[]>()
-  for (const r of await selectRows(spec)) byName.set(key(r.name), [...(byName.get(key(r.name)) ?? []), r])
-  const seen = new Set<string>()
+  // a taken name - by a saved entry or one before it in the file - gets the next free number
+  const taken = new Set((await selectRows(spec)).map((r) => key(r.name)))
+  const renamed: ImportResult['renamed'] = []
+  const maxLength = elementOf(spec.entity, 'name')?.length ?? Infinity
   for (const e of entries) {
-    const name = key(e.d.name)
-    if (seen.has(name)) problems.push(`${e.where}: the name is in the file more than once`)
-    seen.add(name)
-    const matches = byName.get(name) ?? []
-    if (matches.length > 1) problems.push(`${e.where}: ${matches.length} ${spec.many} with this name exist - rename them first`)
-    else e.existing = matches[0]
+    const name = e.d.name!
+    let newName = name
+    for (let n = 2; taken.has(key(newName)); n++) newName = spec.numbered(name.slice(0, maxLength - spec.numbered('', n).length), n)
+    taken.add(key(newName))
+    if (newName === name) continue
+    renamed.push({ name, newName })
+    e.d.name = newName
   }
-  const editing = new Set(opts.isDraft ? await opts.isDraft(entries.flatMap((e) => (e.existing ? [e.existing.ID!] : []))) : [])
-  for (const e of entries) if (e.existing && editing.has(e.existing.ID!)) problems.push(`${e.where}: is being edited in the app - save or discard the changes first`)
 
   for (const e of entries) {
     if (problems.some((p) => p.startsWith(`${e.where}:`))) continue
-    const merged = { ...e.existing, ...e.d, variables: mergeVariables(e.existing?.variables, e.d.variables) }
-    problems.push(...(await collectProblems((reject) => spec.check(merged, e.existing ? 'UPDATE' : 'CREATE', reject), e.where)))
+    problems.push(...(await collectProblems((reject) => spec.check(e.d, reject), e.where)))
   }
 
   if (problems.length) {
@@ -195,9 +192,8 @@ export async function importConfig(
     throw httpError(400, `Nothing was imported: ${shown}${more}`)
   }
 
-  const created = entries.filter((e) => !e.existing).length
   if (!opts.dryRun) await write(spec, entries)
-  return { dryRun: !!opts.dryRun, created, updated: entries.length - created }
+  return { dryRun: !!opts.dryRun, created: entries.length, renamed }
 }
 
 /** The file's top level: JSON, format, version and the list. */
@@ -297,33 +293,11 @@ function columnProblems(entity: string, d: Record<string, unknown>, where: strin
   return problems
 }
 
-/** Variables of the file over the saved ones: same name = new value, others are kept. */
-function mergeVariables(saved: VariableDoc[] | undefined, file: VariableDoc[] | undefined): VariableDoc[] | undefined {
-  if (!file) return saved
-  const merged = new Map((saved ?? []).map((v) => [v.name, v]))
-  for (const v of file) merged.set(v.name, { ...merged.get(v.name), ...v })
-  return [...merged.values()]
-}
-
-/** New entries are created, existing ones get the fields of the file. Runs in the transaction of the request. */
+/** Every entry is inserted with a new ID (broker variables with it). Runs in the transaction of the request. */
 async function write(spec: KindSpec, entries: Entry[]): Promise<void> {
-  const entity = `aem.suite.${spec.entity}`
-  const fresh = entries.filter((e) => !e.existing)
-  if (fresh.length)
-    await INSERT.into(entity).entries(
-      fresh.map(({ d }) => ({ ...spec.where, ...d, ID: cds.utils.uuid(), ...(spec.variables ? { variables: (d.variables ?? []).map((v) => ({ ...v })) } : {}) }))
-    )
-  for (const { d, existing } of entries) {
-    if (!existing) continue
-    const { variables, name, ...fields } = d
-    // the name as in the file: "orders" in the file renames "ORDERS"
-    await UPDATE(entity).set({ ...fields, name }).where({ ID: existing.ID })
-    for (const v of variables ?? []) {
-      const saved = existing.variables?.find((s) => s.name === v.name) as (VariableDoc & { ID?: string }) | undefined
-      if (saved) await UPDATE('aem.suite.Variables').set({ value: v.value ?? null }).where({ ID: saved.ID })
-      else await INSERT.into('aem.suite.Variables').entries({ ID: cds.utils.uuid(), broker_ID: existing.ID, ...v })
-    }
-  }
+  await INSERT.into(`aem.suite.${spec.entity}`).entries(
+    entries.map(({ d }) => ({ ...spec.where, ...d, ID: cds.utils.uuid(), ...(spec.variables ? { variables: (d.variables ?? []).map((v) => ({ ...v })) } : {}) }))
+  )
 }
 
 // ------------------------------------------------------------------------------------------------ helpers

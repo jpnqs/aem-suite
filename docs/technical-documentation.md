@@ -150,7 +150,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `Destinations` | Read-only value help (`@cds.persistence.skip`) – destinations from the bound destination service and from env `destinations`, filtered to broker URLs. |
 | `CredentialModes` | Code list. |
 | `exportConfig(kind, ids)` | `kind` = `NUMBER_RANGES`, `BROKERS` or `VARIABLES` (global). Returns `{ filename, content, count }`: the JSON file of the given entries, all of the kind without ids. See *Configuration file* below. |
-| `importConfig(kind, content, dryRun)` | Creates and updates entries from such a file, matched by name; returns `{ dryRun, created, updated }`. Request bodies up to 2 MB. |
+| `importConfig(kind, content, dryRun)` | Adds the entries of such a file as new ones (existing entries are never changed); returns `{ dryRun, created, renamed: [{ name, newName }] }`. Request bodies up to 2 MB. |
 
 The rules of saving a number range or a broker live in `srv/lib/config/checks.ts`, so the draft handlers and the import apply the same ones.
 
@@ -262,8 +262,8 @@ All texts are in `i18n/i18n.properties`; the layout uses CSS grid and SAP themin
 Number ranges use `aem-suite.number-ranges` / `numberRanges` (`description`, `prefix`, `suffix`, `length`, `start`, `step`, `maximum`), global variables `aem-suite.variables` / `variables` (`value`). One table (`KINDS`) describes the three kinds: entity, format, fields and rules.
 
 - **Export** leaves out what belongs to one system: IDs, `managed` fields, the counter of a number range (`current`, `lastUsedAt`) and the connection status of a broker. There is no password to leave out. `Integer64` values are numbers in the file (text if they are beyond 2^53). Sorted by name, empty fields left out.
-- **Import** matches by name ignoring case. A new name is inserted, an existing entry is updated with the fields of the file (missing fields keep their value, a name differing in case renames it); broker variables are merged by name. Nothing is deleted. A name twice in the file, or a name that several saved brokers share, is a problem; so is an entry with an open draft (`AdminService` passes a lookup on the draft tables), so an import is not overwritten when that draft is saved.
-- **All or nothing, one pass**, like the test case import: types, column lengths, enum values and `@assert.range` limits from the model, then the rules of `srv/lib/config/checks.ts` on the saved entry merged with the file; all problems in one 400 (first 20). Limit: 1 000 entries per file.
+- **Import only inserts**, with new IDs (brokers with their variables); saved entries are never updated or deleted. A name that is taken ignoring case – by a saved entry or an earlier one in the file – gets the next free number, in a form the name rules allow (`KINDS[].numbered`: `ORDERS_2`, `aem-dev (2)`), shortened to fit the column. The result lists these renames, so the UI can show them before the import. Fields missing in the file get the database defaults.
+- **All or nothing, one pass**, like the test case import: types, column lengths, enum values and `@assert.range` limits from the model, then the rules of `srv/lib/config/checks.ts` for a new entry; all problems in one 400 (first 20). Limit: 1 000 entries per file.
 - **UI**: the list reports of Brokers, Global Variables and Number Ranges get *Export* / *Import* toolbar actions from `app/_shared/ConfigFile.js` (the kind follows from the app); the file handling in the browser (`app/_shared/Files.js`) is shared with the test case export.
 
 ### TestAgentService – MCP `/mcp/agent` (role `Tester`)

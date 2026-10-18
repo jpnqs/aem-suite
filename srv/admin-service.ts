@@ -7,7 +7,7 @@ import { listDestinations } from './lib/broker/destinations'
 import { currentJwt, needsPassword } from './lib/broker/resolve'
 import { VAR_NAME, VAR_NAME_RULE } from './lib/testcases/node-validation'
 import { checkBroker, checkNumberRange } from './lib/config/checks'
-import { exportConfig, importConfig, isConfigKind, type ConfigKind } from './lib/config/export-import'
+import { exportConfig, importConfig, isConfigKind } from './lib/config/export-import'
 import { idOf, keyOf, keyValue } from './lib/core/request'
 import { nameTaken } from './lib/core/unique-name'
 import { currentBeforeLast, currentForNext, formatNumber, issueNext, nextExample } from './lib/template/number-ranges'
@@ -150,8 +150,6 @@ export default class AdminService extends cds.ApplicationService {
     })
 
     // ---------------------------------------------------------------- export / import of the configuration
-    const draftsOf: Record<ConfigKind, cds.entity> = { NUMBER_RANGES: NumberRanges.drafts!, BROKERS: Brokers.drafts!, VARIABLES: GlobalVariables.drafts! }
-
     this.on('exportConfig', (req) => {
       const { kind, ids } = req.data as { kind: unknown; ids?: string[] }
       if (!isConfigKind(kind)) return req.reject(400, 'Unknown kind of configuration')
@@ -160,10 +158,7 @@ export default class AdminService extends cds.ApplicationService {
     this.on('importConfig', (req) => {
       const { kind, content, dryRun } = req.data as { kind: unknown; content: string; dryRun?: boolean }
       if (!isConfigKind(kind)) return req.reject(400, 'Unknown kind of configuration')
-      // entries being edited in the app are not changed underneath the user
-      const isDraft = async (ids: string[]) =>
-        ids.length ? ((await SELECT.from(draftsOf[kind]).columns('ID').where({ ID: { in: ids } })) as { ID: string }[]).map((r) => r.ID) : []
-      return importConfig(kind, content, { dryRun: !!dryRun, isDraft })
+      return importConfig(kind, content, { dryRun: !!dryRun })
     })
 
     // ---------------------------------------------------------------- value help

@@ -145,9 +145,9 @@ Then, in the app: **Brokers → Create**, *Credentials* **BTP Destination**, and
 Brokers, global variables and number ranges can be saved as a JSON file and imported again – to set up a second system the same way, to keep the configuration in Git, or as a backup. Each of the three apps has **Export** and **Import** above its list.
 
 - **Export**: select rows → **Export** (nothing selected = all). The file holds the settings only – no IDs, no authors, no connection status, and no passwords (they are never stored). Brokers come with their broker variables. Number ranges come without their counter: the counter belongs to the system it runs in.
-- **Import**: **Import** → choose a file that was exported from the same app. It is checked first and you confirm how many entries are **new** and how many are **updated**.
-- **Matched by name.** An entry whose name does not exist yet (ignoring upper / lower case) is created. An existing one gets the values of the file; fields missing in the file keep their value. Broker variables are merged: same name = new value, the others stay. **Nothing is deleted**, and the counter of an existing number range is not touched.
-- **All or nothing.** The file gets the same checks as the apps (URL and message VPN of direct brokers, variable names, number range limits, text lengths, ...). If anything is wrong, nothing is imported and the message lists every problem, for example `broker "aem-dev": msgVpn: Message VPN is required`. An entry that someone is editing right now cannot be imported – save or discard the changes first.
+- **Import**: **Import** → choose a file that was exported from the same app. It is checked first and you confirm what will be added.
+- **Import only adds.** Every entry of the file becomes a new entry – existing brokers, variables and number ranges are never changed or deleted. If a name is taken already (ignoring upper / lower case), the new entry gets a number: `ORDERS` becomes `ORDERS_2`, `aem-dev` becomes `aem-dev (2)`. The confirmation lists these names, and you can rename the entries afterwards. Imported number ranges start at their first number.
+- **All or nothing.** The file gets the same checks as the apps (URL and message VPN of direct brokers, variable names, number range limits, text lengths, ...). If anything is wrong, nothing is imported and the message lists every problem, for example `broker "aem-dev": msgVpn: Message VPN is required`.
 
 ```json
 {
@@ -452,7 +452,7 @@ The page shows what the **next number** will look like, the **last number issued
 
 The counter is stored in the database: every message of a run that uses the range takes its own number, also when the broker later rejects the message, and a number is never handed out twice. A run that cannot connect to a broker sends nothing and takes no numbers. The Preview shows the next number without using it up.
 
-Number ranges can be moved to another system with **Export** and **Import** (the counter stays where it is): see [Export and import the configuration](#export-and-import-the-configuration).
+Number ranges can be moved to another system with **Export** and **Import** (the counter is not part of the file): see [Export and import the configuration](#export-and-import-the-configuration).
 
 Use the range in topic, payload, correlation ID or user properties:
 

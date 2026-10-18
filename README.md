@@ -67,7 +67,7 @@ Subscribe to topics (wildcards allowed), browse a queue without taking messages,
 
 ### Manage brokers
 
-Maintain broker connections (BTP destination or direct), test the connection, and filter by credentials, status and activity. Broker URLs are completed for you: the host is enough. Brokers, global variables and number ranges can be exported to a JSON file and imported into another system (matched by name, never with passwords).
+Maintain broker connections (BTP destination or direct), test the connection, and filter by credentials, status and activity. Broker URLs are completed for you: the host is enough. Brokers, global variables and number ranges can be exported to a JSON file and imported into another system (always as new entries, never with passwords).
 
 ![Brokers](docs/images/brokers.png)
 

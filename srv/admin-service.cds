@@ -92,8 +92,8 @@ service AdminService {
   action exportConfig(kind : ConfigKind not null, ids : many UUID) returns ConfigExportResult;
 
   /**
-   * Imports a file of exportConfig: entries are matched by name (ignoring case) - new names are created, existing
-   * entries updated with the fields of the file, nothing is deleted. All or nothing; dryRun only checks the file.
+   * Imports a file of exportConfig: every entry is added as a new one, existing entries are never changed. A taken
+   * name gets a number ("ORDERS_2", "aem-dev (2)"). All or nothing; dryRun only checks the file.
    */
   action importConfig(kind : ConfigKind not null, content : LargeString not null, dryRun : Boolean) returns ConfigImportResult;
 
@@ -108,7 +108,11 @@ service AdminService {
   type ConfigImportResult {
     dryRun  : Boolean;
     created : Integer;
-    updated : Integer;
+    /** entries whose name was taken: the name in the file and the one they get */
+    renamed : many {
+      name    : String;
+      newName : String;
+    };
   }
 
   type ConnectionResult {

@@ -61,9 +61,9 @@ test.describe('export and import (configuration)', () => {
     await expect(page.getByText(/^Exported \d+ brokers to aem-suite-brokers-/)).toBeVisible()
   })
 
-  test('imports number ranges after a check and a confirmation', async ({ page }) => {
+  test('imports number ranges as new entries, a taken name gets a number', async ({ page }) => {
     const name = uniqueName('E2E_IMPORTED')
-    const file = { format: 'aem-suite.number-ranges', version: 1, numberRanges: [{ name, prefix: 'E2E-', length: 4, start: 1 }] }
+    const file = { format: 'aem-suite.number-ranges', version: 1, numberRanges: [{ name, prefix: 'E2E-', length: 4, start: 1 }, { name, prefix: 'TWO-' }] }
     await openApp(page, apps.numberRanges)
     await expectAppOpen(page, apps.numberRanges)
     const chooser = page.waitForEvent('filechooser')
@@ -71,15 +71,16 @@ test.describe('export and import (configuration)', () => {
     await (await chooser).setFiles({ name: 'ranges.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(file)) })
 
     const confirm = page.getByRole('alertdialog')
-    await expect(confirm).toContainText('Import "ranges.json"?')
-    await expect(confirm).toContainText('New: 1')
+    await expect(confirm).toContainText('Import 2 number ranges from "ranges.json"?')
+    await expect(confirm).toContainText(`${name} → ${name}_2`)
     await confirm.getByRole('button', { name: 'Import' }).click()
-    await expect(page.getByText('Imported: 1 new, 0 updated')).toBeVisible()
+    await expect(page.getByText('Imported 2 number ranges')).toBeVisible()
     // the list is refreshed
-    await expect(page.getByText(name, { exact: true })).toBeVisible()
+    await expect(page.getByText(`${name}_2`, { exact: true })).toBeVisible()
 
-    const found = await (await page.request.get('/odata/v4/admin/NumberRanges?$select=ID&$filter=' + encodeURIComponent(`name eq '${name}'`))).json()
-    expect(found.value).toHaveLength(1)
-    track(`/odata/v4/admin/NumberRanges(ID=${found.value[0].ID},IsActiveEntity=true)`)
+    const filter = encodeURIComponent(`startswith(name,'${name}')`)
+    const found = await (await page.request.get(`/odata/v4/admin/NumberRanges?$select=ID&$filter=${filter}`)).json()
+    expect(found.value).toHaveLength(2)
+    for (const { ID } of found.value) track(`/odata/v4/admin/NumberRanges(ID=${ID},IsActiveEntity=true)`)
   })
 })

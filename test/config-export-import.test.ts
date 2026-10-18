@@ -1,5 +1,5 @@
 import cds from '@sap/cds'
-import { createActive, draft, resetDatabase, startServer, users } from './helpers'
+import { resetDatabase, startServer, users } from './helpers'
 
 const { POST } = startServer()
 const { admin, tester } = users
@@ -54,29 +54,50 @@ describe('export / import of the configuration', () => {
       expect((await exportConfig('NUMBER_RANGES', [cds.utils.uuid()])).status).toBe(404)
     })
 
-    it('creates new ranges and updates existing ones by name - the counter stays', async () => {
-      await INSERT.into('aem.suite.NumberRanges').entries({ ID: cds.utils.uuid(), name: 'ORDERS', prefix: 'SO-', length: 10, start: '4500000001', step: 1, current: '4500000042' })
+    it('adds every entry as a new one - a taken name gets a number, existing ranges stay as they are', async () => {
+      await INSERT.into('aem.suite.NumberRanges').entries([
+        { ID: cds.utils.uuid(), name: 'ORDERS', prefix: 'SO-', length: 10, start: '4500000001', step: 1, current: '4500000042' },
+        { ID: cds.utils.uuid(), name: 'ORDERS_2', start: '1' }
+      ])
       const content = ranges([
-        { name: 'orders', prefix: 'PO-', start: 4500000001 },
-        { name: 'INVOICES', prefix: 'INV-', length: 6, start: 1 }
+        { name: 'orders', prefix: 'PO-', start: 1 },
+        { name: 'INVOICES', prefix: 'INV-', length: 6, start: 1 },
+        { name: 'invoices', prefix: 'X-' }
       ])
 
       const check = await importConfig('NUMBER_RANGES', content, true)
-      expect(check.data).toMatchObject({ dryRun: true, created: 1, updated: 1 })
+      expect(check.data).toEqual(
+        expect.objectContaining({
+          dryRun: true,
+          created: 3,
+          renamed: [
+            { name: 'orders', newName: 'orders_3' },
+            { name: 'invoices', newName: 'invoices_2' }
+          ]
+        })
+      )
       expect(await range('INVOICES')).toBeUndefined()
 
       const res = await importConfig('NUMBER_RANGES', content)
-      expect(res.data).toMatchObject({ dryRun: false, created: 1, updated: 1 })
-      // the name as in the file, untouched fields and the counter kept
-      expect(await range('orders')).toMatchObject({ prefix: 'PO-', length: 10, current: '4500000042' })
+      expect(res.data).toMatchObject({ dryRun: false, created: 3 })
+      expect(await range('ORDERS')).toMatchObject({ prefix: 'SO-', length: 10, current: '4500000042' })
+      expect(await range('orders_3')).toMatchObject({ prefix: 'PO-', start: '1', current: null })
       expect(await range('INVOICES')).toMatchObject({ prefix: 'INV-', length: 6, start: '1', current: null })
+      expect(await range('invoices_2')).toMatchObject({ prefix: 'X-' })
+    })
+
+    it('a numbered name still fits the column', async () => {
+      const long = 'N'.repeat(50)
+      await INSERT.into('aem.suite.NumberRanges').entries({ ID: cds.utils.uuid(), name: long, start: '1' })
+      const res = await importConfig('NUMBER_RANGES', ranges([{ name: long }]))
+      expect(res.data.renamed).toEqual([{ name: long, newName: `${'N'.repeat(48)}_2` }])
     })
 
     it('a file exported in one system imports into another', async () => {
       await INSERT.into('aem.suite.NumberRanges').entries({ ID: cds.utils.uuid(), name: 'ORDERS', prefix: 'SO-', length: 10, start: '4500000001', step: 1 })
       const { content } = (await exportConfig('NUMBER_RANGES')).data
       await resetDatabase()
-      expect((await importConfig('NUMBER_RANGES', content)).data).toMatchObject({ created: 1, updated: 0 })
+      expect((await importConfig('NUMBER_RANGES', content)).data).toMatchObject({ created: 1, renamed: [] })
       expect(await range('ORDERS')).toMatchObject({ prefix: 'SO-', length: 10, start: '4500000001', step: 1 })
     })
 
@@ -89,7 +110,6 @@ describe('export / import of the configuration', () => {
           { name: 'STEP', step: 0 },
           { name: 'MAX', start: 10, maximum: 5 },
           { name: 'TYPE', length: 'ten' },
-          { name: 'good' },
           { name: 'LONG', prefix: 'x'.repeat(21) }
         ])
       )
@@ -100,17 +120,8 @@ describe('export / import of the configuration', () => {
       expect(message).toContain('number range "STEP": step: The step must be at least 1')
       expect(message).toContain('number range "MAX": maximum: The maximum must not be below the start')
       expect(message).toContain('number range "TYPE": length: must be a whole number')
-      expect(message).toContain('number range "good": the name is in the file more than once')
       expect(message).toContain('number range "LONG": prefix: at most 20 characters')
       expect(await range('GOOD')).toBeUndefined()
-    })
-
-    it('does not change a range that is being edited', async () => {
-      const orders = await createActive(POST, 'admin', 'NumberRanges', { name: 'ORDERS', start: 1 }, admin)
-      await draft.edit(POST, 'admin', 'NumberRanges', orders.ID, admin)
-      const res = await importConfig('NUMBER_RANGES', ranges([{ name: 'ORDERS', prefix: 'X-' }]))
-      expect(res.status).toBe(400)
-      expect(res.data.error.message).toContain('number range "ORDERS": is being edited in the app')
     })
   })
 
@@ -153,32 +164,31 @@ describe('export / import of the configuration', () => {
       expect(res.data.content).not.toMatch(/"ID"|lastConnection|password/)
     })
 
-    it('creates brokers with variables and merges the variables of existing ones', async () => {
+    it('adds brokers with their variables, a taken name gets a number', async () => {
       await INSERT.into('aem.suite.Brokers').entries({
         ID: cds.utils.uuid(),
         ...dev,
         url: 'wss://dev.messaging.solace.cloud:443',
-        variables: [
-          { ID: cds.utils.uuid(), name: 'region', value: 'eu' },
-          { ID: cds.utils.uuid(), name: 'keep', value: 'me' }
-        ]
+        variables: [{ ID: cds.utils.uuid(), name: 'region', value: 'eu' }]
       })
       const res = await importConfig(
         'BROKERS',
         brokers([
-          { name: 'AEM-DEV', msgVpn: 'dev2', variables: [{ name: 'region', value: 'us' }, { name: 'tier', value: 2 }] },
-          { name: 'aem-prod', credentialMode: 'DESTINATION', destinationName: 'AEM_PROD', variables: [{ name: 'env', value: 'prod' }] }
+          { ...dev, name: 'AEM-DEV', msgVpn: 'dev2', variables: [{ name: 'region', value: 'us' }, { name: 'tier', value: 2 }] },
+          { name: 'aem-prod', credentialMode: 'DESTINATION', destinationName: 'AEM_PROD' }
         ])
       )
-      expect(res.data).toMatchObject({ created: 1, updated: 1 })
-      expect(await broker('AEM-DEV')).toMatchObject({ msgVpn: 'dev2', username: 'tester' })
-      expect(await brokerVariables('AEM-DEV')).toEqual([
-        { name: 'keep', value: 'me' },
+      expect(res.data).toMatchObject({ created: 2, renamed: [{ name: 'AEM-DEV', newName: 'AEM-DEV (2)' }] })
+      // the saved broker is untouched
+      expect(await broker('aem-dev')).toMatchObject({ msgVpn: 'dev' })
+      expect(await brokerVariables('aem-dev')).toEqual([{ name: 'region', value: 'eu' }])
+      expect(await broker('AEM-DEV (2)')).toMatchObject({ msgVpn: 'dev2', username: 'tester' })
+      expect(await brokerVariables('AEM-DEV (2)')).toEqual([
         { name: 'region', value: 'us' },
         { name: 'tier', value: '2' }
       ])
       expect(await broker('aem-prod')).toMatchObject({ credentialMode: 'DESTINATION', destinationName: 'AEM_PROD', active: true })
-      expect(await brokerVariables('aem-prod')).toEqual([{ name: 'env', value: 'prod' }])
+      expect(await brokerVariables('aem-prod')).toEqual([])
     })
 
     it('completes URLs like the app', async () => {
@@ -187,10 +197,6 @@ describe('export / import of the configuration', () => {
     })
 
     it('checks the rules of the app', async () => {
-      await INSERT.into('aem.suite.Brokers').entries([
-        { ID: cds.utils.uuid(), ...dev, name: 'twice' },
-        { ID: cds.utils.uuid(), ...dev, name: 'Twice' }
-      ])
       const res = await importConfig(
         'BROKERS',
         brokers([
@@ -200,7 +206,6 @@ describe('export / import of the configuration', () => {
           { ...dev, name: 'timeout', connectTimeoutMs: 5 },
           { ...dev, name: 'vars', variables: [{ name: 'a' }, { name: 'a' }] },
           { ...dev, name: 'var-name', variables: [{ name: 'bad name' }] },
-          { name: 'twice', msgVpn: 'x' },
           { credentialMode: 'DIRECT' }
         ])
       )
@@ -212,8 +217,7 @@ describe('export / import of the configuration', () => {
       expect(message).toContain('broker "timeout": connectTimeoutMs: must be between 1000 and 120000')
       expect(message).toContain('broker "vars": variable "a" is in the file more than once')
       expect(message).toContain('broker "var-name": variables(0)/name: Invalid variable name "bad name"')
-      expect(message).toContain('broker "twice": 2 brokers with this name exist')
-      expect(message).toContain('broker #8: needs a name')
+      expect(message).toContain('broker #7: needs a name')
     })
   })
 
@@ -233,11 +237,12 @@ describe('export / import of the configuration', () => {
       ])
 
       const imported = await importConfig('VARIABLES', variables([{ name: 'REGION', value: 'us' }, { name: 'tenant', value: 'acme' }]))
-      expect(imported.data).toMatchObject({ created: 1, updated: 1 })
+      expect(imported.data).toMatchObject({ created: 2, renamed: [{ name: 'REGION', newName: 'REGION_2' }] })
       const rows = await SELECT.from('aem.suite.Variables').columns('name', 'value', 'broker_ID').orderBy('name')
       expect(rows).toEqual([
-        { name: 'REGION', value: 'us', broker_ID: null },
+        { name: 'REGION_2', value: 'us', broker_ID: null },
         { name: 'app', value: 'aem', broker_ID: null },
+        { name: 'region', value: 'eu', broker_ID: null },
         { name: 'secretish', value: 'broker only', broker_ID: brokerId },
         { name: 'tenant', value: 'acme', broker_ID: null }
       ])

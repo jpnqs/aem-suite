@@ -24,11 +24,25 @@ sap.ui.define(["module", "sap/m/MessageBox", "sap/m/MessageToast", "./Actions", 
     return t(count === 1 ? "config.one" : "config.many", [count]);
   }
 
+  // renamed entries listed in the confirmation, the rest as "... and N more"
+  var MAX_RENAMES_SHOWN = 10;
+
   /** Asks whether the checked file should be imported; resolves true or false. */
   function confirmImport(fileName, check, t) {
     var importAction = t("action.import");
+    var renamed = check.renamed || [];
+    var text = t("config.confirmImport", [entries(check.created, t), fileName]);
+    if (renamed.length) {
+      var lines = renamed.slice(0, MAX_RENAMES_SHOWN).map(function (r) {
+        return t("config.renamedLine", [r.name, r.newName]);
+      });
+      if (renamed.length > MAX_RENAMES_SHOWN) {
+        lines.push(t("config.renamedMore", [renamed.length - MAX_RENAMES_SHOWN]));
+      }
+      text += "\n\n" + t("config.confirmRenamed") + "\n" + lines.join("\n");
+    }
     return new Promise(function (resolve) {
-      MessageBox.confirm(t("config.confirmImport", [fileName, check.created, check.updated]), {
+      MessageBox.confirm(text, {
         title: importAction,
         actions: [importAction, MessageBox.Action.CANCEL],
         emphasizedAction: importAction,
@@ -89,7 +103,7 @@ sap.ui.define(["module", "sap/m/MessageBox", "sap/m/MessageToast", "./Actions", 
           if (!result) {
             return undefined;
           }
-          MessageToast.show(t("config.imported", [result.created, result.updated]));
+          MessageToast.show(t("config.imported", [entries(result.created, t)]));
           return api.refresh();
         })
         .catch(Actions.showError);
