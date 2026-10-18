@@ -1,0 +1,13 @@
+{
+  // MCP server of the local dev server (npm run watch) for GitHub Copilot agent mode.
+  // Demo login tester:tester (mocked auth, in package.json) - base64 of "tester:tester"; no real credentials.
+  "servers": {
+    "aem-suite": {
+      "type": "http",
+      "url": "http://localhost:4004/mcp/agent",
+      "headers": {
+        "Authorization": "Basic dGVzdGVyOnRlc3Rlcg=="
+      }
+    }
+  }
+}

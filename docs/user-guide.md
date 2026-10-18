@@ -544,6 +544,8 @@ The assistant acts as **you**: it sees and may do exactly what your roles allow,
 claude mcp add --transport http aem-suite http://localhost:4004/mcp/agent --header "Authorization: Basic dGVzdGVyOnRlc3Rlcg=="
 ```
 
+For **GitHub Copilot** in VS Code the repository contains `.vscode/mcp.json` with the same address and demo login. Start `npm run watch`, open the file and click **Start** above the server (or *MCP: List Servers*), then switch Copilot Chat to **Agent** mode – `aem-suite` appears under the tools.
+
 **Things you can ask**
 
 - *"Which test cases exist for orders, and which of them failed last time?"*

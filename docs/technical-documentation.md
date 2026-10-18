@@ -505,6 +505,7 @@ npm run verify      # before every commit: typecheck + lint + Jest (what CI runs
 npm run e2e         # Playwright: UI apps in a browser (e2e:ui, e2e:headed, e2e:trace)
 npm run typer       # regenerate the cds-typer models (@cds-models) - typecheck, test, watch and the e2e server do it first
 npm run build:ui    # ui5 build of all apps, as the MTA build does it
+npm run mcp:inspect # MCP Inspector (browser) on the running dev server: tools, calls, raw JSON-RPC of /mcp/agent
 ```
 
 | Script | Does |
