@@ -134,6 +134,26 @@ test('number ranges', async ({ page }) => {
   await page.screenshot({ path: out('number-ranges') })
 })
 
+test('data cleanup', async ({ page }) => {
+  // a few old saved messages, so the preview has something to show (the server's database is fresh per run)
+  for (const [topic, receivedAt] of [
+    ['aem/orders/created/v1/4500000001', '2026-01-12T09:15:00Z'],
+    ['aem/orders/created/v1/4500000002', '2026-02-03T14:40:00Z'],
+    ['aem/notifications/email/v1', '2026-03-21T08:05:00Z']
+  ]) {
+    const res = await page.request.post('/odata/v4/subscribe/ReceivedMessages', { data: { topic, payload: '{}', sourceType: 'TOPIC', receivedAt } })
+    expect(res.ok()).toBe(true)
+  }
+  // taller than the other shots: the preview sits below the categories
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await open(page, 'AEMSuiteCleanup-manage')
+  await page.locator('.sapMPanel').filter({ has: page.getByText('Saved messages', { exact: true }) }).getByRole('switch').click()
+  await page.getByRole('button', { name: 'Preview', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Delete…' })).toBeEnabled()
+  await calm(page)
+  await page.screenshot({ path: out('cleanup') })
+})
+
 test('help', async ({ page }) => {
   await open(page, 'AEMSuiteHelp-display&/6-run-tests')
   await expect(page.locator('h2[id="6-run-tests"]')).toBeVisible()

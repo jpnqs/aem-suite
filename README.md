@@ -71,6 +71,12 @@ Maintain broker connections (BTP destination or direct), test the connection, an
 
 ![Brokers](docs/images/brokers.png)
 
+### Clean up old data
+
+Runs, run payloads, saved messages and subscriber setups pile up. The **Data Cleanup** app (Admin) deletes them by age and further criteria – **Preview** first shows what would go, **Delete…** asks once more. Every cleanup is logged on the History tab, and selections you need again can be saved as rules.
+
+![Data Cleanup](docs/images/cleanup.png)
+
 ### Documentation inside the app
 
 The user guide is rendered from Markdown with navigation, search and links to every heading.
