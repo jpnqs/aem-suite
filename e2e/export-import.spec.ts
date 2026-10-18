@@ -41,3 +41,45 @@ test.describe('export and import (Test Cases)', () => {
     track(`/odata/v4/test/TestCases(ID=${found.value[0].ID},IsActiveEntity=true)`)
   })
 })
+
+// The same for the admin configuration (app/_shared/ConfigFile.js): number ranges, brokers, global variables.
+
+test.describe('export and import (configuration)', () => {
+  const track = deleteAfterEach()
+
+  test('exports the brokers as a JSON file', async ({ page }) => {
+    await openApp(page, apps.brokers)
+    await expectAppOpen(page, apps.brokers)
+    const download = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Export', exact: true }).click()
+    const file = await download
+    expect(file.suggestedFilename()).toMatch(/^aem-suite-brokers-\d{4}-\d{2}-\d{2}\.json$/)
+    const content = JSON.parse(fs.readFileSync(await file.path(), 'utf8'))
+    expect(content.format).toBe('aem-suite.brokers')
+    // the demo brokers of test/data
+    expect(content.brokers.map((b: { name: string }) => b.name)).toContain('local-docker')
+    await expect(page.getByText(/^Exported \d+ brokers to aem-suite-brokers-/)).toBeVisible()
+  })
+
+  test('imports number ranges after a check and a confirmation', async ({ page }) => {
+    const name = uniqueName('E2E_IMPORTED')
+    const file = { format: 'aem-suite.number-ranges', version: 1, numberRanges: [{ name, prefix: 'E2E-', length: 4, start: 1 }] }
+    await openApp(page, apps.numberRanges)
+    await expectAppOpen(page, apps.numberRanges)
+    const chooser = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: 'Import', exact: true }).click()
+    await (await chooser).setFiles({ name: 'ranges.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(file)) })
+
+    const confirm = page.getByRole('alertdialog')
+    await expect(confirm).toContainText('Import "ranges.json"?')
+    await expect(confirm).toContainText('New: 1')
+    await confirm.getByRole('button', { name: 'Import' }).click()
+    await expect(page.getByText('Imported: 1 new, 0 updated')).toBeVisible()
+    // the list is refreshed
+    await expect(page.getByText(name, { exact: true })).toBeVisible()
+
+    const found = await (await page.request.get('/odata/v4/admin/NumberRanges?$select=ID&$filter=' + encodeURIComponent(`name eq '${name}'`))).json()
+    expect(found.value).toHaveLength(1)
+    track(`/odata/v4/admin/NumberRanges(ID=${found.value[0].ID},IsActiveEntity=true)`)
+  })
+})

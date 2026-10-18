@@ -41,7 +41,7 @@ describe('shared UI modules (app/_shared)', () => {
   })
 
   it('gives an app the modules it names plus what they load', () => {
-    expect(modulesUsedBy(sources('brokers'))).toEqual(['Apps.js', 'Help.js', 'Navigation.js'])
+    expect(modulesUsedBy(sources('brokers'))).toEqual(['Actions.js', 'Apps.js', 'ConfigFile.js', 'Files.js', 'Help.js', 'Navigation.js'])
     expect(modulesUsedBy(sources('help'))).toEqual(['Actions.js'])
     expect(modulesUsedBy(['sap.ui.define(["com/aem/suite/x/shared/Help"])'])).toEqual(['Apps.js', 'Help.js', 'Navigation.js'])
   })

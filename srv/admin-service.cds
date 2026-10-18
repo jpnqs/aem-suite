@@ -3,6 +3,8 @@ using {aem.suite as db} from '../db/schema';
 /** Broker and global variable administration. */
 @path    : '/odata/v4/admin'
 @requires: 'Admin'
+// imports of configuration files are sent as one request
+@cds.server.body_parser.limit: '2mb'
 service AdminService {
 
   @odata.draft.enabled
@@ -75,6 +77,39 @@ service AdminService {
       @Core.OperationAvailable: in.IsActiveEntity
       action countDown();
     };
+
+  /** What a configuration file holds: number ranges, brokers (with their variables) or global variables. */
+  type ConfigKind : String enum {
+    NUMBER_RANGES;
+    BROKERS;
+    VARIABLES;
+  }
+
+  /**
+   * Exports number ranges, brokers or global variables as the content of a JSON file; without ids all of the kind.
+   * Without IDs, authors, number range counters and connection status - and brokers have no stored passwords.
+   */
+  action exportConfig(kind : ConfigKind not null, ids : many UUID) returns ConfigExportResult;
+
+  /**
+   * Imports a file of exportConfig: entries are matched by name (ignoring case) - new names are created, existing
+   * entries updated with the fields of the file, nothing is deleted. All or nothing; dryRun only checks the file.
+   */
+  action importConfig(kind : ConfigKind not null, content : LargeString not null, dryRun : Boolean) returns ConfigImportResult;
+
+  type ConfigExportResult {
+    /** suggested file name */
+    filename : String;
+    /** the JSON file: { format, version, exportedAt, <numberRanges | brokers | variables>: [ ... ] } */
+    content  : LargeString;
+    count    : Integer;
+  }
+
+  type ConfigImportResult {
+    dryRun  : Boolean;
+    created : Integer;
+    updated : Integer;
+  }
 
   type ConnectionResult {
     ok        : Boolean;

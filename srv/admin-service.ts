@@ -1,16 +1,17 @@
 import cds from '@sap/cds'
 import { NumberRanges as NumberRangeRows } from '#cds-models/aem/suite'
 import { checkConnection } from './lib/broker/check'
-import { normalizeBrokerUrl, toSmfUrl } from './lib/broker/url'
+import { normalizeBrokerUrl } from './lib/broker/url'
 import { config } from './lib/core/config'
 import { listDestinations } from './lib/broker/destinations'
 import { currentJwt, needsPassword } from './lib/broker/resolve'
-import { validateVariables, VAR_NAME, VAR_NAME_RULE } from './lib/testcases/node-validation'
+import { VAR_NAME, VAR_NAME_RULE } from './lib/testcases/node-validation'
+import { checkBroker, checkNumberRange } from './lib/config/checks'
+import { exportConfig, importConfig, isConfigKind, type ConfigKind } from './lib/config/export-import'
 import { idOf, keyOf, keyValue } from './lib/core/request'
 import { nameTaken } from './lib/core/unique-name'
-import { currentBeforeLast, currentForNext, formatNumber, issueNext, MAX_LENGTH, nextExample, RANGE_NAME } from './lib/template/number-ranges'
+import { currentBeforeLast, currentForNext, formatNumber, issueNext, nextExample } from './lib/template/number-ranges'
 import { TemplateError } from './lib/template/resolve'
-import { errMsg } from './lib/core/errors'
 
 /** Connection check on save is capped so saving never blocks long. */
 const AUTO_CHECK_TIMEOUT_MS = 5000
@@ -102,23 +103,7 @@ export default class AdminService extends cds.ApplicationService {
       const d = req.data as BrokerData
       if (d.url) d.url = normalizeBrokerUrl(d.url)
 
-      if (d.credentialMode === 'DESTINATION') {
-        if (!d.destinationName) req.error(400, 'Destination name is required', 'in/destinationName')
-      } else if (d.credentialMode === 'DIRECT' || req.event === 'CREATE') {
-        if (!d.url) req.error(400, 'URL is required', 'in/url')
-        if (!d.msgVpn) req.error(400, 'Message VPN is required', 'in/msgVpn')
-        // username is optional: if empty, it is asked for together with the password
-      }
-      if (d.url) {
-        try {
-          toSmfUrl(d.url)
-        } catch (e) {
-          req.error(400, errMsg(e), 'in/url')
-        }
-      }
-      // connectTimeoutMs and credentialMode: @assert.range in db/schema.cds
-      // broker variables follow the same rules as test case variables (a deep update sends the whole list)
-      validateVariables(d.variables as { name?: string | null }[] | undefined, (status, message, target) => req.error(status, message, target))
+      checkBroker(d, req.event === 'CREATE' ? 'CREATE' : 'UPDATE', (status, message, target) => req.error(status, message, target))
     })
 
     // automatic connection test on save - only possible for destination brokers
@@ -164,6 +149,23 @@ export default class AdminService extends cds.ApplicationService {
       return { ok: check.ok, message: check.message, latencyMs: check.latencyMs }
     })
 
+    // ---------------------------------------------------------------- export / import of the configuration
+    const draftsOf: Record<ConfigKind, cds.entity> = { NUMBER_RANGES: NumberRanges.drafts!, BROKERS: Brokers.drafts!, VARIABLES: GlobalVariables.drafts! }
+
+    this.on('exportConfig', (req) => {
+      const { kind, ids } = req.data as { kind: unknown; ids?: string[] }
+      if (!isConfigKind(kind)) return req.reject(400, 'Unknown kind of configuration')
+      return exportConfig(kind, ids)
+    })
+    this.on('importConfig', (req) => {
+      const { kind, content, dryRun } = req.data as { kind: unknown; content: string; dryRun?: boolean }
+      if (!isConfigKind(kind)) return req.reject(400, 'Unknown kind of configuration')
+      // entries being edited in the app are not changed underneath the user
+      const isDraft = async (ids: string[]) =>
+        ids.length ? ((await SELECT.from(draftsOf[kind]).columns('ID').where({ ID: { in: ids } })) as { ID: string }[]).map((r) => r.ID) : []
+      return importConfig(kind, content, { dryRun: !!dryRun, isDraft })
+    })
+
     // ---------------------------------------------------------------- value help
     this.on('READ', Destinations, async (req) => {
       const search = String((req.query as { SELECT?: { search?: { val?: string }[] } }).SELECT?.search?.[0]?.val ?? '')
@@ -203,16 +205,9 @@ async function validateNumberRange(req: cds.Request): Promise<void> {
     delete d.current
     delete d.lastUsedAt
   }
-  if (req.event === 'CREATE' || d.name !== undefined) {
-    const name = (d.name ?? '').trim()
-    if (!RANGE_NAME.test(name)) return req.reject(400, 'The name must start with a letter and may contain letters, digits, _ and - (it is used as {{numberRange.<name>}})', 'in/name')
-    d.name = name
-    if (await nameTaken('NumberRanges', name, d.ID)) return req.reject(400, `A number range named "${name}" exists already`, 'in/name')
-  }
-  if (d.length != null && (d.length < 0 || d.length > MAX_LENGTH)) return req.reject(400, `The length must be between 0 and ${MAX_LENGTH} digits (0 = no leading zeros)`, 'in/length')
-  if (d.step != null && d.step < 1) return req.reject(400, 'The step must be at least 1', 'in/step')
-  if (d.start != null && BigInt(d.start) < 0n) return req.reject(400, 'The start must not be negative', 'in/start')
-  if (d.maximum != null && d.start != null && BigInt(d.maximum) < BigInt(d.start)) return req.reject(400, 'The maximum must not be below the start', 'in/maximum')
-  if (d.prefix && d.prefix.includes('{{')) return req.reject(400, 'Prefix and suffix are plain text, no variables', 'in/prefix')
-  if (d.suffix && d.suffix.includes('{{')) return req.reject(400, 'Prefix and suffix are plain text, no variables', 'in/suffix')
+  const checkName = req.event === 'CREATE' || d.name !== undefined
+  if (checkName) d.name = (d.name ?? '').trim()
+  // the first problem is reported (reject throws)
+  checkNumberRange(d, checkName, (status, message, target) => req.reject(status, message, target))
+  if (checkName && (await nameTaken('NumberRanges', d.name!, d.ID))) return req.reject(400, `A number range named "${d.name}" exists already`, 'in/name')
 }
