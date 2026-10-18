@@ -12,7 +12,7 @@ test.describe('authorization (tester)', () => {
     })
   }
 
-  for (const app of [apps.brokers, apps.variables, apps.numberRanges]) {
+  for (const app of [apps.brokers, apps.variables, apps.numberRanges, apps.cleanup]) {
     test(`cannot open ${app.title}`, async ({ page }) => {
       await openApp(page, app)
       await expectLoadError(page)

@@ -57,7 +57,7 @@
     "mcp:inspect": "npx --yes @modelcontextprotocol/inspector@2.11.0 --web --transport http --server-url http://localhost:4004/mcp/agent --header \"Authorization: Basic dGVzdGVyOnRlc3Rlcg==\"",
     "before:cds-watch": "cds-typer \"*\"",
     "typer": "cds-typer \"*\"",
-    "typecheck": "npm run typer --silent && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p app/subscriber && tsc --noEmit -p app/testcases && tsc --noEmit -p e2e",
+    "typecheck": "npm run typer --silent && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p app/subscriber && tsc --noEmit -p app/testcases && tsc --noEmit -p app/cleanup && tsc --noEmit -p e2e",
     "lint": "eslint .",
     "pretest": "npm run typer --silent",
     "test": "jest",

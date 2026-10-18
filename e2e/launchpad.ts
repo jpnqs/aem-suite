@@ -10,6 +10,7 @@ export const apps = {
   brokers: { intent: 'AEMSuiteBrokers-manage', title: 'AEM Suite – Brokers' },
   variables: { intent: 'AEMSuiteVariables-manage', title: 'AEM Suite – Global Variables' },
   numberRanges: { intent: 'AEMSuiteNumberRanges-manage', title: 'AEM Suite – Number Ranges' },
+  cleanup: { intent: 'AEMSuiteCleanup-manage', title: 'AEM Suite – Data Cleanup' },
   help: { intent: 'AEMSuiteHelp-display', title: 'AEM Suite – Help' }
 } as const
 

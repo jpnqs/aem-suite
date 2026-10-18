@@ -1,0 +1,267 @@
+<mvc:View
+  controllerName="com.aem.suite.cleanup.controller.Main"
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:f="sap.f"
+  xmlns:l="sap.ui.layout"
+  displayBlock="true"
+  height="100%">
+  <f:DynamicPage id="page" class="aemPage sapUiResponsiveContentPadding" showFooter="{= ${state>/tab} === 'cleanup' }" busy="{state>/busy}" busyIndicatorDelay="300">
+    <f:title>
+      <f:DynamicPageTitle>
+        <f:heading>
+          <HBox alignItems="Center">
+            <core:Icon src="sap-icon://eraser" size="1.5rem" color="Default" class="sapUiSmallMarginEnd aemTitleIcon" />
+            <Title text="{i18n>view.title}" />
+          </HBox>
+        </f:heading>
+        <f:expandedContent>
+          <Text text="{i18n>view.subtitle}" />
+        </f:expandedContent>
+        <f:actions>
+          <Button text="{i18n>view.help}" type="Transparent" icon="sap-icon://sys-help" press=".onHelp" />
+        </f:actions>
+      </f:DynamicPageTitle>
+    </f:title>
+    <f:content>
+      <IconTabBar id="tabs" selectedKey="{state>/tab}" expandable="false" applyContentPadding="false" headerBackgroundDesign="Transparent" select=".onTabSelect">
+        <items>
+          <IconTabFilter key="cleanup" text="{i18n>tab.cleanup}" icon="sap-icon://eraser">
+            <VBox class="sapUiSmallMarginTop">
+              <!-- saved rules -->
+              <OverflowToolbar style="Clear" class="sapUiSmallMarginBottom">
+                <Label text="{i18n>rule.label}" labelFor="ruleSelect" />
+                <Select
+                  id="ruleSelect"
+                  selectedKey="{state>/ruleId}"
+                  forceSelection="false"
+                  width="16rem"
+                  change=".onRuleChange"
+                  items="{path: '/CleanupRules', sorter: {path: 'name'}}">
+                  <core:ListItem key="{ID}" text="{name}" additionalText="{description}" />
+                </Select>
+                <Button text="{i18n>rule.saveAs}" icon="sap-icon://save" press=".onSaveRule" enabled="{state>/hasSelection}" tooltip="{i18n>rule.saveAs.tooltip}" />
+                <Button icon="sap-icon://delete" press=".onDeleteRule" enabled="{= !!${state>/ruleId} }" tooltip="{i18n>rule.delete}" />
+                <ToolbarSpacer />
+                <Button text="{i18n>view.reset}" icon="sap-icon://reset" type="Transparent" press=".onReset" />
+              </OverflowToolbar>
+
+              <!-- test runs -->
+              <Panel class="aemCard aemCategory sapUiSmallMarginBottom" binding="{state>/selection/runs}">
+                <headerToolbar>
+                  <OverflowToolbar style="Clear">
+                    <core:Icon src="sap-icon://kpi-managing-my-area" class="sapUiTinyMarginEnd" />
+                    <Title text="{i18n>category.RUNS}" />
+                    <Text text="{i18n>category.RUNS.info}" class="aemHint sapUiSmallMarginBegin" />
+                    <ToolbarSpacer />
+                    <Switch state="{state>enabled}" />
+                  </OverflowToolbar>
+                </headerToolbar>
+                <VBox visible="{state>enabled}">
+                  <core:Fragment fragmentName="com.aem.suite.cleanup.view.RunCriteria" type="XML" />
+                </VBox>
+              </Panel>
+
+              <!-- run payloads only -->
+              <Panel class="aemCard aemCategory sapUiSmallMarginBottom" binding="{state>/selection/runPayloads}">
+                <headerToolbar>
+                  <OverflowToolbar style="Clear">
+                    <core:Icon src="sap-icon://document-text" class="sapUiTinyMarginEnd" />
+                    <Title text="{i18n>category.RUN_PAYLOADS}" />
+                    <Text text="{i18n>category.RUN_PAYLOADS.info}" class="aemHint sapUiSmallMarginBegin" />
+                    <ToolbarSpacer />
+                    <Switch state="{state>enabled}" />
+                  </OverflowToolbar>
+                </headerToolbar>
+                <VBox visible="{state>enabled}">
+                  <core:Fragment fragmentName="com.aem.suite.cleanup.view.RunCriteria" type="XML" />
+                </VBox>
+              </Panel>
+
+              <!-- saved messages -->
+              <Panel class="aemCard aemCategory sapUiSmallMarginBottom" binding="{state>/selection/messages}">
+                <headerToolbar>
+                  <OverflowToolbar style="Clear">
+                    <core:Icon src="sap-icon://inbox" class="sapUiTinyMarginEnd" />
+                    <Title text="{i18n>category.MESSAGES}" />
+                    <Text text="{i18n>category.MESSAGES.info}" class="aemHint sapUiSmallMarginBegin" />
+                    <ToolbarSpacer />
+                    <Switch state="{state>enabled}" />
+                  </OverflowToolbar>
+                </headerToolbar>
+                <l:Grid defaultSpan="XL3 L3 M6 S12" hSpacing="1" vSpacing="0.5" containerQuery="true" visible="{state>enabled}" class="aemCriteria">
+                  <VBox>
+                    <layoutData><l:GridData span="XL6 L6 M12 S12" /></layoutData>
+                    <Label text="{i18n>crit.age}" required="true" />
+                    <core:Fragment fragmentName="com.aem.suite.cleanup.view.Age" type="XML" />
+                  </VBox>
+                  <VBox>
+                    <Label text="{i18n>crit.brokers}" />
+                    <MultiComboBox selectedKeys="{state>brokerIds}" placeholder="{i18n>crit.all}" width="100%" items="{path: '/Brokers', sorter: {path: 'name'}, templateShareable: true}">
+                      <core:Item key="{ID}" text="{name}" />
+                    </MultiComboBox>
+                  </VBox>
+                  <VBox>
+                    <Label text="{i18n>crit.savedBy}" />
+                    <MultiComboBox selectedKeys="{state>savedBy}" placeholder="{i18n>crit.everyone}" width="100%" items="{path: 'state>/users', templateShareable: true}">
+                      <core:Item key="{state>name}" text="{state>name}" />
+                    </MultiComboBox>
+                  </VBox>
+                  <VBox>
+                    <Label text="{i18n>crit.sourceType}" />
+                    <MultiComboBox selectedKeys="{state>sourceTypes}" placeholder="{i18n>crit.all}" width="100%">
+                      <core:Item key="TOPIC" text="{i18n>source.TOPIC}" />
+                      <core:Item key="QUEUE_BROWSE" text="{i18n>source.QUEUE_BROWSE}" />
+                      <core:Item key="QUEUE_CONSUME" text="{i18n>source.QUEUE_CONSUME}" />
+                    </MultiComboBox>
+                  </VBox>
+                  <VBox>
+                    <Label text="{i18n>crit.topicContains}" />
+                    <Input value="{state>topicContains}" placeholder="{i18n>crit.topicContains.placeholder}" />
+                  </VBox>
+                </l:Grid>
+              </Panel>
+
+              <!-- subscriber setups -->
+              <Panel class="aemCard aemCategory sapUiSmallMarginBottom" binding="{state>/selection/presets}">
+                <headerToolbar>
+                  <OverflowToolbar style="Clear">
+                    <core:Icon src="sap-icon://bookmark" class="sapUiTinyMarginEnd" />
+                    <Title text="{i18n>category.PRESETS}" />
+                    <Text text="{i18n>category.PRESETS.info}" class="aemHint sapUiSmallMarginBegin" />
+                    <ToolbarSpacer />
+                    <Switch state="{state>enabled}" />
+                  </OverflowToolbar>
+                </headerToolbar>
+                <l:Grid defaultSpan="XL3 L3 M6 S12" hSpacing="1" vSpacing="0.5" containerQuery="true" visible="{state>enabled}" class="aemCriteria">
+                  <VBox>
+                    <layoutData><l:GridData span="XL6 L6 M12 S12" /></layoutData>
+                    <Label text="{i18n>crit.notChangedFor}" required="true" />
+                    <core:Fragment fragmentName="com.aem.suite.cleanup.view.Age" type="XML" />
+                  </VBox>
+                  <VBox>
+                    <Label text="{i18n>crit.users}" />
+                    <MultiComboBox selectedKeys="{state>users}" placeholder="{i18n>crit.everyone}" width="100%" items="{path: 'state>/users', templateShareable: true}">
+                      <core:Item key="{state>name}" text="{state>name}" />
+                    </MultiComboBox>
+                  </VBox>
+                  <VBox>
+                    <Label text="{i18n>crit.brokers}" />
+                    <MultiComboBox selectedKeys="{state>brokerIds}" placeholder="{i18n>crit.all}" width="100%" items="{path: '/Brokers', sorter: {path: 'name'}, templateShareable: true}">
+                      <core:Item key="{ID}" text="{name}" />
+                    </MultiComboBox>
+                  </VBox>
+                  <VBox>
+                    <Label text="{i18n>crit.inactiveBroker}" />
+                    <CheckBox selected="{state>inactiveBroker}" text="{i18n>crit.inactiveBroker.text}" />
+                  </VBox>
+                </l:Grid>
+              </Panel>
+
+              <!-- orphans -->
+              <Panel class="aemCard sapUiSmallMarginBottom" binding="{state>/selection/orphans}">
+                <headerToolbar>
+                  <OverflowToolbar style="Clear">
+                    <core:Icon src="sap-icon://broken-link" class="sapUiTinyMarginEnd" />
+                    <Title text="{i18n>category.ORPHANS}" />
+                    <Text text="{i18n>category.ORPHANS.info}" class="aemHint sapUiSmallMarginBegin" />
+                  </OverflowToolbar>
+                </headerToolbar>
+                <HBox wrap="Wrap" class="sapUiSmallMarginBeginEnd">
+                  <CheckBox selected="{state>messages}" text="{i18n>category.ORPHAN_MESSAGES}" class="sapUiMediumMarginEnd" />
+                  <CheckBox selected="{state>presets}" text="{i18n>category.ORPHAN_PRESETS}" class="sapUiMediumMarginEnd" />
+                  <CheckBox selected="{state>stats}" text="{i18n>category.ORPHAN_STATS}" class="sapUiMediumMarginEnd" />
+                  <CheckBox selected="{state>variables}" text="{i18n>category.ORPHAN_VARIABLES}" />
+                </HBox>
+              </Panel>
+
+              <!-- preview -->
+              <Panel class="aemCard sapUiSmallMarginBottom" visible="{= !!${state>/preview} }">
+                <headerToolbar>
+                  <OverflowToolbar style="Clear">
+                    <core:Icon src="sap-icon://inspection" class="sapUiTinyMarginEnd" />
+                    <Title text="{i18n>preview.title}" />
+                    <ToolbarSpacer />
+                    <ObjectNumber number="{state>/preview/total}" unit="{i18n>preview.rows}" emphasized="true" state="{= ${state>/preview/total} > 0 ? 'Warning' : 'None' }" />
+                  </OverflowToolbar>
+                </headerToolbar>
+                <MessageStrip text="{i18n>preview.stale}" type="Warning" showIcon="true" visible="{= !${state>/previewCurrent} }" class="sapUiSmallMargin" />
+                <Table id="previewTable" items="{state>/preview/categories}" noDataText="{i18n>preview.none}">
+                  <columns>
+                    <Column><Text text="{i18n>preview.category}" /></Column>
+                    <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>preview.cutoff}" /></Column>
+                    <Column hAlign="End"><Text text="{i18n>preview.count}" /></Column>
+                    <Column hAlign="End" width="8rem"><Text text="" /></Column>
+                  </columns>
+                  <items>
+                    <ColumnListItem>
+                      <Text text="{path: 'state>category', formatter: '.categoryText'}" />
+                      <Text text="{path: 'state>cutoff', formatter: '.cutoffText'}" />
+                      <ObjectNumber number="{state>count}" emphasized="{= ${state>count} > 0 }" />
+                      <Button text="{i18n>preview.samples}" type="Transparent" press=".onShowSamples" enabled="{= ${state>count} > 0 }" />
+                    </ColumnListItem>
+                  </items>
+                </Table>
+              </Panel>
+            </VBox>
+          </IconTabFilter>
+
+          <IconTabFilter key="history" text="{i18n>tab.history}" icon="sap-icon://history">
+            <Table
+              id="historyTable"
+              class="aemCard sapUiSmallMarginTop"
+              growing="true"
+              growingThreshold="30"
+              noDataText="{i18n>history.none}"
+              items="{path: '/CleanupLogs', sorter: {path: 'createdAt', descending: true}, suspended: true}">
+              <columns>
+                <Column><Text text="{i18n>history.at}" /></Column>
+                <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>history.by}" /></Column>
+                <Column><Text text="{i18n>history.summary}" /></Column>
+                <Column><Text text="{i18n>history.status}" /></Column>
+                <Column hAlign="End"><Text text="{i18n>history.deleted}" /></Column>
+                <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>history.rule}" /></Column>
+              </columns>
+              <items>
+                <ColumnListItem>
+                  <Text text="{createdAt}" />
+                  <Text text="{createdBy}" />
+                  <VBox>
+                    <Text text="{summary}" />
+                    <Text text="{errorMessage}" visible="{= !!${errorMessage} }" class="aemError" />
+                  </VBox>
+                  <ObjectStatus
+                    text="{path: 'status', formatter: '.statusText'}"
+                    state="{= ${status} === 'DONE' ? 'Success' : ${status} === 'PARTIAL' ? 'Warning' : 'Error' }" />
+                  <ObjectNumber number="{totalCount}" />
+                  <Text text="{ruleName}" />
+                </ColumnListItem>
+              </items>
+            </Table>
+          </IconTabFilter>
+        </items>
+      </IconTabBar>
+    </f:content>
+    <f:footer>
+      <OverflowToolbar>
+        <Text text="{i18n>footer.hint}" class="aemHint" />
+        <ToolbarSpacer />
+        <Button
+          id="previewButton"
+          text="{i18n>footer.preview}"
+          icon="sap-icon://inspection"
+          type="Emphasized"
+          enabled="{state>/hasSelection}"
+          press=".onPreview" />
+        <Button
+          id="deleteButton"
+          text="{i18n>footer.delete}"
+          icon="sap-icon://delete"
+          type="Reject"
+          enabled="{= ${state>/previewCurrent} &amp;&amp; ${state>/preview/total} > 0 }"
+          press=".onDelete" />
+      </OverflowToolbar>
+    </f:footer>
+  </f:DynamicPage>
+</mvc:View>

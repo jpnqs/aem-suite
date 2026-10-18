@@ -1,0 +1,14 @@
+{
+  "name": "aem-suite-cleanup",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "ui5 build --clean-dest --dest dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@sapui5/types": "1.148.12",
+    "ui5-tooling-transpile": "^3.13.1",
+    "ui5-task-zipper": "^3.7.0"
+  }
+}

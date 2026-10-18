@@ -1,0 +1,30 @@
+<!-- How old the data must be: older than N days / weeks / months / years, or before a date. Relative to a category of state>/selection. -->
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+  <HBox alignItems="Center" wrap="Wrap">
+    <SegmentedButton selectedKey="{state>age/mode}" width="13rem" class="sapUiSmallMarginEnd">
+      <items>
+        <SegmentedButtonItem key="OLDER" text="{i18n>age.olderThan}" />
+        <SegmentedButtonItem key="BEFORE" text="{i18n>age.before}" />
+      </items>
+    </SegmentedButton>
+    <StepInput
+      value="{state>age/value}"
+      min="1"
+      max="3650"
+      width="7rem"
+      visible="{= ${state>age/mode} === 'OLDER' }"
+      class="sapUiTinyMarginEnd" />
+    <Select selectedKey="{state>age/unit}" width="8rem" visible="{= ${state>age/mode} === 'OLDER' }">
+      <core:Item key="DAYS" text="{i18n>unit.days}" />
+      <core:Item key="WEEKS" text="{i18n>unit.weeks}" />
+      <core:Item key="MONTHS" text="{i18n>unit.months}" />
+      <core:Item key="YEARS" text="{i18n>unit.years}" />
+    </Select>
+    <DatePicker
+      value="{state>age/before}"
+      valueFormat="yyyy-MM-dd"
+      maxDate="{state>/yesterday}"
+      width="11rem"
+      visible="{= ${state>age/mode} === 'BEFORE' }" />
+  </HBox>
+</core:FragmentDefinition>

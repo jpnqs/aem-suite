@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "allowJs": true,
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "noEmit": true,
+    "lib": ["es2022", "dom"],
+    "rootDir": "./webapp",
+    "baseUrl": "./",
+    "types": ["@sapui5/types"],
+    "paths": {
+      "com/aem/suite/cleanup/shared/*": ["../_shared/*"],
+      "com/aem/suite/cleanup/*": ["./webapp/*"]
+    }
+  },
+  "include": ["./webapp/**/*"]
+}

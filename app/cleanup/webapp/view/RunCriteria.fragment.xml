@@ -1,0 +1,38 @@
+<!-- Criteria of the test runs - for "Test runs" and "Run payloads". Relative to state>/selection/runs or .../runPayloads. -->
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout">
+  <l:Grid defaultSpan="XL3 L3 M6 S12" hSpacing="1" vSpacing="0.5" containerQuery="true" class="aemCriteria">
+    <VBox>
+      <layoutData><l:GridData span="XL6 L6 M12 S12" /></layoutData>
+      <Label text="{i18n>crit.age}" required="true" />
+      <core:Fragment fragmentName="com.aem.suite.cleanup.view.Age" type="XML" />
+    </VBox>
+    <VBox>
+      <Label text="{i18n>crit.outcome}" />
+      <MultiComboBox selectedKeys="{state>outcomes}" placeholder="{i18n>crit.all}" width="100%">
+        <core:Item key="PASSED" text="{i18n>outcome.PASSED}" />
+        <core:Item key="FAILED" text="{i18n>outcome.FAILED}" />
+        <core:Item key="STOPPED" text="{i18n>outcome.STOPPED}" />
+      </MultiComboBox>
+    </VBox>
+    <VBox>
+      <Label text="{i18n>crit.startedBy}" />
+      <MultiComboBox selectedKeys="{state>startedBy}" placeholder="{i18n>crit.everyone}" width="100%" items="{path: 'state>/users', templateShareable: true}">
+        <core:Item key="{state>name}" text="{state>name}" />
+      </MultiComboBox>
+    </VBox>
+    <VBox>
+      <Label text="{i18n>crit.brokers}" />
+      <MultiComboBox selectedKeys="{state>brokerIds}" placeholder="{i18n>crit.all}" width="100%" items="{path: '/Brokers', sorter: {path: 'name'}, templateShareable: true}">
+        <core:Item key="{ID}" text="{name}" />
+      </MultiComboBox>
+    </VBox>
+    <VBox>
+      <Label text="{i18n>crit.summaryContains}" />
+      <Input value="{state>summaryContains}" placeholder="{i18n>crit.summaryContains.placeholder}" />
+    </VBox>
+    <VBox>
+      <Label text="{i18n>crit.keepNewest}" />
+      <StepInput value="{state>keepNewest}" min="0" max="100000" width="9rem" description="{i18n>crit.keepNewest.unit}" />
+    </VBox>
+  </l:Grid>
+</core:FragmentDefinition>

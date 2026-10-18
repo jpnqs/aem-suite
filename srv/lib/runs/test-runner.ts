@@ -26,6 +26,11 @@ export function waitForRun(runId: string): Promise<void> {
   return activeRuns.get(runId) ?? Promise.resolve()
 }
 
+/** The runs the runner of this server still works on (the data cleanup leaves them alone). */
+export function activeRunIds(): string[] {
+  return [...activeRuns.keys()]
+}
+
 /** A result row before the message is sent. */
 type PendingResult = Required<Pick<RunResult, 'ID'>> & { testCase_ID: string; broker_ID: string; brokerName: string }
 
