@@ -29,20 +29,10 @@ annotate service.Brokers with @(
     {Value: credentialMode},
     {Value: destinationName},
     {Value: active},
-    {Value: lastConnectionAt},
-    {
-      $Type : 'UI.DataFieldForAction',
-      Action: 'AdminService.testConnection',
-      Label : '{i18n>TestConnection}'
-    }
+    {Value: lastConnectionAt}
   ],
-  UI.Identification            : [
-    {
-      $Type : 'UI.DataFieldForAction',
-      Action: 'AdminService.testConnection',
-      Label : '{i18n>TestConnection}'
-    },
-  ],
+  // the "Test Connection" buttons are custom actions (manifest.json, webapp/ext/ConnectionTest.js):
+  // no parameter dialog for destination brokers, and a masked password field for direct ones
   UI.HeaderFacets              : [{
     $Type : 'UI.ReferenceFacet',
     Target: '@UI.FieldGroup#Status',
@@ -160,21 +150,10 @@ annotate service.Brokers with @(
   connectionCriticality @UI.Hidden;
 }
 
-// refresh the connection fields after a save (the automatic test) and after "Test Connection"
+// refresh the connection fields after a save (the automatic test)
 annotate service.Brokers with @Common.SideEffects #connection: {
   SourceEntities  : ['/AdminService.EntityContainer/Brokers'],
   TargetProperties: ['lastConnectionStatus', 'lastConnectionAt', 'lastConnectionMessage']
-};
-
-annotate service.Brokers actions {
-  testConnection @Common.SideEffects: {TargetProperties: [
-    'in/lastConnectionStatus',
-    'in/lastConnectionAt',
-    'in/lastConnectionMessage',
-    'in/connectionCriticality'
-  ]}
-  (username @Common.Label: '{i18n>UsernameOnlyIfNotMaintainedOnTheBroker}',
-   password @UI.Masked  @Common.Label: '{i18n>PasswordDirectModeOnlyNotStored}');
 };
 
 

@@ -133,6 +133,11 @@
                     "selectionMode": "Multi"
                   },
                   "actions": {
+                    "testConnection": {
+                      "press": "com.aem.suite.brokers.ext.ConnectionTest.test",
+                      "text": "{{action.testConnection}}",
+                      "requiresSelection": true
+                    },
                     "exportSelected": {
                       "press": "com.aem.suite.brokers.shared.ConfigFile.exportSelected",
                       "text": "{{action.export}}",
@@ -159,6 +164,11 @@
               "content": {
                 "header": {
                   "actions": {
+                    "testConnection": {
+                      "press": "com.aem.suite.brokers.ext.ConnectionTest.test",
+                      "text": "{{action.testConnection}}",
+                      "visible": "{= !${ui>/isEditable} }"
+                    },
                     "help": {
                       "press": "com.aem.suite.brokers.shared.Help.open",
                       "text": "{{action.help}}"
