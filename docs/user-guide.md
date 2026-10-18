@@ -87,7 +87,7 @@ Open **Brokers** → **Create**.
 
 > **Passwords are never saved.** For direct brokers you enter the password when you run tests, test the connection or start a subscription. It is used only for that action.
 
-**Test Connection**: on the broker page, click **Test Connection** (enter the password for direct brokers, and the username if none is maintained on the broker). The result is shown in the header ("Last Connection Test") and in the broker list. Destination brokers are tested automatically when you save them.
+**Test Connection**: on the broker page, or with one or more brokers selected in the list, click **Test Connection**. Destination brokers are tested right away. For direct brokers a dialog asks for the password (and the username if none is maintained on the broker); the password is only used for this test. The result is shown in the header ("Last Connection Test") and in the broker list. Destination brokers are also tested automatically when you save them.
 
 **Broker variables**: on the broker page, section *Broker Variables* – values that apply only when sending to this broker (e.g. `region = eu` for the EU broker). See [section 10](#10-variables-and-templates).
 
