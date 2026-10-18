@@ -1,12 +1,12 @@
 import cds from '@sap/cds'
 import path from 'node:path'
-import { TECHNICAL_ELEMENTS, TEST_FIELDS } from '../srv/lib/test-fields'
+import { TECHNICAL_ELEMENTS, TEST_FIELDS } from '../srv/lib/testcases/test-fields'
 
-// lib/test-fields.ts is the list of test case fields that export, import, the agent and the length checks use.
+// lib/testcases/test-fields.ts is the list of test case fields that export, import, the agent and the length checks use.
 // A new element of aem.suite.TestCases has to be added there (or be a technical one), and the agent's
 // CDS signatures, which cannot be derived from it, have to offer it too.
 
-describe('test case fields (lib/test-fields.ts)', () => {
+describe('test case fields (lib/testcases/test-fields.ts)', () => {
   let model: cds.linked.LinkedCSN
   beforeAll(async () => {
     model = cds.linked(await cds.load(path.join(__dirname, '..', 'srv')))

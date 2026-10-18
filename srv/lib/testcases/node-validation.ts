@@ -1,11 +1,11 @@
 import { TestCases } from '#cds-models/aem/suite'
-import { detectContentType, SORT_STEP } from './defaults'
-import { errMsg, httpError } from './errors'
+import { detectContentType, SORT_STEP } from '../core/defaults'
+import { errMsg, httpError } from '../core/errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
 import { TEST_FIELDS } from './test-fields'
-import type { TestCaseRecord } from './test-case-spec'
+import type { TestCaseRecord } from '../runs/test-case-spec'
 import { loadTree } from './tree'
-import { columnLength, elementOf, enumValues, rangeOf } from './model'
+import { columnLength, elementOf, enumValues, rangeOf } from '../core/model'
 
 /**
  * Rules for creating / changing test cases and folders - shared by the UI service (TestService),

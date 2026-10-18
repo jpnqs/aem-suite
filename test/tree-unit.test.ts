@@ -1,4 +1,4 @@
-import { Tree } from '../srv/lib/tree'
+import { Tree } from '../srv/lib/testcases/tree'
 
 // The in-memory tree without a server (hierarchy queries, moves and folder runs: tree.test.ts).
 

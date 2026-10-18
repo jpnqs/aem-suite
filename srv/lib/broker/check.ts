@@ -1,8 +1,8 @@
-import { loadBroker, resolveConnection } from './credentials/resolve'
+import { loadBroker, resolveConnection } from './resolve'
 import { Brokers, type ConnectionStatus } from '#cds-models/aem/suite'
-import { errMsg, truncate } from './errors'
-import { columnLength } from './model'
-import { connect } from './solace/connector'
+import { errMsg, truncate } from '../core/errors'
+import { columnLength } from '../core/model'
+import { connect } from '../solace/connector'
 
 export interface ConnectionCheck {
   ok: boolean

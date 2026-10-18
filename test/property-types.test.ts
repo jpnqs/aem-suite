@@ -1,5 +1,5 @@
 import { buildMessage } from '../srv/lib/solace/session'
-import { inferPropertyType, parseBool, parseInt64, propertyValueProblem } from '../srv/lib/property-types'
+import { inferPropertyType, parseBool, parseInt64, propertyValueProblem } from '../srv/lib/testcases/property-types'
 
 const TOO_BIG = '9007199254740993' // 2^53 + 1: Number() would silently round it
 

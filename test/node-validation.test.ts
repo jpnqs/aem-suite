@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import path from 'node:path'
-import { collectProblems, NodeData, validateEnums, validateNode } from '../srv/lib/node-validation'
+import { collectProblems, NodeData, validateEnums, validateNode } from '../srv/lib/testcases/node-validation'
 
 // Field rules without a server - enums and lengths come from db/schema.cds.
 

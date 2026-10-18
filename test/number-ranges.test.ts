@@ -1,5 +1,5 @@
 import cds from '@sap/cds'
-import { allocateNumbers } from '../srv/lib/number-ranges'
+import { allocateNumbers } from '../srv/lib/template/number-ranges'
 import { createActive, draft, fakeBroker, resetDatabase, runAndWait, startServer, users } from './helpers'
 
 const { GET, POST, PATCH } = startServer()

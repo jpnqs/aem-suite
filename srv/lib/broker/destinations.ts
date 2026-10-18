@@ -1,7 +1,7 @@
 import cds from '@sap/cds'
 import { getAllDestinationsFromDestinationService, getServiceBinding } from '@sap-cloud-sdk/connectivity'
-import { isBrokerUrl, readBrokerProps } from '../broker-url'
-import { errMsg } from '../errors'
+import { isBrokerUrl, readBrokerProps } from './url'
+import { errMsg } from '../core/errors'
 
 const LOG = cds.log('aem-destinations')
 

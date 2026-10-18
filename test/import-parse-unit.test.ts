@@ -1,8 +1,8 @@
 import cds from '@sap/cds'
 import path from 'node:path'
-import { importNodes } from '../srv/lib/export-import'
+import { importNodes } from '../srv/lib/testcases/export-import'
 
-// Reading an import file (srv/lib/export-import.ts) without a server: a dry run with nodes at the top level only
+// Reading an import file (srv/lib/testcases/export-import.ts) without a server: a dry run with nodes at the top level only
 // needs the model (column lengths, enums). The HTTP side is in export-import.test.ts.
 
 const dryRun = (content: unknown) => importNodes(typeof content === 'string' ? content : JSON.stringify(content), { dryRun: true })

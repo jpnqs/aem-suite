@@ -1,4 +1,4 @@
-import { waitForRun } from '../srv/lib/test-runner'
+import { waitForRun } from '../srv/lib/runs/test-runner'
 import { createActive, fakeBroker, resetDatabase, startServer, users, waitFor, withAemSuiteConfig } from './helpers'
 
 const { GET, POST } = startServer()

@@ -1,7 +1,7 @@
 import cds from '@sap/cds'
 import { TestCases } from '#cds-models/aem/suite'
-import { httpError } from './errors'
-import { columnLength } from './model'
+import { httpError } from '../core/errors'
+import { columnLength } from '../core/model'
 import { selectNodesDeep } from './nodes'
 import { loadTree, renumberSiblings, TreeNode } from './tree'
 

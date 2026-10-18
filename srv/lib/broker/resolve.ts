@@ -1,9 +1,9 @@
 import cds from '@sap/cds'
 import { getDestination } from '@sap-cloud-sdk/connectivity'
 import type { ConnectionConfig } from '../solace/session'
-import { readBrokerProps, toSmfUrl } from '../broker-url'
-import { httpError, HttpError } from '../errors'
-import { DEFAULT_CLIENT_NAME_PREFIX, DEFAULT_CONNECT_TIMEOUT_MS } from '../defaults'
+import { readBrokerProps, toSmfUrl } from './url'
+import { httpError, HttpError } from '../core/errors'
+import { DEFAULT_CLIENT_NAME_PREFIX, DEFAULT_CONNECT_TIMEOUT_MS } from '../core/defaults'
 
 import { Brokers, type CredentialMode } from '#cds-models/aem/suite'
 

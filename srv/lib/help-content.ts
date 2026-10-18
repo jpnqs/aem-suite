@@ -2,8 +2,8 @@ import cds from '@sap/cds'
 import fs from 'node:fs'
 import path from 'node:path'
 import MarkdownIt from 'markdown-it'
-import { config } from './config'
-import { httpError } from './errors'
+import { config } from './core/config'
+import { httpError } from './core/errors'
 
 /**
  * In-app help: the user guide (docs/user-guide.md) rendered to HTML sections for the Help app.

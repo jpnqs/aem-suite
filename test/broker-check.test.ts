@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
-import { checkConnection } from '../srv/lib/broker-check'
-import type { BrokerConnection } from '../srv/lib/credentials/resolve'
+import { checkConnection } from '../srv/lib/broker/check'
+import type { BrokerConnection } from '../srv/lib/broker/resolve'
 import { setConnector } from '../srv/lib/solace/connector'
 import { resetDatabase, startServer } from './helpers'
 

@@ -27,7 +27,7 @@ entity PropertyTypes : CodeList {
 
 /*
  * @assert.range on the enum types: CAP rejects other values on every OData write (the UI only offers them as
- * dropdowns). Direct database writes (agent, import, copy) are checked by lib/node-validation.ts.
+ * dropdowns). Direct database writes (agent, import, copy) are checked by lib/testcases/node-validation.ts.
  */
 @assert.range
 type CredentialMode : String(12) enum {

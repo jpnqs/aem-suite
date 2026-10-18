@@ -7,8 +7,8 @@ import {
   needsPassword,
   needsUsername,
   resolveConnection
-} from '../srv/lib/credentials/resolve'
-import { toSmfUrl } from '../srv/lib/broker-url'
+} from '../srv/lib/broker/resolve'
+import { toSmfUrl } from '../srv/lib/broker/url'
 
 // DESTINATION brokers: the BTP Destination service is replaced, as in destinations.test.ts
 jest.mock('@sap-cloud-sdk/connectivity', () => ({ getDestination: jest.fn() }))

@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto'
-import { errMsg } from '../errors'
+import { errMsg } from '../core/errors'
 
 /**
  * Template syntax: {{name}} or {{fn(arg1, arg2)}}

@@ -1,10 +1,10 @@
 import cds from '@sap/cds'
 import path from 'node:path'
-import { columnLength, enumValues, rangeOf } from '../srv/lib/model'
+import { columnLength, enumValues, rangeOf } from '../srv/lib/core/model'
 
 // Facts of db/schema.cds as the code reads them (lengths for truncation, enum values and limits for validation).
 
-describe('model facts (lib/model.ts)', () => {
+describe('model facts (lib/core/model.ts)', () => {
   const before = cds.model
   afterAll(() => {
     cds.model = before

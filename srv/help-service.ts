@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import { loadGuide } from './lib/help-content'
-import { keyValue } from './lib/request'
+import { keyValue } from './lib/core/request'
 
 export default class HelpService extends cds.ApplicationService {
   async init() {

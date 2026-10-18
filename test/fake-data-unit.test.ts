@@ -1,4 +1,4 @@
-import { generateFake } from '../srv/lib/fake-data'
+import { generateFake } from '../srv/lib/template/fake-data'
 import { TemplateError, TemplateResolver, fakerKey, generatedSlots } from '../srv/lib/template/resolve'
 
 // faker test data without a server: generation, refusals and the template side (previews and runs: fake-data.test.ts).

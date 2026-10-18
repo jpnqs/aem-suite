@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
-import * as testCaseSpec from '../srv/lib/test-case-spec'
-import { failRuns, waitForRun } from '../srv/lib/test-runner'
+import * as testCaseSpec from '../srv/lib/runs/test-case-spec'
+import { failRuns, waitForRun } from '../srv/lib/runs/test-runner'
 import { setSessionFactory, stopAll } from '../srv/lib/solace/subscription-hub'
 import { FakeSubscriberSession } from './fakes/solace'
 import { createActive, draft, fakeBroker, resetDatabase, runAndWait, startServer, users, withDestinations } from './helpers'

@@ -1,6 +1,6 @@
-import { buildSpec, scopeFor, TestCaseRecord, VariableScopes } from '../srv/lib/test-case-spec'
+import { buildSpec, scopeFor, TestCaseRecord, VariableScopes } from '../srv/lib/runs/test-case-spec'
 import { TemplateError } from '../srv/lib/template/resolve'
-import { Tree } from '../srv/lib/tree'
+import { Tree } from '../srv/lib/testcases/tree'
 
 // From a stored test case to what is published - without a database.
 

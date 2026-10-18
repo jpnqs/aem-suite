@@ -1,9 +1,9 @@
 import cds from '@sap/cds'
 import path from 'node:path'
-import type { AemSuiteConfig } from '../srv/lib/config'
+import type { AemSuiteConfig } from '../srv/lib/core/config'
 import { setConnector } from '../srv/lib/solace/connector'
 import type { PublishSpec } from '../srv/lib/solace/session'
-import { waitForRun } from '../srv/lib/test-runner'
+import { waitForRun } from '../srv/lib/runs/test-runner'
 
 /** The mocked users (package.json, profiles development and test). */
 export const users = {

@@ -8,7 +8,7 @@ import { textsOf, Texts } from "./i18n";
 
 /**
  * Export and import of test cases and folders as a JSON file: the browser saves / reads the file, the content
- * travels in the actions exportNodes / importNodes of the service (srv/lib/export-import.ts).
+ * travels in the actions exportNodes / importNodes of the service (srv/lib/testcases/export-import.ts).
  */
 
 const REVOKE_URL_MS = 1000;

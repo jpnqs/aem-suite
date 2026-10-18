@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import type { Application, Request, Response, NextFunction } from 'express'
-import { config } from './config'
+import { config } from './core/config'
 
 /**
  * OAuth discovery for the MCP endpoint (MCP authorization spec, RFC 9728 / RFC 8414), so AI clients

@@ -124,9 +124,9 @@ Browser ── approuter (XSUAA, websockets) ──┬─ /odata/v4/{admin,test,
 CAP srv (TypeScript)
   srv/lib/solace/session.ts            solclientjs session wrapper: connect, publish + ACK, subscribe, queue flows
   srv/lib/solace/subscription-hub.ts   live subscriptions (in memory, per user, heartbeat-based idle timeout)
-  srv/lib/test-runner.ts               async multi-broker runs, results + websocket progress
+  srv/lib/runs/test-runner.ts               async multi-broker runs, results + websocket progress
   srv/lib/template/resolve.ts          {{variable}} resolver
-  srv/lib/credentials/                 destination / direct connection data, destination value help
+  srv/lib/broker/                 destination / direct connection data, destination value help
 HANA Cloud · Destination service · XSUAA
 ```
 

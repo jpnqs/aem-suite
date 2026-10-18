@@ -1,6 +1,6 @@
 import { allFakers, type Faker } from '@faker-js/faker'
-import { FAKER_PREFIX, TemplateError } from './template/resolve'
-import { errMsg } from './errors'
+import { FAKER_PREFIX, TemplateError } from './resolve'
+import { errMsg } from '../core/errors'
 
 /**
  * Test data from faker.js for templates: {{faker.<module>.<method>}} or {{faker.<module>.<method>(args)}}, e.g.

@@ -1,9 +1,9 @@
 import cds from '@sap/cds'
 import type solace from 'solclientjs'
-import { config } from '../config'
-import { BrokerConnection, loadBroker, resolveConnection } from '../credentials/resolve'
-import { errMsg, httpError } from '../errors'
-import { emitLive } from '../live'
+import { config } from '../core/config'
+import { BrokerConnection, loadBroker, resolveConnection } from '../broker/resolve'
+import { errMsg, httpError } from '../core/errors'
+import { emitLive } from '../core/live'
 import { readMessage, SolaceSession, sol } from './session'
 
 const LOG = cds.log('aem-subscribe')

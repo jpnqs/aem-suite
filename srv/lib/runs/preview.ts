@@ -1,6 +1,6 @@
-import { loadBroker } from './credentials/resolve'
+import { loadBroker } from '../broker/resolve'
 import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord, withGenerated } from './test-case-spec'
-import { errMsg } from './errors'
+import { errMsg } from '../core/errors'
 
 export interface Preview {
   valid: boolean

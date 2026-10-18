@@ -1,7 +1,7 @@
 import cds from '@sap/cds'
 import { Brokers, ReceivedMessages, TestCases, TestRuns } from '#cds-models/aem/suite'
 import { listSubscriptions } from './lib/solace/subscription-hub'
-import { runOutcome } from './lib/test-runner'
+import { runOutcome } from './lib/runs/test-runner'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RECENT_DAYS = 7

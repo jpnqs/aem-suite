@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
-import * as testCaseSpec from '../srv/lib/test-case-spec'
-import { runOutcome } from '../srv/lib/test-runner'
+import * as testCaseSpec from '../srv/lib/runs/test-case-spec'
+import { runOutcome } from '../srv/lib/runs/test-runner'
 import { createActive, fakeBroker, resetDatabase, runAndWait, startServer, users } from './helpers'
 
 const { GET, POST } = startServer()

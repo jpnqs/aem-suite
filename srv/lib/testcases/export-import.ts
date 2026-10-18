@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
-import { SORT_STEP } from './defaults'
-import { errMsg, httpError } from './errors'
+import { SORT_STEP } from '../core/defaults'
+import { errMsg, httpError } from '../core/errors'
 import { collectProblems, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './node-validation'
 import { TestCases } from '#cds-models/aem/suite'
 import { selectNodesDeep } from './nodes'

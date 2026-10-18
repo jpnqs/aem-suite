@@ -1,6 +1,6 @@
-import { detectContentType } from '../srv/lib/defaults'
-import { normalizeBrokerUrl } from '../srv/lib/broker-url'
-import { inferPropertyType } from '../srv/lib/property-types'
+import { detectContentType } from '../srv/lib/core/defaults'
+import { normalizeBrokerUrl } from '../srv/lib/broker/url'
+import { inferPropertyType } from '../srv/lib/testcases/property-types'
 
 describe('normalizeBrokerUrl', () => {
   it.each([

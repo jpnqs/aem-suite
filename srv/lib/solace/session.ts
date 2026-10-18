@@ -1,8 +1,8 @@
 import solace from 'solclientjs'
 import { randomUUID } from 'node:crypto'
-import { DEFAULT_ACK_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS } from '../defaults'
-import { errMsg } from '../errors'
-import { parseBool, parseInt64, PropertyType } from '../property-types'
+import { DEFAULT_ACK_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS } from '../core/defaults'
+import { errMsg } from '../core/errors'
+import { parseBool, parseInt64, PropertyType } from '../testcases/property-types'
 
 let initialized = false
 

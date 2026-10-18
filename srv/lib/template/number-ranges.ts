@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import { NumberRanges } from '#cds-models/aem/suite'
-import { TemplateError, type GeneratedSlot } from './template/resolve'
+import { TemplateError, type GeneratedSlot } from './resolve'
 
 /** Name of a number range as used in {{numberRange.<name>}}. */
 export const RANGE_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/

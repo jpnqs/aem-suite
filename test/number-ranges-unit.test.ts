@@ -1,4 +1,4 @@
-import { formatNumber, nextExample } from '../srv/lib/number-ranges'
+import { formatNumber, nextExample } from '../srv/lib/template/number-ranges'
 import { TemplateError, TemplateResolver, generatedSlots } from '../srv/lib/template/resolve'
 
 // Number ranges without a server: the template side and the formatting (service and runs: number-ranges.test.ts).

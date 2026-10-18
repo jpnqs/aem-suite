@@ -1,6 +1,6 @@
 import { TestCases, type TestCase } from '#cds-models/aem/suite'
-import { SORT_STEP } from './defaults'
-import { httpError } from './errors'
+import { SORT_STEP } from '../core/defaults'
+import { httpError } from '../core/errors'
 
 /**
  * Helpers for the test case tree (folders + test cases in aem.suite.TestCases).

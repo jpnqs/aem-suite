@@ -1,10 +1,10 @@
 import cds from '@sap/cds'
-import { copyNodes } from '../srv/lib/copy-nodes'
-import { buildPreview } from '../srv/lib/preview'
-import type { TestCaseRecord } from '../srv/lib/test-case-spec'
+import { copyNodes } from '../srv/lib/testcases/copy-nodes'
+import { buildPreview } from '../srv/lib/runs/preview'
+import type { TestCaseRecord } from '../srv/lib/runs/test-case-spec'
 import { resetDatabase, startServer } from './helpers'
 
-// srv/lib/preview.ts and srv/lib/copy-nodes.ts called directly (the services use them through
+// srv/lib/runs/preview.ts and srv/lib/testcases/copy-nodes.ts called directly (the services use them through
 // TestService.preview / duplicate / copyNodes and the agent's previewTestCase / copyNodes).
 
 startServer()

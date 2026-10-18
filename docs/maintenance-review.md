@@ -23,20 +23,20 @@ State of branch `chore/maintenance-review` after working through sections 2–7 
 | B3 | Fixed | 9161236 | `validateVariables` also for broker variables |
 | B4 | Fixed | b233ecf | `@restrict` on ReceivedMessages (read/save/createTestCase for testers, delete own; admins delete any); not updatable in the service |
 | B5 | Fixed | c4bfe31 | 404 for unknown broker, 400 for inactive broker and failed connect (400 rather than 502: CAP hides 5xx texts in production) |
-| B6 | Fixed | 71fc969 | descriptor in `srv/lib/test-fields.ts` (not `lib/nodes.ts`: circular import), guarded by `test/test-fields.test.ts` incl. the agent CDS signatures |
+| B6 | Fixed | 71fc969 | descriptor in `srv/lib/testcases/test-fields.ts` (not `lib/testcases/nodes.ts`: circular import), guarded by `test/test-fields.test.ts` incl. the agent CDS signatures |
 | B7 | Fixed | 4d7b60d | `srv/common.cds` (namespace `aem.suite.api`); RunRef has `total` in both services |
 | B8 | Fixed | 33f262f | skippedCount/repetitions/iteration/sequence exposed, `skipped` in the summary, failures filtered in the query |
-| B9 | Fixed | 474e687, a8baccb | `lib/model.ts#columnLength` for every cut; redundant preset length checks removed |
+| B9 | Fixed | 474e687, a8baccb | `lib/core/model.ts#columnLength` for every cut; redundant preset length checks removed |
 | B10 | Fixed | 5bd5b1d | separate `disposed` flag; `bindFlow` timeout guard |
 | B11 | Fixed | (B11 commit) | new RunStatus STOPPED: cancelRun ends the run STOPPED, outcome STOPPED / criticality 2 (FAILED if something failed), in TestService, Home, the agent (RunSummary, instructions), the run dialog and the docs; failRuns stays FAILED |
 | B12 | Fixed | 135ddca, 33f262f | comments fixed, `@mcp.instructions` extended, createRun/executeRunInBackground/normalizeOptions no longer exported |
 | B13 | Fixed | 35c5ed0 | enum unions come from the cds-typer models; preset SOURCE_TYPES check replaced by `@assert.range` |
-| B14 | Fixed | 135ddca | `lib/live.ts#emitLive`; all loggers `aem-` (audit logger is now `aem-agent`) |
+| B14 | Fixed | 135ddca | `lib/core/live.ts#emitLive`; all loggers `aem-` (audit logger is now `aem-agent`) |
 | B15 | Fixed | df0a3cb | `errMsg` everywhere, `req.reject` in on-handlers (before-handlers keep collecting with `req.error`) |
 | B16 | Fixed | df0a3cb | one FAKER_PREFIX, `generatedSlots`/`TemplateScope.generated`/`withGenerated`, `referencedNames`+`isBuiltin` removed, quote-aware faker arguments |
 | B17 | Fixed | 35c5ed0 | cds-typer entities and row types in tree, nodes, test-runner, home, agent, copy, export/import, number ranges, credentials; `@singular` fixes; typecheck/test/e2e server generate the models. Two `NumberRanges.current` updates stay by name (typer types Integer64 as number) |
 | B17a | Fixed | 8b33008 | `keyOf` returns a Partial key, `idOf` rejects without ID, `keyValue` for Destinations and Help |
-| B18 | Fixed | 8b33008 | `lib/unique-name.ts#nameTaken`, case-insensitive for global variables, number ranges and setups |
+| B18 | Fixed | 8b33008 | `lib/core/unique-name.ts#nameTaken`, case-insensitive for global variables, number ranges and setups |
 | B19 | Fixed | 4a9b982 | agent relies on startRun/createRun (with its own message limit); its refusal text now says "messages" |
 | B20 | Fixed | 4a9b982 | test compares CDS outcome/criticality with `runOutcome` for every status combination |
 | B21 | Fixed | 5cca662 | stats of deleted test cases are deleted in TestService (association kept: as a composition drafts would copy stats) |
@@ -106,7 +106,7 @@ Items marked **⚖ Decision** need a decision from the owner (security policy, d
 
 ## 1. Summary
 
-The code base is in clearly better shape than two days ago. Shared helpers exist (`lib/errors.ts`, `lib/config.ts`, `lib/request.ts`, `app/_shared`), linting covers TypeScript, `npm run verify` exists, and the subscription hub has its own tests.
+The code base is in clearly better shape than two days ago. Shared helpers exist (`lib/core/errors.ts`, `lib/core/config.ts`, `lib/core/request.ts`, `app/_shared`), linting covers TypeScript, `npm run verify` exists, and the subscription hub has its own tests.
 
 The remaining maintenance cost comes from five themes:
 
@@ -184,7 +184,7 @@ Several consistency checks exist only as Jest tests, so they protect nothing unl
 ### 3.1 Bugs and security
 
 #### B1 – A failing DB write during a run is swallowed and the run ends `DONE` (High)
-[srv/lib/test-runner.ts:313-314](../srv/lib/test-runner.ts#L313-L314), [:230-238](../srv/lib/test-runner.ts#L230-L238)
+[srv/lib/runs/test-runner.ts:313-314](../srv/lib/runs/test-runner.ts#L313-L314), [:230-238](../srv/lib/runs/test-runner.ts#L230-L238)
 
 ```ts
 await Promise.allSettled(brokerIds.map((brokerId) => runBroker(brokerId, pending.filter(...), ctx)))
@@ -205,12 +205,12 @@ The comment at `:317` ("every result ends PASSED, FAILED or ERROR") is therefore
 - Optionally, let a failed per-result write mark only that result `ERROR`.
 
 #### B2 – Enum values are not checked on the OData paths (Medium)
-[db/schema.cds:22-75](../db/schema.cds#L22-L75), [srv/test-service.ts:40-46](../srv/test-service.ts#L40-L46), [srv/lib/node-validation.ts:8-12](../srv/lib/node-validation.ts#L8-L12)
+[db/schema.cds:22-75](../db/schema.cds#L22-L75), [srv/test-service.ts:40-46](../srv/test-service.ts#L40-L46), [srv/lib/testcases/node-validation.ts:8-12](../srv/lib/testcases/node-validation.ts#L8-L12)
 
 - CAP validates enum values only when an element has `@assert.range`, and none does.
 - `validateEnums` is called by the agent, the import and `createNode`, but not by `TestService`'s `before(['CREATE','UPDATE'], TestCases)` handler.
 - So a direct OData PATCH can store `deliveryMode: 'FOO'`, `TestCaseProperties.type: 'X'` or `Brokers.credentialMode: 'X'`.
-- The `credentialMode` case matters: `needsPassword` ([resolve.ts:103-105](../srv/lib/credentials/resolve.ts#L103-L105)) treats any value other than `'DESTINATION'` as DIRECT.
+- The `credentialMode` case matters: `needsPassword` ([resolve.ts:103-105](../srv/lib/broker/resolve.ts#L103-L105)) treats any value other than `'DESTINATION'` as DIRECT.
 - The header comment of `node-validation.ts` ("all ways in apply exactly the same checks") is therefore not true.
 
 **Recommendation:**
@@ -223,7 +223,7 @@ The comment at `:317` ("every result ends PASSED, FAILED or ERROR") is therefore
 
 - Only `GlobalVariables` gets name and duplicate checks. The "Broker Variables" table on the broker object page accepts any name.
 - A name like `my var` saves fine but can never be referenced: `EXPR` in [template/resolve.ts:63](../srv/lib/template/resolve.ts#L63) requires `[A-Za-z_][\w.-]*`.
-- Duplicate names resolve to whichever row loads last ([test-case-spec.ts:62-68](../srv/lib/test-case-spec.ts#L62-L68)).
+- Duplicate names resolve to whichever row loads last ([test-case-spec.ts:62-68](../srv/lib/runs/test-case-spec.ts#L62-L68)).
 
 **Recommendation:** extract `validateVariables(list, reject, targetPrefix)` from `validateNode` and call it from the Brokers `before(['CREATE','UPDATE'])` handler as well.
 
@@ -237,7 +237,7 @@ The comment at `:317` ("every result ends PASSED, FAILED or ERROR") is therefore
 **Recommendation:** `@restrict: [{ grant: 'READ', to: 'Tester' }, { grant: 'DELETE', to: 'Tester', where: 'createdBy = $user' }, { grant: '*', to: 'Admin' }]`, adjusted to what the UI needs (it creates through the `createTestCase` action and through the live view's save). Then move `Updatable: false` from the UI annotations into the service.
 
 #### B5 – `startSubscription` returns 500 for user errors (Medium)
-[srv/lib/solace/subscription-hub.ts:115-122](../srv/lib/solace/subscription-hub.ts#L115-L122), [srv/lib/credentials/resolve.ts:29-33](../srv/lib/credentials/resolve.ts#L29-L33), [srv/lib/solace/session.ts:121](../srv/lib/solace/session.ts#L121)
+[srv/lib/solace/subscription-hub.ts:115-122](../srv/lib/solace/subscription-hub.ts#L115-L122), [srv/lib/broker/resolve.ts:29-33](../srv/lib/broker/resolve.ts#L29-L33), [srv/lib/solace/session.ts:121](../srv/lib/solace/session.ts#L121)
 
 - `resolveConnection` errors become `httpError(400)`.
 - `loadBroker` throws a plain `Error('Broker … not found')`, and a failed `openSession` (wrong password, unreachable host) throws a plain `Error('Connect failed: …')`. Both reach the client as **500**.
@@ -255,13 +255,13 @@ The comment at `:317` ("every result ends PASSED, FAILED or ERROR") is therefore
 |---|---|
 | `TEST_FIELDS` | [agent-service.ts:29-41](../srv/agent-service.ts#L29-L41) |
 | `TestNodes` and the parameters of `createTestCase`/`updateTestCase` | [agent-service.cds:23-45, :167-200](../srv/agent-service.cds#L23-L45) |
-| `NodeDoc`, `Row`, `toDoc`, and the text/whole lists in `nodeData` | [export-import.ts:32-48, :77-90, :133-148, :264-265](../srv/lib/export-import.ts#L32-L48) |
-| `TestCaseRecord` | [test-case-spec.ts:12-28](../srv/lib/test-case-spec.ts#L12-L28) |
-| the length-checked fields | [node-validation.ts:89](../srv/lib/node-validation.ts#L89) |
+| `NodeDoc`, `Row`, `toDoc`, and the text/whole lists in `nodeData` | [export-import.ts:32-48, :77-90, :133-148, :264-265](../srv/lib/testcases/export-import.ts#L32-L48) |
+| `TestCaseRecord` | [test-case-spec.ts:12-28](../srv/lib/runs/test-case-spec.ts#L12-L28) |
+| the length-checked fields | [node-validation.ts:89](../srv/lib/testcases/node-validation.ts#L89) |
 
 Adding a field such as `replyTo` means touching all of them. If one is forgotten, export/import or the agent drops the field without an error.
 
-**Recommendation:** one descriptor in `lib/nodes.ts` (for example `TEST_FIELDS = { topic: 'text', ttl: 'int', … }`) used by export, import, the agent and validation. Even better, derive it from `cds.model.definitions['aem.suite.TestCases'].elements`. Add a test that the descriptor covers every element of the entity, except the technical ones.
+**Recommendation:** one descriptor in `lib/testcases/nodes.ts` (for example `TEST_FIELDS = { topic: 'text', ttl: 'int', … }`) used by export, import, the agent and validation. Even better, derive it from `cds.model.definitions['aem.suite.TestCases'].elements`. Add a test that the descriptor covers every element of the entity, except the technical ones.
 
 #### B7 – The same result types are declared twice in CDS (Medium)
 [srv/test-service.cds:162-192, :224-241](../srv/test-service.cds#L162-L192) vs. [srv/agent-service.cds:214-243, :252-275](../srv/agent-service.cds#L214-L243)
@@ -286,14 +286,14 @@ Adding a field such as `replyTo` means touching all of them. If one is forgotten
 
 #### B9 – Column lengths are hardcoded in about 12 places (Medium)
 - Hardcoded:
-  - `MAX_ERROR = 2000` and the values 500 and 1000 in [test-runner.ts:13-14, :83, :429-430](../srv/lib/test-runner.ts#L13-L14)
-  - [broker-check.ts:41](../srv/lib/broker-check.ts#L41)
+  - `MAX_ERROR = 2000` and the values 500 and 1000 in [test-runner.ts:13-14, :83, :429-430](../srv/lib/runs/test-runner.ts#L13-L14)
+  - [broker/check.ts:41](../srv/lib/broker/check.ts#L41)
   - [subscribe-service.ts:102-103](../srv/subscribe-service.ts#L102-L103)
-  - `.slice(0, 200)` in [copy-nodes.ts:59](../srv/lib/copy-nodes.ts#L59) and [test-service.ts:35](../srv/test-service.ts#L35)
+  - `.slice(0, 200)` in [copy-nodes.ts:59](../srv/lib/testcases/copy-nodes.ts#L59) and [test-service.ts:35](../srv/test-service.ts#L35)
 - `node-validation.ts:62-67` already reads the lengths from the model (`elementOf`).
 - `subscribe-service.ts:127-144` re-checks preset lengths that CAP already enforces for OData input.
 
-**Recommendation:** move `elementOf` into `lib/model.ts` as `columnLength(entity, element)`, use it for every `truncate` (this also fixes the trigger of B1), and drop the redundant preset checks.
+**Recommendation:** move `elementOf` into `lib/core/model.ts` as `columnLength(entity, element)`, use it for every `truncate` (this also fixes the trigger of B1), and drop the redundant preset checks.
 
 #### B10 – Session cleanup gaps in the Solace session (Medium)
 [srv/lib/solace/session.ts:251-253, :300-306, :321-337](../srv/lib/solace/session.ts#L300-L306)
@@ -304,7 +304,7 @@ Adding a field such as `replyTo` means touching all of them. If one is forgotten
 **Recommendation:** use a separate `disposed` flag so that `close()` always disposes exactly once, and give `bindFlow` the same timeout guard as `connect`.
 
 #### B11 – A stopped run looks like a successful one (Low) ⚖ Decision
-[srv/lib/test-runner.ts:250-260, :383-386](../srv/lib/test-runner.ts#L250-L260), [srv/test-service.cds:94-99](../srv/test-service.cds#L94-L99)
+[srv/lib/runs/test-runner.ts:250-260, :383-386](../srv/lib/runs/test-runner.ts#L250-L260), [srv/test-service.cds:94-99](../srv/test-service.cds#L94-L99)
 
 A cancelled run ends `status: 'DONE'` with the outcome PASSED (green) if nothing failed. Only `skippedCount` tells it apart. **Option:** add a `STOPPED` value to `RunStatus`, or let the outcome show it. This changes product behaviour, and `run-options.test.ts:109` currently asserts the existing behaviour.
 
@@ -312,15 +312,15 @@ A cancelled run ends `status: 'DONE'` with the outcome PASSED (green) if nothing
 
 | # | What | Where | Recommendation |
 |---|---|---|---|
-| B12 | Stale comments | [live-service.cds:27](../srv/live-service.cds#L27) says "(UP, DOWN, ERROR)", but the code emits STOPPED/DOWN/THROTTLED/RESUMED. [defaults.ts:1-4](../srv/lib/defaults.ts#L1-L4) still says "completes user input" (that moved to `broker-url.ts`). [number-ranges.ts:42](../srv/lib/number-ranges.ts#L42) names a `count` parameter, but the function takes `last`. [test-runner.ts:107-110](../srv/lib/test-runner.ts#L107-L110) still describes calling `executeRunInBackground` by hand. [agent-service.cds:16](../srv/agent-service.cds#L16) `@mcp.instructions` does not mention `{{newUuid}}`, `{{numberRange.X}}` or `{{faker.…}}` | Fix the texts. Un-export `createRun`, `executeRunInBackground` and `normalizeOptions` if only the module uses them |
-| B13 | Enum literal unions re-declared in TS: `PropertyType`, `DeliveryMode`, `NodeKind`, `CredentialMode`, `SourceType` (3× incl. `SOURCE_TYPES`), `'OK'\|'ERROR'`, `'FOLDER'\|'TEST'`. Some fields are plain `string` where the schema has an enum (`session.ts:66`, `subscription-hub.ts:49`, `node-validation.ts:101`) | [property-types.ts:5](../srv/lib/property-types.ts#L5), [session.ts:29](../srv/lib/solace/session.ts#L29), [tree.ts:10](../srv/lib/tree.ts#L10), [resolve.ts:8](../srv/lib/credentials/resolve.ts#L8), [subscription-hub.ts:10](../srv/lib/solace/subscription-hub.ts#L10), [subscribe-service.ts:117](../srv/subscribe-service.ts#L117) | Take them from cds-typer (B17 below), or re-export them from one `lib/types.ts` |
-| B14 | Two ways to push to `LiveService`: the runner connects once, while the hub calls `cds.connect.to('LiveService')` per message. Logger names are mixed (`aem-runner`, `aem-subscribe`, `aem-destinations`, plain `agent`) | [test-runner.ts:266-287](../srv/lib/test-runner.ts#L266-L287), [subscription-hub.ts:268-275](../srv/lib/solace/subscription-hub.ts#L268-L275), [agent-service.ts:13](../srv/agent-service.ts#L13) | One `lib/live.ts#emitLive(event, data, context)`, and the `aem-` prefix for every logger |
+| B12 | Stale comments | [live-service.cds:27](../srv/live-service.cds#L27) says "(UP, DOWN, ERROR)", but the code emits STOPPED/DOWN/THROTTLED/RESUMED. [defaults.ts:1-4](../srv/lib/core/defaults.ts#L1-L4) still says "completes user input" (that moved to `broker/url.ts`). [number-ranges.ts:42](../srv/lib/template/number-ranges.ts#L42) names a `count` parameter, but the function takes `last`. [test-runner.ts:107-110](../srv/lib/runs/test-runner.ts#L107-L110) still describes calling `executeRunInBackground` by hand. [agent-service.cds:16](../srv/agent-service.cds#L16) `@mcp.instructions` does not mention `{{newUuid}}`, `{{numberRange.X}}` or `{{faker.…}}` | Fix the texts. Un-export `createRun`, `executeRunInBackground` and `normalizeOptions` if only the module uses them |
+| B13 | Enum literal unions re-declared in TS: `PropertyType`, `DeliveryMode`, `NodeKind`, `CredentialMode`, `SourceType` (3× incl. `SOURCE_TYPES`), `'OK'\|'ERROR'`, `'FOLDER'\|'TEST'`. Some fields are plain `string` where the schema has an enum (`session.ts:66`, `subscription-hub.ts:49`, `node-validation.ts:101`) | [property-types.ts:5](../srv/lib/testcases/property-types.ts#L5), [session.ts:29](../srv/lib/solace/session.ts#L29), [tree.ts:10](../srv/lib/testcases/tree.ts#L10), [resolve.ts:8](../srv/lib/broker/resolve.ts#L8), [subscription-hub.ts:10](../srv/lib/solace/subscription-hub.ts#L10), [subscribe-service.ts:117](../srv/subscribe-service.ts#L117) | Take them from cds-typer (B17 below), or re-export them from one `lib/types.ts` |
+| B14 | Two ways to push to `LiveService`: the runner connects once, while the hub calls `cds.connect.to('LiveService')` per message. Logger names are mixed (`aem-runner`, `aem-subscribe`, `aem-destinations`, plain `agent`) | [test-runner.ts:266-287](../srv/lib/runs/test-runner.ts#L266-L287), [subscription-hub.ts:268-275](../srv/lib/solace/subscription-hub.ts#L268-L275), [agent-service.ts:13](../srv/agent-service.ts#L13) | One `lib/core/live.ts#emitLive(event, data, context)`, and the `aem-` prefix for every logger |
 | B15 | Error style is mixed: `return req.error(404)` / `req.reject(404)` / `throw httpError`. `(e as Error).message` is used instead of `errMsg(e)` in ~12 places (a non-Error throw gives `undefined`) | `test-service.ts:82`, `subscribe-service.ts:75`, `agent-service.ts:89,109,124,147`, `admin-service.ts:86`, `destinations.ts:38`, `export-import.ts:206`, `fake-data.ts:85`, `node-validation.ts:124`, `preview.ts:32`, `session.ts:148,172,191,220,334` | `req.reject` in handlers, `httpError` in `lib/`, `errMsg` everywhere |
-| B16 | Template module: `FAKER_PREFIX` is defined twice. The `isBuiltin` list repeats the `fixed` keys. `NumberSlot` now also carries faker values (`range: ''`), so the names `numberSlots` and `TemplateScope.numbers` are misleading. `referencedNames` is used only in tests. `parseArgs` splits on every comma, including inside quoted strings | [fake-data.ts:11, :49](../srv/lib/fake-data.ts#L11), [template/resolve.ts:40-47, :75-83, :99, :129, :164, :203](../srv/lib/template/resolve.ts#L40-L47) | One constant. Derive `isBuiltin` from `fixed`. Rename to `generatedSlots`/`generated`. Use a quote-aware split |
-| B17a | Key reading bypasses `keyOf`, and `keyOf` returns `{} as EntityKey`, so `.ID` is typed `string` but can be `undefined` | [admin-service.ts:146](../srv/admin-service.ts#L146), [help-service.ts:8](../srv/help-service.ts#L8), [request.ts:11](../srv/lib/request.ts#L11) | Use `keyOf` everywhere, typed as `Partial<…>` or with a throw-on-missing variant |
+| B16 | Template module: `FAKER_PREFIX` is defined twice. The `isBuiltin` list repeats the `fixed` keys. `NumberSlot` now also carries faker values (`range: ''`), so the names `numberSlots` and `TemplateScope.numbers` are misleading. `referencedNames` is used only in tests. `parseArgs` splits on every comma, including inside quoted strings | [fake-data.ts:11, :49](../srv/lib/template/fake-data.ts#L11), [template/resolve.ts:40-47, :75-83, :99, :129, :164, :203](../srv/lib/template/resolve.ts#L40-L47) | One constant. Derive `isBuiltin` from `fixed`. Rename to `generatedSlots`/`generated`. Use a quote-aware split |
+| B17a | Key reading bypasses `keyOf`, and `keyOf` returns `{} as EntityKey`, so `.ID` is typed `string` but can be `undefined` | [admin-service.ts:146](../srv/admin-service.ts#L146), [help-service.ts:8](../srv/help-service.ts#L8), [request.ts:11](../srv/lib/core/request.ts#L11) | Use `keyOf` everywhere, typed as `Partial<…>` or with a throw-on-missing variant |
 | B18 | Name uniqueness: case-insensitive for NumberRanges, case-sensitive for GlobalVariables and presets | [admin-service.ts:119-122, :185-186](../srv/admin-service.ts#L119-L122), [subscribe-service.ts:129](../srv/subscribe-service.ts#L129) | Pick one rule (case-insensitive) in a shared helper |
-| B19 | `startRun` logic: the agent handler repeats the unknown-test-case check and `expandToTests` that `createRun` already does | [agent-service.ts:174-177](../srv/agent-service.ts#L174-L177), [test-runner.ts:119-122](../srv/lib/test-runner.ts#L119-L122) | Let the agent rely on `createRun` |
-| B20 | Criticality and outcome are still written twice (CDS `case` vs. TS `runOutcome`), and the PASSED/FAILED/ERROR `case` is repeated within `test-service.cds` | [test-service.cds:93-99, :118-135](../srv/test-service.cds#L93-L99), [test-runner.ts:379-386](../srv/lib/test-runner.ts#L379-L386), [admin-service.ts:106-107](../srv/admin-service.ts#L106-L107) | Accept with the existing "keep in sync" comments, but add one test that compares the CDS outcome with `runOutcome` for every status combination |
+| B19 | `startRun` logic: the agent handler repeats the unknown-test-case check and `expandToTests` that `createRun` already does | [agent-service.ts:174-177](../srv/agent-service.ts#L174-L177), [test-runner.ts:119-122](../srv/lib/runs/test-runner.ts#L119-L122) | Let the agent rely on `createRun` |
+| B20 | Criticality and outcome are still written twice (CDS `case` vs. TS `runOutcome`), and the PASSED/FAILED/ERROR `case` is repeated within `test-service.cds` | [test-service.cds:93-99, :118-135](../srv/test-service.cds#L93-L99), [test-runner.ts:379-386](../srv/lib/runs/test-runner.ts#L379-L386), [admin-service.ts:106-107](../srv/admin-service.ts#L106-L107) | Accept with the existing "keep in sync" comments, but add one test that compares the CDS outcome with `runOutcome` for every status combination |
 
 ### 3.3 Schema
 
@@ -328,15 +328,15 @@ A cancelled run ends `status: 'DONE'` with the outcome PASSED (green) if nothing
 |---|---|---|---|
 | B21 | `TestCases.lastResult` is an Association, so deleting a test case leaves orphaned `TestCaseStats` rows | [db/schema.cds:143-155](../db/schema.cds#L143-L155) | Composition, or delete the stats in the delete handler |
 | B22 | `SubscriberPresets.username` is String(100), `Brokers.username` is String(200) | [db/schema.cds:91, :243](../db/schema.cds#L91) | Use one length (a shared `type Username : String(200)`) |
-| B23 | `TestRuns` stores `repetitions`, `delayMs` and `stopOnFailure`, but not `order` | [db/schema.cds:184-187](../db/schema.cds#L184-L187), [test-runner.ts:43](../srv/lib/test-runner.ts#L43) | Store `order` too, so a run can be understood afterwards |
+| B23 | `TestRuns` stores `repetitions`, `delayMs` and `stopOnFailure`, but not `order` | [db/schema.cds:184-187](../db/schema.cds#L184-L187), [test-runner.ts:43](../srv/lib/runs/test-runner.ts#L43) | Store `order` too, so a run can be understood afterwards |
 | B24 | `NumberRanges.name` uniqueness is enforced only in code (race between two creates) | [admin-service.ts:185-186](../srv/admin-service.ts#L185-L186) | Add `@assert.unique` |
 | B25 | Field titles live in the UI annotations (repeated per app) instead of on the entity | see U7 | `@title` on `db/schema.cds` |
 
 ### 3.4 Type safety (carried over)
 
-- **B17 – cds-typer models are still unused (Medium).** Nothing imports `#cds-models`. Entity names are still string literals (TestRuns 11×, RunResults 7×, Brokers 6×, TestCases 6×, plus two private `TABLE` constants in `nodes.ts:7` and `tree.ts:8`). There are 8 `as unknown as` casts and 7 hand-written row shapes for `TestCases` (`TreeNode`, `Sibling`, `NodeRow`, `NodeData`, `TestCaseRecord`, 2× `Row`). `RunRow` in `home-service.ts:9` claims columns that are not selected. **Recommendation:** import the generated entities, starting with `lib/nodes.ts`, `lib/tree.ts` and `test-runner.ts`. This also solves B6, B13 and most casts. Make `typecheck` run `cds-typer` first, so a fresh clone type-checks.
+- **B17 – cds-typer models are still unused (Medium).** Nothing imports `#cds-models`. Entity names are still string literals (TestRuns 11×, RunResults 7×, Brokers 6×, TestCases 6×, plus two private `TABLE` constants in `nodes.ts:7` and `tree.ts:8`). There are 8 `as unknown as` casts and 7 hand-written row shapes for `TestCases` (`TreeNode`, `Sibling`, `NodeRow`, `NodeData`, `TestCaseRecord`, 2× `Row`). `RunRow` in `home-service.ts:9` claims columns that are not selected. **Recommendation:** import the generated entities, starting with `lib/testcases/nodes.ts`, `lib/testcases/tree.ts` and `test-runner.ts`. This also solves B6, B13 and most casts. Make `typecheck` run `cds-typer` first, so a fresh clone type-checks.
 - **B26 – One write per row (Low).**
-  - `renumberSiblings` ([tree.ts:100-104](../srv/lib/tree.ts#L100-L104)) and `copySubtree` ([copy-nodes.ts:55-71](../srv/lib/copy-nodes.ts#L55-L71)) write one row per statement.
+  - `renumberSiblings` ([tree.ts:100-104](../srv/lib/testcases/tree.ts#L100-L104)) and `copySubtree` ([copy-nodes.ts:55-71](../srv/lib/testcases/copy-nodes.ts#L55-L71)) write one row per statement.
   - New: `RunProgress.finish`/`skip` open **one transaction and one websocket emit per message**. With `runs.maxResults = 5000` that is up to 5000 of each per run.
   - **Recommendation:** throttle the emits (for example at most every 250 ms, plus the final one). Batch the inserts per depth.
 
@@ -373,7 +373,7 @@ A cancelled run ends `status: 'DONE'` with the outcome PASSED (green) if nothing
 **Recommendation:** add a `heartbeat(subscriptionId)` action that touches only the page's own subscription, and make `activeSubscriptions` read-only.
 
 #### U3 – Exporting only unsaved drafts exports the whole tree (Medium)
-[app/testcases/webapp/ext/TestCaseActions.js:425-442](../app/testcases/webapp/ext/TestCaseActions.js#L425-L442), [srv/lib/export-import.ts:112-114](../srv/lib/export-import.ts#L112-L114)
+[app/testcases/webapp/ext/TestCaseActions.js:425-442](../app/testcases/webapp/ext/TestCaseActions.js#L425-L442), [srv/lib/testcases/export-import.ts:112-114](../srv/lib/testcases/export-import.ts#L112-L114)
 
 If only drafts are selected, `selectActiveIds` returns `[]` ("Unsaved drafts are skipped"), and `exportNodes([])` means "everything". **Recommendation:** return early when `selectedContexts.length > 0 && ids.length === 0`, as `copySelected` and `runSelected` already do.
 
@@ -514,7 +514,7 @@ Only the titles, descriptions and intents of the launchpad are tested. **Recomme
 - `fake-data.test.ts:115-118` "uses the language of the setting" only checks `valid === true`.
 - `agent.test.ts:77-85` "speaks MCP to testers only" only tests anonymous → 401. **Fix:** add `users.noRole` → 403.
 - `agent.test.ts:367` ignores the `getRunSummary` result.
-- `run-options.test.ts:92-100` starts and stops the run as admin, so the "own run" branch of `cancelRun` ([test-runner.ts:68](../srv/lib/test-runner.ts#L68)) is never told apart from the Admin branch. **Fix:** add a tester-stops-own-run case and a tester-cannot-stop-other's-run case.
+- `run-options.test.ts:92-100` starts and stops the run as admin, so the "own run" branch of `cancelRun` ([test-runner.ts:68](../srv/lib/runs/test-runner.ts#L68)) is never told apart from the Admin branch. **Fix:** add a tester-stops-own-run case and a tester-cannot-stop-other's-run case.
 - `run-options.test.ts:83` `stats.find(...)?.run_ID).not.toBe(runId)` also passes when there is no row.
 - `services.test.ts:74` asserts `badBroker.url` in an unrelated test.
 
@@ -541,12 +541,12 @@ Only the titles, descriptions and intents of the launchpad are tested. **Recomme
 | Module | Gap |
 |---|---|
 | `srv/admin-service.ts` | Broker validation messages (URL/VPN required, unsupported scheme, timeout range), the "saved, but the connection test failed" warning, GlobalVariables invalid name, NumberRanges reset 404/negative. None of these messages appear in a test |
-| `srv/lib/credentials/resolve.ts` | All DESTINATION error branches (`:59-73`) and `currentJwt()`. `resolve.test.ts` covers DIRECT only. Mock `getDestination` the same way `destinations.test.ts` does |
+| `srv/lib/broker/resolve.ts` | All DESTINATION error branches (`:59-73`) and `currentJwt()`. `resolve.test.ts` covers DIRECT only. Mock `getDestination` the same way `destinations.test.ts` does |
 | `srv/lib/solace/session.ts` | `subscribe` (OK/error/timeout), queue consumer/browser/`bindFlow`, connect guard timeout, `DOWN_ERROR`, close timeout, non-text messages |
 | `srv/lib/solace/subscription-hub.ts` | Subscribe failure → session closed + 400, flow `DOWN_ERROR`, ack failure. `FakeSubscriberSession` has no failure modes: add `failSubscribe`/`emitFlowDown()` |
-| `srv/lib/test-runner.ts` | "Test case was deleted" (`:357-360`), TemplateError → ERROR (`:375`), progress websocket emits, `served`/`shutdown` wiring in `server.ts`, B1 |
-| `srv/lib/number-ranges.ts` | Optimistic-lock retry and the "is busy" error (`:100-113`) |
-| `srv/lib/preview.ts`, `copy-nodes.ts`, parse/validate of `export-import.ts` | HTTP tests only, no direct unit tests |
+| `srv/lib/runs/test-runner.ts` | "Test case was deleted" (`:357-360`), TemplateError → ERROR (`:375`), progress websocket emits, `served`/`shutdown` wiring in `server.ts`, B1 |
+| `srv/lib/template/number-ranges.ts` | Optimistic-lock retry and the "is busy" error (`:100-113`) |
+| `srv/lib/runs/preview.ts`, `copy-nodes.ts`, parse/validate of `export-import.ts` | HTTP tests only, no direct unit tests |
 | `srv/subscribe-service.ts` | `start` success over HTTP, `stop`, non-empty `activeSubscriptions` |
 | `srv/live-service.cds` | E2E only; websocket auth and context are not covered by Jest |
 | Demo data (`test/data`) | Only checked by e2e (6 of 13 test cases). Optional: a Jest test that previews every demo test node |

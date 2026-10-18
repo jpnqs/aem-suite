@@ -1,19 +1,19 @@
-import type { BrokerRecord } from './credentials/resolve'
+import type { BrokerRecord } from '../broker/resolve'
 import { TestCaseVariables, Variables, type TestCase, type TestCaseProperty, type TestCaseVariable } from '#cds-models/aem/suite'
-import type { PublishSpec } from './solace/session'
-import type { TestField } from './test-fields'
-import { TemplateResolver, TemplateScope, jsonError, TemplateError, generatedSlots } from './template/resolve'
-import { allocateNumbers } from './number-ranges'
-import { generateFake } from './fake-data'
-import { config } from './config'
-import { DEFAULT_ACK_TIMEOUT_MS, detectContentType } from './defaults'
-import { NodeRow, selectNodesDeep } from './nodes'
-import { inferPropertyType } from './property-types'
-import { loadTree, Tree } from './tree'
+import type { PublishSpec } from '../solace/session'
+import type { TestField } from '../testcases/test-fields'
+import { TemplateResolver, TemplateScope, jsonError, TemplateError, generatedSlots } from '../template/resolve'
+import { allocateNumbers } from '../template/number-ranges'
+import { generateFake } from '../template/fake-data'
+import { config } from '../core/config'
+import { DEFAULT_ACK_TIMEOUT_MS, detectContentType } from '../core/defaults'
+import { NodeRow, selectNodesDeep } from '../testcases/nodes'
+import { inferPropertyType } from '../testcases/property-types'
+import { loadTree, Tree } from '../testcases/tree'
 
 /**
  * A test case (or folder) with its user properties and variables, as runs, previews and the checks use it:
- * the fields of lib/test-fields.ts typed by the model (cds-typer), with the key and names that are always there.
+ * the fields of lib/testcases/test-fields.ts typed by the model (cds-typer), with the key and names that are always there.
  */
 export type TestCaseRecord = Pick<TestCase, TestField | 'kind' | 'parent_ID'> & {
   ID: string

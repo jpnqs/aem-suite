@@ -1,6 +1,6 @@
 import cds from '@sap/cds'
 import WebSocket from 'ws'
-import { emitLive } from '../srv/lib/live'
+import { emitLive } from '../srv/lib/core/live'
 import * as hub from '../srv/lib/solace/subscription-hub'
 import { FakeSubscriberSession } from './fakes/solace'
 import { resetDatabase, startServer } from './helpers'

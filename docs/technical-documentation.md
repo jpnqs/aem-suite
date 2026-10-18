@@ -43,7 +43,7 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
               │                 │                                      │ subscription-hub ───────┤ message
               │                 ▼                                      ▼                         │ subscriptionStatus
               │        solace/connector ──► solace/session (solclientjs) ──► AEM broker(s)
-              │        credentials/resolve ──► BTP Destination service (DESTINATION brokers)
+              │        broker/resolve ──────► BTP Destination service (DESTINATION brokers)
               ▼
         HANA Cloud (HDI container)
 ```
@@ -78,7 +78,14 @@ srv/
   help-service.*, home-service.*   Help app and Home app (every logged-in user)
   agent-service.*             MCP service for AI assistants
   server.ts                   MCP OAuth discovery; dev only: app-relative odata/ws rewrite, no-cache header for UI files
-  lib/                        business logic (see section 7)
+  lib/                        business logic (see section 7):
+    core/                     config, defaults, errors, model facts, request keys, live events, unique names
+    broker/                   broker URLs, credentials (direct + BTP destinations), connection check
+    solace/                   solclientjs session, publishing connector, live subscription hub
+    template/                 template engine, faker data, number ranges
+    testcases/                tree, node reads/writes and validation, copy, export/import, fields, property types
+    runs/                     test runner, test case -> publish spec, preview
+    help-content.ts, mcp-oauth.ts   Help app content, MCP OAuth discovery
   types/solclientjs.d.ts      typings for solclientjs (the package ships none)
 test/
   *.test.ts                   Jest: unit, service and consistency tests (section 11)
@@ -113,7 +120,7 @@ mta.yaml, xs-security.json    deployment
 | `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
 | `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
 
-All enum types carry `@assert.range`, and so do the numeric limits `ackTimeoutMs` (100–120 000), `priority` (0–255) and `connectTimeoutMs` (1 000–120 000): CAP rejects other values on every OData write. Writes that bypass OData (AI agent, import, copy, test case from a message) are checked by `srv/lib/node-validation.ts`, which reads the same limits from the model (`srv/lib/model.ts`).
+All enum types carry `@assert.range`, and so do the numeric limits `ackTimeoutMs` (100–120 000), `priority` (0–255) and `connectTimeoutMs` (1 000–120 000): CAP rejects other values on every OData write. Writes that bypass OData (AI agent, import, copy, test case from a message) are checked by `srv/lib/testcases/node-validation.ts`, which reads the same limits from the model (`srv/lib/core/model.ts`).
 
 Result semantics:
 
@@ -137,7 +144,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `Brokers` (draft) | Broker maintenance. Handlers: URL completion while editing and on save, validation, **automatic connection test on save for DESTINATION brokers** (max. 5 s). |
 | `Brokers.testConnection(username, password)` | Opens/closes a session, stores the outcome. `password` is required for DIRECT brokers and never stored; `username` only if none is maintained on the broker. |
 | `BrokerVariables` | Broker variables (composition of `Brokers`); the same name rules as test case variables (a name a template can reference, each once). |
-| `GlobalVariables` (draft) | Projection on `Variables` without broker; names unique regardless of case (like number ranges and subscriber setups, `srv/lib/unique-name.ts`). |
+| `GlobalVariables` (draft) | Projection on `Variables` without broker; names unique regardless of case (like number ranges and subscriber setups, `srv/lib/core/unique-name.ts`). |
 | `NumberRanges` (draft) | Virtual `lastNumber` / `nextNumber` (formatted). Bound action `reset(nextNumber)`. `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
 | `Destinations` | Read-only value help (`@cds.persistence.skip`) – destinations from the bound destination service and from env `destinations`, filtered to broker URLs. |
 | `CredentialModes` | Code list. |
@@ -149,7 +156,7 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `TestCases` (draft, **hierarchy**) | Folder/test case tree. Computed columns `LimitedDescendantCount`, `DistanceFromRoot`, `DrillState`, `LimitedRank` and `@Aggregation.RecursiveHierarchy #TestTree` / `@Hierarchy.RecursiveHierarchy #TestTree` enable CAP hierarchy queries for the Fiori tree table. `kindText` is a display text for `kind`. |
 | `TestCases.runTest(brokerIds, credentials, options)` | Runs one node (a folder runs its subtree). `options`: the advanced settings (section 7.6). |
 | `TestCases.preview(brokerId)` | Resolves topic, payload, correlation ID and properties without sending. Works on drafts. |
-| `TestCases.duplicate()` | Copies a test case or a folder with everything below it (`srv/lib/copy-nodes.ts`); the copy is named "… (Copy)" and placed right after the original. |
+| `TestCases.duplicate()` | Copies a test case or a folder with everything below it (`srv/lib/testcases/copy-nodes.ts`); the copy is named "… (Copy)" and placed right after the original. |
 | `exportNodes(ids)` | Returns `{ filename, content, folders, testCases }`: the JSON file for the given nodes (folders with everything below them; without ids the whole tree). The browser saves `content` as a file. |
 | `importNodes(content, parentId, dryRun)` | Creates the nodes of an export file below `parentId` (empty = top level) as **new** nodes; with `dryRun` it only checks and counts. All or nothing, see "Export and import file" below. The service accepts request bodies up to 5 MB (`@cds.server.body_parser.limit`). |
 | `copyNodes(ids)` | Same for several nodes; a node below another selected node is copied with that node only. Returns `{ ID, name }` per copy. Used by the *Copy* buttons. |
@@ -222,7 +229,7 @@ One function for the **Home app**: `overview()` returns who is logged in, whethe
 
 All texts are in `i18n/i18n.properties`; the layout uses CSS grid and SAP theming parameters only, so it works in light and dark themes and on phones. While a run is in progress the page reloads every 10 s. It navigates with `shared/Navigation.js`, like the other apps.
 
-### Export and import file (`srv/lib/export-import.ts`)
+### Export and import file (`srv/lib/testcases/export-import.ts`)
 
 ```json
 { "format": "aem-suite.test-cases", "version": 1, "exportedAt": "2026-10-15T09:39:25.031Z",
@@ -235,7 +242,7 @@ All texts are in `i18n/i18n.properties`; the layout uses CSS grid and SAP themin
 
 - **Export** is a nested tree without IDs, authors, sort order or run data (the order of the arrays is the order in the tree: folders first, then manual order; variables and properties are sorted by name, empty fields are left out). A folder comes with everything below it; nodes below another selected node are exported once.
 - **Import** reads the same format but is lenient: `kind` may be left out (`children` = folder), `payload` may be a JSON value (it is stored as pretty-printed text), property / variable values may be numbers or booleans. `format` must match and `version` must not be newer than the system's. Limits: 5 000 nodes, 20 levels.
-- **All or nothing, one pass.** First every node is type-checked (wrong types, children on a test case, ...), then the same rules as the UI are applied via `srv/lib/node-validation.ts` (`validateEnums`, `validateNode`, `validateParent`, including text lengths because the import writes to the database directly). All problems are collected with their position (`Orders / EU / Order created: payload: ...`) and the request is rejected with the first 20 of them. Only a file without problems is written.
+- **All or nothing, one pass.** First every node is type-checked (wrong types, children on a test case, ...), then the same rules as the UI are applied via `srv/lib/testcases/node-validation.ts` (`validateEnums`, `validateNode`, `validateParent`, including text lengths because the import writes to the database directly). All problems are collected with their position (`Orders / EU / Order created: payload: ...`) and the request is rejected with the first 20 of them. Only a file without problems is written.
 - **Write.** New IDs are generated; nodes are inserted level by level (parents first) in one transaction behind the existing nodes of the target folder. Existing nodes are never changed, so importing a file twice creates two copies.
 
 ### TestAgentService – MCP `/mcp/agent` (role `Tester`)
@@ -267,7 +274,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 | `runTests(testCaseIds, brokerIds, credentials)` | starts a run in the background, returns `runId` and the number of results |
 | `getRunSummary(runId, waitSeconds)` | status, counters (`skipped` separately) and up to 25 FAILED / ERROR results; waits up to 30 s for the end of the run |
 
-**Same rules as the UI.** Creating and changing nodes goes through `srv/lib/node-validation.ts`, the same checks `TestService` uses (valid JSON, parent must be a folder, property types, ACK timeout range, ...). All problems of a call are returned in one error text. `previewTestCase` shares `srv/lib/preview.ts` with the UI preview; copying uses `srv/lib/copy-nodes.ts`.
+**Same rules as the UI.** Creating and changing nodes goes through `srv/lib/testcases/node-validation.ts`, the same checks `TestService` uses (valid JSON, parent must be a folder, property types, ACK timeout range, ...). All problems of a call are returned in one error text. `previewTestCase` shares `srv/lib/runs/preview.ts` with the UI preview; copying uses `srv/lib/testcases/copy-nodes.ts`.
 
 **Guard rails** (the adapter itself has no governance: no rate limits, no audit log, no approvals):
 
@@ -311,7 +318,7 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 
 Single place that opens publishing connections (`connect(conn)`). Tests replace it with `setPublisherFactory()` / `setConnector()` – runs and connection tests then work without a broker.
 
-### 7.3 `credentials/resolve.ts` and `credentials/destinations.ts`
+### 7.3 `broker/resolve.ts` and `broker/destinations.ts`
 
 - `resolveConnection(broker, jwt, password, username)` → `{ url, vpnName, userName, password, clientName, connectTimeoutMs }`.
   - **DIRECT**: URL/VPN from the broker, **password from the current request** (`MissingPasswordError` if absent). The username is the maintained one; only if the broker has none, the one from the request is used (`MissingUsernameError` if neither). `needsUsername(broker)` tells the UIs whether to ask.
@@ -348,20 +355,20 @@ Variables may reference other variables (depth 5, cycle detection). Unknown name
 3. `consume` (runs) takes the numbers with a compare-and-set `UPDATE` of `NumberRanges.current` in a transaction of its own that commits at once, retried a few times, so parallel runs never get the same number and a number is not reissued if the message fails later. `peek` (Preview, MCP preview) only computes the next numbers.
 4. An exhausted range (`maximum` or digits exceeded) or an unknown range is a `TemplateError`, so the result is `ERROR` and `current` does not move.
 
-**Faker.** `{{faker.<module>.<method>[(args)]}}` (`fake-data.ts`, [`@faker-js/faker`](https://fakerjs.dev), v9 because it ships CommonJS, which Jest needs) uses the same mechanism as number ranges: `generatedSlots` lists the expressions (one slot per distinct expression, one per `as` alias), `withGenerated` calls `generateFake` for them (also in `peek` mode) and the resolver inserts the values. Safety: only the data modules in `MODULES` are reachable (not `helpers`, `seed`, `constructor`, ...), the method must be a function of that module, and the arguments are parsed as numbers, booleans or text - a template cannot run code. `number.int/float`, `finance.amount` take (min,max), `date.between` (from,to). Dates are written as ISO text. The language is `cds.aemSuite.faker.locale`; an unknown locale falls back to English. `test/fake-data.test.ts` pins the refusals.
+**Faker.** `{{faker.<module>.<method>[(args)]}}` (`template/fake-data.ts`, [`@faker-js/faker`](https://fakerjs.dev), v9 because it ships CommonJS, which Jest needs) uses the same mechanism as number ranges: `generatedSlots` lists the expressions (one slot per distinct expression, one per `as` alias), `withGenerated` calls `generateFake` for them (also in `peek` mode) and the resolver inserts the values. Safety: only the data modules in `MODULES` are reachable (not `helpers`, `seed`, `constructor`, ...), the method must be a function of that module, and the arguments are parsed as numbers, booleans or text - a template cannot run code. `number.int/float`, `finance.amount` take (min,max), `date.between` (from,to). Dates are written as ISO text. The language is `cds.aemSuite.faker.locale`; an unknown locale falls back to English. `test/fake-data.test.ts` pins the refusals.
 
-### 7.5 `test-case-spec.ts`
+### 7.5 `runs/test-case-spec.ts`
 
 Loads test cases with properties and variables, builds the variable scopes (`loadVariableScopes`: global, per broker, per folder + the tree), computes the folder chain of a node (`scopeFor`) and turns a test case into a `PublishSpec` (`buildSpec`): rejects empty topics and wildcards, applies content-type detection and property-type inference as fallbacks.
 
-### 7.6 `test-runner.ts`
+### 7.6 `runs/test-runner.ts`
 
 `createRun` → validation (brokers exist and are active, passwords for DIRECT brokers, at least one test case after folder expansion), `summary`, pending rows. `executeRunInBackground` → see section 3. `waitForRun(runId)` exists for tests.
 
 
 **Advanced settings** (`RunOptions` of `runTests` / `runTest`, saved on the `TestRuns` row): `repetitions` (1 - `runs.maxRepetitions`), `delayMs` (0 - `runs.maxDelayMs`), `order` (`ROUND`: the selection N times; `EACH`: every test case N times in a row) and `stopOnFailure`. `createRun` checks them (`normalizeOptions`) and the total (test cases x brokers x repetitions <= `runs.maxResults`), and creates one PENDING `RunResults` row per message with `iteration` and `sequence` (the order within a broker). `runBroker` sends a broker's rows in `sequence` order, waits `delayMs` between two messages (`pause`, interrupted when the run is stopped) and - after a failed message with `stopOnFailure`, or when the run was stopped - marks the rest `SKIPPED` (`RunProgress.skip`: counted as done, in `TestRuns.skippedCount`, not as failed; skipped results do not touch `TestCaseStats`). `cancelRun` (service action `cancelRun(runId)`) puts the run into an in-memory set that the loops check, so it only works on the instance that executes the run; allowed for the user who started the run and for administrators. A stopped run ends with status `STOPPED` (outcome STOPPED, or FAILED if a message failed before); `maxActiveRuns` and every "running" filter look at `RUNNING` only, so a stopped run frees its slot like a finished one.
 
-### 7.7 `tree.ts`
+### 7.7 `testcases/tree.ts`
 
 In-memory tree over `TestCases` (`ID`, `parent_ID`, `kind`, `name`, `sortOrder`): `ancestors`, `isWithin` (cycle check), `expandToTests` (folders → test cases in tree order), `compareSiblings` (folders first, then `sortOrder`, then name).
 
@@ -371,7 +378,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
 
 > **Single instance:** the hub state lives in one Node.js process. `mta.yaml` pins the backend to `instances: 1`. Scaling out needs sticky sessions plus a shared registry (e.g. Redis), and the websocket plugin's Redis adapter.
 
-### 7.9 `defaults.ts`
+### 7.9 `core/defaults.ts`, `broker/url.ts`, `testcases/property-types.ts`
 
 - `normalizeBrokerUrl`: host only → `wss://host:443`; ports 55443 → `tcps`, 55555/55003 → `tcp`, 8008/80 → `ws`, 443/8443 → `wss`; strips paths.
 - `detectContentType`: `{`/`[` → `application/json`, else `text/plain`.
@@ -566,7 +573,7 @@ The live views (Test Cases run progress, Live Subscriber) use WebSockets through
 | Goal | Where |
 |---|---|
 | Change or add help text | edit `docs/user-guide.md` - nothing else. Keep headings stable (apps link to them, see the Help buttons above); a new `## ` heading becomes a new section automatically |
-| New agent capability (MCP) | an unbound action / function in `srv/agent-service.cds` + handler in `srv/agent-service.ts`; reuse the checks in `srv/lib/node-validation.ts`; list it in `test/agent.test.ts` (the test pins the exact set of entities and actions) |
+| New agent capability (MCP) | an unbound action / function in `srv/agent-service.cds` + handler in `srv/agent-service.ts`; reuse the checks in `srv/lib/testcases/node-validation.ts`; list it in `test/agent.test.ts` (the test pins the exact set of entities and actions) |
 | New built-in template function | `TemplateResolver.callFunction` / `fixed` in `srv/lib/template/resolve.ts` (+ the help list in `PayloadSection.js`) |
 | Payload assertions / round-trip checks | `test-runner.ts`: subscribe before publishing (use `SolaceSession.subscribe`/`onMessage`), new result fields in `RunResults` |
 | Other protocols (MQTT, AMQP, REST) | implement the `Publisher` interface and route in `solace/connector.ts` per broker setting |
