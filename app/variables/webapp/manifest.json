@@ -131,6 +131,18 @@
                   "tableSettings": {
                     "type": "ResponsiveTable",
                     "selectionMode": "Multi"
+                  },
+                  "actions": {
+                    "exportSelected": {
+                      "press": "com.aem.suite.variables.shared.ConfigFile.exportSelected",
+                      "text": "{{action.export}}",
+                      "requiresSelection": false
+                    },
+                    "importFile": {
+                      "press": "com.aem.suite.variables.shared.ConfigFile.importFile",
+                      "text": "{{action.import}}",
+                      "requiresSelection": false
+                    }
                   }
                 }
               }

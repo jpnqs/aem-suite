@@ -10,6 +10,7 @@ save messages as **test cases**, send them to one or several brokers with one cl
 - [1. Getting started](#1-getting-started)
 - [2. Set up brokers (Admin)](#2-set-up-brokers-admin)
   - [Brokers from a BTP destination](#brokers-from-a-btp-destination)
+  - [Export and import the configuration](#export-and-import-the-configuration)
 - [3. Global variables (Admin)](#3-global-variables-admin)
 - [4. Organize test cases in folders](#4-organize-test-cases-in-folders)
   - [Export and import](#export-and-import)
@@ -139,11 +140,30 @@ Then, in the app: **Brokers → Create**, *Credentials* **BTP Destination**, and
 
 > **The technical user decides what the tests may do.** Every run through this destination publishes as that user, so give it an ACL profile that allows the topics you test – and nothing more on production brokers. Who may *use* the destination is decided by the app's roles (Tester runs, Admin maintains brokers).
 
+### Export and import the configuration
+
+Brokers, global variables and number ranges can be saved as a JSON file and imported again – to set up a second system the same way, to keep the configuration in Git, or as a backup. Each of the three apps has **Export** and **Import** above its list.
+
+- **Export**: select rows → **Export** (nothing selected = all). The file holds the settings only – no IDs, no authors, no connection status, and no passwords (they are never stored). Brokers come with their broker variables. Number ranges come without their counter: the counter belongs to the system it runs in.
+- **Import**: **Import** → choose a file that was exported from the same app. It is checked first and you confirm what will be added.
+- **Import only adds.** Every entry of the file becomes a new entry – existing brokers, variables and number ranges are never changed or deleted. If a name is taken already (ignoring upper / lower case), the new entry gets a number: `ORDERS` becomes `ORDERS_2`, `aem-dev` becomes `aem-dev (2)`. The confirmation lists these names, and you can rename the entries afterwards. Imported number ranges start at their first number.
+- **All or nothing.** The file gets the same checks as the apps (URL and message VPN of direct brokers, variable names, number range limits, text lengths, ...). If anything is wrong, nothing is imported and the message lists every problem, for example `broker "aem-dev": msgVpn: Message VPN is required`.
+
+```json
+{
+  "format": "aem-suite.number-ranges",
+  "version": 1,
+  "numberRanges": [ { "name": "ORDERS", "description": "Sales orders", "prefix": "SO-", "length": 10, "start": 4500000001, "step": 1 } ]
+}
+```
+
+The other formats are `aem-suite.brokers` with a list `brokers` and `aem-suite.variables` with a list `variables` – export once to see all fields.
+
 ---
 
 ## 3. Global variables (Admin)
 
-**Global Variables** contains values that every test case can use, e.g. `app = shop`. Use them in topics and payloads as `{{app}}`. Names may contain letters, digits, `_ . -` and must be unique.
+**Global Variables** contains values that every test case can use, e.g. `app = shop`. Use them in topics and payloads as `{{app}}`. Names may contain letters, digits, `_ . -` and must be unique. To copy them to another system, use **Export** and **Import** – see [Export and import the configuration](#export-and-import-the-configuration).
 
 ---
 
@@ -431,6 +451,8 @@ Real SAP messages carry identifiers such as sales order `SO-000042` or a deliver
 The page shows what the **next number** will look like, the **last number issued** and when a run used the range last. **Reset** sets the next number (empty = back to the first number) – for example to start a new test series from the beginning. **Count Up** issues the next number just like a run would, **Count Down** gives the last issued number back so the next run gets it again – handy to try out a new range without sending a message.
 
 The counter is stored in the database: every message of a run that uses the range takes its own number, also when the broker later rejects the message, and a number is never handed out twice. A run that cannot connect to a broker sends nothing and takes no numbers. The Preview shows the next number without using it up.
+
+Number ranges can be moved to another system with **Export** and **Import** (the counter is not part of the file): see [Export and import the configuration](#export-and-import-the-configuration).
 
 Use the range in topic, payload, correlation ID or user properties:
 

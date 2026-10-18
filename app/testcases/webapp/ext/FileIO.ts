@@ -4,14 +4,13 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ExtensionAPI from "sap/fe/core/ExtensionAPI";
 import ListReportExtensionAPI from "sap/fe/templates/ListReport/ExtensionAPI";
 import Actions from "com/aem/suite/testcases/shared/Actions";
+import Files from "com/aem/suite/testcases/shared/Files";
 import { textsOf, Texts } from "./i18n";
 
 /**
  * Export and import of test cases and folders as a JSON file: the browser saves / reads the file, the content
  * travels in the actions exportNodes / importNodes of the service (srv/lib/testcases/export-import.ts).
  */
-
-const REVOKE_URL_MS = 1000;
 
 interface Counts {
   folders?: number;
@@ -28,38 +27,6 @@ function describeCounts(r: Counts, t: Texts): string {
     parts.push(t(r.testCases === 1 ? "file.testCaseOne" : "file.testCaseMany", [r.testCases]));
   }
   return parts.join(t("file.and")) || t("file.nothing");
-}
-
-/** Lets the browser save text as a file. */
-function download(filename: string, text: string): void {
-  const url = URL.createObjectURL(new window.Blob([text], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  // the download has started by then; the object URL only keeps the text in memory
-  setTimeout(() => URL.revokeObjectURL(url), REVOKE_URL_MS);
-}
-
-/** Opens the file chooser; resolves with { name, text } or null if nothing was chosen. */
-function pickJsonFile(): Promise<{ name: string; text: string } | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json,application/json";
-    input.addEventListener("change", () => {
-      const file = input.files && input.files[0];
-      if (!file) {
-        resolve(null);
-        return;
-      }
-      void file.text().then((text) => resolve({ name: file.name, text }));
-    });
-    input.addEventListener("cancel", () => resolve(null));
-    input.click();
-  });
 }
 
 /** Asks whether the checked file should be imported; resolves true or false. */
@@ -83,7 +50,7 @@ export default {
   exportNodes(api: ExtensionAPI, ids: string[]): Promise<void> {
     const t = textsOf(api);
     return Actions.invokeAction<Counts & { filename: string; content: string }>(api.getModel() as ODataModel, "/exportNodes(...)", { ids }).then((result) => {
-      download(result.filename, result.content);
+      Files.download(result.filename, result.content);
       MessageToast.show(t("file.exported", [describeCounts(result, t), result.filename]));
     });
   },
@@ -95,7 +62,7 @@ export default {
   async importNodes(api: ListReportExtensionAPI, parentId: string | null): Promise<void> {
     const model = api.getModel() as ODataModel;
     const t = textsOf(api);
-    const file = await pickJsonFile();
+    const file = await Files.pickJsonFile();
     if (!file) {
       return;
     }

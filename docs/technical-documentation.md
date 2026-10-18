@@ -84,6 +84,7 @@ srv/
     solace/                   solclientjs session, publishing connector, live subscription hub
     template/                 template engine, faker data, number ranges
     testcases/                tree, node reads/writes and validation, copy, export/import, fields, property types
+    config/                   rules of number ranges and brokers, export/import of brokers, global variables, number ranges
     runs/                     test runner, test case -> publish spec, preview
     help-content.ts, mcp-oauth.ts   Help app content, MCP OAuth discovery
   types/solclientjs.d.ts      typings for solclientjs (the package ships none)
@@ -148,6 +149,10 @@ All OData V4. Paths are prefixed with the approuter URL in BTP.
 | `NumberRanges` (draft) | Virtual `lastNumber` / `nextNumber` (formatted). Bound actions `reset(nextNumber)`, `countUp()` (issues the next number like a run, in the request's transaction) and `countDown()` (gives the last issued number back, compare-and-set on `current`; 400 when nothing was issued). `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
 | `Destinations` | Read-only value help (`@cds.persistence.skip`) – destinations from the bound destination service and from env `destinations`, filtered to broker URLs. |
 | `CredentialModes` | Code list. |
+| `exportConfig(kind, ids)` | `kind` = `NUMBER_RANGES`, `BROKERS` or `VARIABLES` (global). Returns `{ filename, content, count }`: the JSON file of the given entries, all of the kind without ids. See *Configuration file* below. |
+| `importConfig(kind, content, dryRun)` | Adds the entries of such a file as new ones (existing entries are never changed); returns `{ dryRun, created, renamed: [{ name, newName }] }`. Request bodies up to 2 MB. |
+
+The rules of saving a number range or a broker live in `srv/lib/config/checks.ts`, so the draft handlers and the import apply the same ones.
 
 ### TestService – `/odata/v4/test` (role `Tester`)
 
@@ -244,6 +249,22 @@ All texts are in `i18n/i18n.properties`; the layout uses CSS grid and SAP themin
 - **Import** reads the same format but is lenient: `kind` may be left out (`children` = folder), `payload` may be a JSON value (it is stored as pretty-printed text), property / variable values may be numbers or booleans. `format` must match and `version` must not be newer than the system's. Limits: 5 000 nodes, 20 levels.
 - **All or nothing, one pass.** First every node is type-checked (wrong types, children on a test case, ...), then the same rules as the UI are applied via `srv/lib/testcases/node-validation.ts` (`validateEnums`, `validateNode`, `validateParent`, including text lengths because the import writes to the database directly). All problems are collected with their position (`Orders / EU / Order created: payload: ...`) and the request is rejected with the first 20 of them. Only a file without problems is written.
 - **Write.** New IDs are generated; nodes are inserted level by level (parents first) in one transaction behind the existing nodes of the target folder. Existing nodes are never changed, so importing a file twice creates two copies.
+
+### Configuration file (`srv/lib/config/export-import.ts`)
+
+```json
+{ "format": "aem-suite.brokers", "version": 1, "exportedAt": "2026-10-18T09:39:25.031Z",
+  "brokers": [ { "name": "aem-dev", "credentialMode": "DIRECT", "url": "wss://...:443", "msgVpn": "...", "username": "...",
+                 "clientNamePrefix": "aem-suite", "connectTimeoutMs": 10000, "active": true, "agentAllowed": true,
+                 "variables": [{ "name": "...", "value": "..." }] } ] }
+```
+
+Number ranges use `aem-suite.number-ranges` / `numberRanges` (`description`, `prefix`, `suffix`, `length`, `start`, `step`, `maximum`), global variables `aem-suite.variables` / `variables` (`value`). One table (`KINDS`) describes the three kinds: entity, format, fields and rules.
+
+- **Export** leaves out what belongs to one system: IDs, `managed` fields, the counter of a number range (`current`, `lastUsedAt`) and the connection status of a broker. There is no password to leave out. `Integer64` values are numbers in the file (text if they are beyond 2^53). Sorted by name, empty fields left out.
+- **Import only inserts**, with new IDs (brokers with their variables); saved entries are never updated or deleted. A name that is taken ignoring case – by a saved entry or an earlier one in the file – gets the next free number, in a form the name rules allow (`KINDS[].numbered`: `ORDERS_2`, `aem-dev (2)`), shortened to fit the column. The result lists these renames, so the UI can show them before the import. Fields missing in the file get the database defaults.
+- **All or nothing, one pass**, like the test case import: types, column lengths, enum values and `@assert.range` limits from the model, then the rules of `srv/lib/config/checks.ts` for a new entry; all problems in one 400 (first 20). Limit: 1 000 entries per file.
+- **UI**: the list reports of Brokers, Global Variables and Number Ranges get *Export* / *Import* toolbar actions from `app/_shared/ConfigFile.js` (the kind follows from the app); the file handling in the browser (`app/_shared/Files.js`) is shared with the test case export.
 
 ### TestAgentService – MCP `/mcp/agent` (role `Tester`)
 
@@ -395,7 +416,7 @@ In-memory registry of live subscriptions (one session each). Limits (configurabl
   - Draft `UPDATE`: the name follows the topic until the user sets an own name.
   - `CREATE`/`UPDATE`: parent must be a folder and not inside the node (cycle), new nodes get `sortOrder = max + 10`; folders need a name, test cases a topic; JSON validation of payloads (placeholders replaced by `0`), property/variable validation.
   - `moveBefore`: Fiori sends the parent change (PATCH) and this action in the **same change set, processed concurrently**. The target parent is therefore taken from `NextSibling`; "move to end" (`NextSibling = null`) assigns a global maximum `sortOrder`. Reordering keeps `modifiedAt/By`.
-- **AdminService**: URL completion, field validation, destination connection test on save, `Destinations` value help.
+- **AdminService**: URL completion, field validation, destination connection test on save, `Destinations` value help, export / import of the configuration.
 
 ## 8. Frontend
 
