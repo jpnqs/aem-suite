@@ -20,6 +20,8 @@ service HomeService {
 
   type Overview {
     user              : String(255);
+    /** first name from the login (token claim given_name), empty if the login has none: the start page greets with it */
+    firstName         : String(255);
     tester            : Boolean;
     admin             : Boolean;
     // ---- role Tester

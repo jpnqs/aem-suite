@@ -115,6 +115,16 @@
             "norole": {
               "password": "norole",
               "roles": []
+            },
+            "ada": {
+              "password": "ada",
+              "roles": [
+                "Tester"
+              ],
+              "attr": {
+                "givenName": "Ada",
+                "familyName": "Lovelace"
+              }
             }
           }
         }

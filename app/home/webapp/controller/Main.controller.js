@@ -142,7 +142,7 @@ sap.ui.define(
           busy: false,
           error: null,
           tester: !!o.tester,
-          greeting: this._text(hour < 12 ? "greeting.morning" : hour < 18 ? "greeting.afternoon" : "greeting.evening", [o.user || ""]),
+          greeting: this._text(hour < 12 ? "greeting.morning" : hour < 18 ? "greeting.afternoon" : "greeting.evening", [o.firstName || o.user || ""]),
           attention: notices.filter(function (n) {
             return dismissed.indexOf(n.id) < 0;
           }),

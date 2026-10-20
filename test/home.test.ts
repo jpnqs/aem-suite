@@ -34,6 +34,16 @@ describe('home (start page)', () => {
     await INSERT.into('aem.suite.ReceivedMessages').entries({ topic: 't', payload: 'x' })
   })
 
+  it('greets with the first name of the login, the user id is only the fallback', async () => {
+    // mocked users without a name: no first name, the page falls back to the user id
+    expect((await overview(users.tester)).data).toMatchObject({ user: 'tester', firstName: null })
+    // a login with a given name (the token claim given_name of XSUAA / IAS)
+    const named = await overview({ auth: { username: 'ada', password: 'ada' } })
+    expect(named.data).toMatchObject({ user: 'ada', firstName: 'Ada' })
+    // also for a user without a role of the suite
+    expect((await overview(users.noRole)).data).toMatchObject({ user: 'norole', firstName: null, tester: false })
+  })
+
   it('gives testers the figures of the suite', async () => {
     const { status, data } = await overview(users.tester)
     expect(status).toBe(200)

@@ -18,10 +18,12 @@ export default class HomeService extends cds.ApplicationService {
   async init() {
     this.on('overview', async (req) => {
       const user = req.user.id
+      // the login's first name (XSUAA / IAS token: given_name); mocked and technical users have none
+      const firstName = String((req.user.attr as { givenName?: string } | undefined)?.givenName ?? '').trim() || null
       const tester = req.user.is('Tester')
       const admin = req.user.is('Admin')
       // without a role of the suite there is nothing to show but the help
-      if (!tester) return { user, tester, admin, lastRuns: [] }
+      if (!tester) return { user, firstName, tester, admin, lastRuns: [] }
 
       const since = new Date(Date.now() - RECENT_DAYS * DAY_MS).toISOString()
       const [testCases, folders, myTestCases, savedMessages, recent, lastRuns, brokers] = await Promise.all([
@@ -42,6 +44,7 @@ export default class HomeService extends cds.ApplicationService {
       const finished = resultsPassed + resultsFailed
       return {
         user,
+        firstName,
         tester,
         admin,
         testCases,
