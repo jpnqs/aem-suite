@@ -71,3 +71,27 @@ test('typing {{ in the payload suggests variables, built-ins and faker.js', asyn
 
   await page.request.delete(`/odata/v4/test/TestCases(ID=${ID},IsActiveEntity=false)`)
 })
+
+test('Enter makes a new line in the payload editor (the page shortcut must not take it)', async ({ page }) => {
+  const res = await page.request.post('/odata/v4/test/TestCases', { data: { topic: 'e2e/enter', payload: '{"a":1}' } })
+  expect(res.ok()).toBe(true)
+  const { ID } = await res.json()
+  await page.goto(`/launchpad.html#${apps.testCases.intent}&/TestCases(ID=${ID},IsActiveEntity=false)`)
+  await expect(page.getByText('Valid JSON', { exact: true })).toBeVisible()
+
+  const lines = (selector: string) => page.locator(selector).first().evaluate((el: any) => el.querySelector('.ace_editor').env.editor.session.getLength())
+  const payload = '[id$="--payloadEditor"]'
+  await page.locator(payload).first().click()
+  await page.keyboard.press('Control+End')
+  expect(await lines(payload)).toBe(1)
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('x')
+  await expect.poll(() => lines(payload)).toBe(2)
+
+  // the topic stays one line: Enter adds nothing there
+  const topic = '[id$="--topicEditor"]'
+  await page.locator(topic).first().click()
+  await page.keyboard.press('Control+End')
+  await page.keyboard.press('Enter')
+  expect(await lines(topic)).toBe(1)
+})

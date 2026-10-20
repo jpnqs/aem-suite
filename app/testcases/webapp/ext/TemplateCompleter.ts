@@ -123,6 +123,16 @@ export default {
       return;
     }
     editor.data(MARK, true);
+    // Enter belongs to the editor (a new line, or taking a suggestion). The Fiori elements object page has an Enter
+    // shortcut of its own; it ends the key event with preventDefault, so the editor never got its new line. A UI5 event
+    // that is marked is left alone by that shortcut (as with the text areas of the page).
+    editor.addEventDelegate({
+      onkeydown: (event: { key?: string; setMarked(): void }) => {
+        if (event.key === "Enter") {
+          event.setMarked();
+        }
+      }
+    });
     const completer = {
       // the expression typed so far, dots included: faker.person.fu
       identifierRegexps: [/[\w.]/],
