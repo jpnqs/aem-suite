@@ -71,21 +71,28 @@
         <Link text="{i18n>attention.showAgain}" press=".onShowDismissed" />
       </HBox>
 
-      <!-- the apps -->
-      <Title text="{i18n>apps.title}" level="H2" class="aemHomeSectionTitle" />
-      <FlexBox renderType="Bare" items="{path: 'home>/apps', templateShareable: false}" class="aemHomeTiles">
-        <f:Card class="aemHomeTile">
-          <f:header>
-            <card:Header
-              title="{home>title}"
-              subtitle="{home>line}"
-              iconSrc="{home>icon}"
-              iconDisplayShape="Square"
-              iconBackgroundColor="{home>color}"
-              press=".onOpenApp" />
-          </f:header>
-        </f:Card>
-      </FlexBox>
+      <!-- the apps, grouped by the role they are for -->
+      <VBox renderType="Bare" items="{path: 'home>/groups', templateShareable: false}" class="aemHomeGroups">
+        <VBox renderType="Bare" class="aemHomeGroup">
+          <HBox renderType="Bare" alignItems="Baseline" class="aemHomeSectionTitle">
+            <Title text="{home>title}" level="H2" />
+            <Text text="{home>description}" class="aemHomeGroupText" />
+          </HBox>
+          <FlexBox renderType="Bare" items="{path: 'home>apps', templateShareable: false}" class="aemHomeTiles">
+            <f:Card class="aemHomeTile">
+              <f:header>
+                <card:Header
+                  title="{home>title}"
+                  subtitle="{home>line}"
+                  iconSrc="{home>icon}"
+                  iconDisplayShape="Square"
+                  iconBackgroundColor="{home>color}"
+                  press=".onOpenApp" />
+              </f:header>
+            </f:Card>
+          </FlexBox>
+        </VBox>
+      </VBox>
 
       <!-- latest runs -->
       <VBox renderType="Bare" visible="{home>/tester}" class="aemHomeRunsSection">

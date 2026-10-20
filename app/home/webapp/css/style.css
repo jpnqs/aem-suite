@@ -215,3 +215,15 @@
     gap: 0.25rem;
   }
 }
+
+/* groups of app tiles: the apps for testers, the apps for administrators */
+.aemHomeGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aemHomeGroupText {
+  margin-left: 0.75rem;
+  color: var(--sapContent_LabelColor);
+}

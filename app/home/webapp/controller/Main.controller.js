@@ -25,6 +25,8 @@ sap.ui.define(
     ].map(function (a) {
       return Object.assign({}, Apps.get(a.key), a);
     });
+    /** The groups of tiles: the apps for testers, then the apps for administrators (Apps.js: role of an app) */
+    var GROUPS = [{ role: "tester" }, { role: "admin" }];
     var LAST_RUNS = 3;
     /** Prefs key (this browser): ids of the notices the user clicked OK on */
     var DISMISSED_KEY = "homeDismissedNotices";
@@ -148,8 +150,19 @@ sap.ui.define(
           }),
           dismissedCount: dismissed.length,
           dismissedText: dismissed.length === 1 ? this._text("attention.dismissed.one") : this._text("attention.dismissed.many", [dismissed.length]),
-          apps: APPS.filter(allowed).map(function (a) {
-            return { key: a.key, title: that._text("app." + a.key + ".title"), line: that._line(a.key, o), icon: a.icon, color: a.color };
+          groups: GROUPS.map(function (g) {
+            return {
+              key: g.role,
+              title: that._text("apps.group." + g.role),
+              description: that._text("apps.group." + g.role + ".description"),
+              apps: APPS.filter(function (a) {
+                return a.role === g.role && allowed(a);
+              }).map(function (a) {
+                return { key: a.key, title: that._text("app." + a.key + ".title"), line: that._line(a.key, o), icon: a.icon, color: a.color };
+              })
+            };
+          }).filter(function (g) {
+            return g.apps.length > 0;
           }),
           lastRuns: (o.lastRuns || []).slice(0, LAST_RUNS).map(function (r) {
             return {

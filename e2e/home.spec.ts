@@ -15,7 +15,15 @@ test.describe('home (admin)', () => {
     await expect(page.getByText('Needs attention').or(page.getByText(/^All good/))).toBeVisible()
     // demo data: test/data/aem.suite-TestCases.csv
     await expect(tile(page, 'Test Cases').getByText(/^\d+ test cases$/)).toBeVisible()
-    for (const name of ['Test Runs', 'Live Subscriber', 'Saved Messages', 'Brokers', 'Global Variables', 'Number Ranges', 'Help']) await expect(tile(page, name)).toBeVisible()
+    for (const name of ['Test Runs', 'Live Subscriber', 'Saved Messages', 'Brokers', 'Global Variables', 'Number Ranges', 'Data Cleanup']) await expect(tile(page, name)).toBeVisible()
+    // the tiles are grouped by role: the apps for testers first, then the ones for administrators
+    const testing = page.locator('.aemHomeGroup').filter({ has: page.getByRole('heading', { name: 'Testing' }) })
+    const admin = page.locator('.aemHomeGroup').filter({ has: page.getByRole('heading', { name: 'Administration' }) })
+    for (const name of ['Test Cases', 'Test Runs', 'Live Subscriber', 'Saved Messages']) await expect(testing.locator('.aemHomeTile').and(page.getByRole('region', { name, exact: true }))).toBeVisible()
+    for (const name of ['Brokers', 'Global Variables', 'Number Ranges', 'Data Cleanup']) await expect(admin.locator('.aemHomeTile').and(page.getByRole('region', { name, exact: true }))).toBeVisible()
+    await expect(page.locator('.aemHomeGroup')).toHaveCount(2)
+    // Help is the button of the page, not a tile
+    await expect(tile(page, 'Help')).toHaveCount(0)
     await expect(page.getByText('Latest Runs')).toBeVisible()
   })
 
@@ -59,10 +67,12 @@ test.describe('home (tester)', () => {
   test('shows only the apps the tester can open', async ({ page }) => {
     await openApp(page, apps.home)
     await expectAppOpen(page, apps.home)
-    // the apps for role Tester and for everyone (app/_shared/Apps.js), without the admin apps
-    const testerApps = ['Test Cases', 'Test Runs', 'Live Subscriber', 'Saved Messages', 'Help']
+    // the apps for role Tester (app/_shared/Apps.js), in one group, without the admin apps
+    const testerApps = ['Test Cases', 'Test Runs', 'Live Subscriber', 'Saved Messages']
     for (const name of testerApps) await expect(tile(page, name)).toBeVisible()
     await expect(page.locator('.aemHomeTile')).toHaveCount(testerApps.length)
+    await expect(page.getByRole('heading', { name: 'Testing' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Administration' })).toHaveCount(0)
     await expect(tile(page, 'Global Variables')).toHaveCount(0)
   })
 })

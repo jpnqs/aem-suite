@@ -55,7 +55,7 @@ Open the launchpad – the suite's own start page, or your SAP Build Work Zone s
 | **Number Ranges** | document numbers (like SAP) for your messages | Admin |
 | **Help** | this guide, inside the app | everyone |
 
-The **Home** page lists what **needs attention** (failed results, a broker whose connection test failed, ...). Click **OK** on a notice to hide it - it stays hidden in this browser until the situation changes (for example more results fail, or another broker fails). **Show again** brings hidden notices back.
+The **Home** page groups the apps by role: **Testing** (Test Cases, Test Runs, Live Subscriber, Saved Messages) and, if you are an administrator, **Administration** (Brokers, Global Variables, Number Ranges, Data Cleanup). The user guide is the **Help** button of the page. It also lists what **needs attention** (failed results, a broker whose connection test failed, ...). Click **OK** on a notice to hide it - it stays hidden in this browser until the situation changes (for example more results fail, or another broker fails). **Show again** brings hidden notices back.
 
 **Help is always at hand:** every page has a **Help** button (top right) that opens the matching part of this guide in a new tab, so you do not lose what you are doing. The **Help** tile shows the whole guide with a contents list on the left and a **search** that highlights what it finds.
 
