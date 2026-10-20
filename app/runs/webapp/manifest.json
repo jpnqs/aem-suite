@@ -60,7 +60,8 @@
       "libs": {
         "sap.m": {},
         "sap.ui.core": {},
-        "sap.fe.templates": {}
+        "sap.fe.templates": {},
+        "sap.ui.codeeditor": {}
       }
     },
     "contentDensities": {
@@ -165,6 +166,18 @@
                       "text": "{{action.help}}"
                     }
                   }
+                },
+                "body": {
+                  "sections": {
+                    "resolvedPayload": {
+                      "template": "com.aem.suite.runs.ext.ResolvedPayload",
+                      "title": "{{section.resolvedPayload}}",
+                      "position": {
+                        "placement": "After",
+                        "anchor": "Message"
+                      }
+                    }
+                  }
                 }
               },
               "contextPath": "/RunResults"
@@ -212,6 +225,18 @@
                     "help": {
                       "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "{{action.help}}"
+                    }
+                  }
+                },
+                "body": {
+                  "sections": {
+                    "resolvedPayload": {
+                      "template": "com.aem.suite.runs.ext.ResolvedPayload",
+                      "title": "{{section.resolvedPayload}}",
+                      "position": {
+                        "placement": "After",
+                        "anchor": "Message"
+                      }
                     }
                   }
                 }

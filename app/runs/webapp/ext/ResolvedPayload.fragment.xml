@@ -1,0 +1,21 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:ce="sap.ui.codeeditor">
+  <!-- The payload as it was sent: a read-only code editor, like the payload of a test case. -->
+  <VBox
+    core:require="{json: 'com/aem/suite/runs/shared/Json'}"
+    width="100%">
+    <ce:CodeEditor
+      id="resolvedPayloadEditor"
+      type="{path: 'resolvedPayload', formatter: 'json.editorType'}"
+      value="{path: 'resolvedPayload', formatter: 'json.pretty'}"
+      editable="false"
+      lineNumbers="true"
+      syntaxHints="false"
+      height="420px"
+      width="100%"
+      visible="{= !!${resolvedPayload} }" />
+    <Text text="{i18n>NoResolvedPayload}" visible="{= !${resolvedPayload} }" class="sapUiSmallMargin" />
+  </VBox>
+</core:FragmentDefinition>

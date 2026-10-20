@@ -52,23 +52,14 @@ annotate service.ReceivedMessages with @(
     {Value: receivedAt},
     {Value: createdBy}
   ]},
-  UI.FieldGroup #Payload: {Data: [
-    {Value: payload},
-    {Value: userProperties}
-  ]},
   UI.Facets            : [
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Message',
       Target: '@UI.FieldGroup#Message',
       Label : '{i18n>Message}'
-    },
-    {
-      $Type : 'UI.ReferenceFacet',
-      ID    : 'Payload',
-      Target: '@UI.FieldGroup#Payload',
-      Label : '{i18n>Payload}'
     }
+    // payload and user properties: custom section with code editors (app/messages/webapp/ext/MessageBody)
   ]
 ) {
   topic          @UI.MultiLineText;

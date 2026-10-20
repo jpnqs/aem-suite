@@ -57,7 +57,8 @@
       "libs": {
         "sap.m": {},
         "sap.ui.core": {},
-        "sap.fe.templates": {}
+        "sap.fe.templates": {},
+        "sap.ui.codeeditor": {}
       }
     },
     "contentDensities": {
@@ -150,6 +151,18 @@
                     "help": {
                       "press": "com.aem.suite.messages.shared.Help.open",
                       "text": "{{action.help}}"
+                    }
+                  }
+                },
+                "body": {
+                  "sections": {
+                    "messageBody": {
+                      "template": "com.aem.suite.messages.ext.MessageBody",
+                      "title": "{{section.payload}}",
+                      "position": {
+                        "placement": "After",
+                        "anchor": "Message"
+                      }
                     }
                   }
                 }

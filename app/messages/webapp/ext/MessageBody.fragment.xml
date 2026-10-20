@@ -1,0 +1,32 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:ce="sap.ui.codeeditor">
+  <!-- Payload and user properties of the saved message: read-only code editors, like the payload of a test case. -->
+  <VBox
+    core:require="{json: 'com/aem/suite/messages/shared/Json'}"
+    width="100%">
+    <ce:CodeEditor
+      id="payloadEditor"
+      type="{path: 'payload', formatter: 'json.editorType'}"
+      value="{path: 'payload', formatter: 'json.pretty'}"
+      editable="false"
+      lineNumbers="true"
+      syntaxHints="false"
+      height="420px"
+      width="100%"
+      visible="{= !!${payload} }" />
+    <Text text="{i18n>NoPayload}" visible="{= !${payload} }" class="sapUiSmallMargin" />
+    <Title text="{i18n>UserProperties}" level="H5" class="sapUiSmallMarginTop sapUiTinyMarginBottom" visible="{= !!${userProperties} &amp;&amp; ${userProperties} !== '{}' }" />
+    <ce:CodeEditor
+      id="propertiesEditor"
+      type="json"
+      value="{path: 'userProperties', formatter: 'json.pretty'}"
+      editable="false"
+      lineNumbers="true"
+      syntaxHints="false"
+      height="160px"
+      width="100%"
+      visible="{= !!${userProperties} &amp;&amp; ${userProperties} !== '{}' }" />
+  </VBox>
+</core:FragmentDefinition>

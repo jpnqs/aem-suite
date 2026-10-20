@@ -342,7 +342,7 @@ PASSED means the broker accepted the message. It does not check whether a consum
 
 The list opens with **your** runs ("Started By" filter); remove the filter to see all runs.
 
-Open a row to see the **resolved payload** that was actually sent. Open the run (click *Run Started*) to see all results of that run together with its totals.
+Open a row to see the **resolved payload** that was actually sent - formatted, in a read-only code editor like the payload of a test case (a message that was never sent says so). Saved messages show their payload and user properties the same way. Open the run (click *Run Started*) to see all results of that run together with its totals.
 
 The **Last Result** of each test case is also shown in the test case list and in the header of the test case page.
 

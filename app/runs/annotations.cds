@@ -185,20 +185,14 @@ annotate service.RunResults with @(
     {Value: correlationId},
     {Value: errorMessage}
   ]},
-  UI.FieldGroup #Payload: {Data: [{Value: resolvedPayload}]},
   UI.Facets            : [
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Message',
       Target: '@UI.FieldGroup#Message',
       Label : '{i18n>Message}'
-    },
-    {
-      $Type : 'UI.ReferenceFacet',
-      ID    : 'Payload',
-      Target: '@UI.FieldGroup#Payload',
-      Label : '{i18n>ResolvedPayload}'
     }
+    // the payload: custom section with a code editor (app/runs/webapp/ext/ResolvedPayload)
   ]
 ) {
   sequence          @UI.Hidden;
