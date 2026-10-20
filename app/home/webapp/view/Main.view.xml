@@ -51,7 +51,10 @@
           <CustomListItem highlight="{home>state}">
             <HBox renderType="Bare" justifyContent="SpaceBetween" alignItems="Center" class="aemHomeAttentionItem">
               <ObjectStatus text="{home>text}" state="{home>state}" icon="{home>icon}" />
-              <Link text="{home>action}" visible="{= !!${home>target} }" press=".onOpenApp" />
+              <HBox renderType="Bare" alignItems="Center" class="aemHomeAttentionActions">
+                <Link text="{home>action}" visible="{= !!${home>target} }" press=".onOpenApp" />
+                <Button text="{i18n>attention.ok}" type="Transparent" tooltip="{i18n>attention.ok.tooltip}" press=".onDismiss" />
+              </HBox>
             </HBox>
           </CustomListItem>
         </List>
@@ -60,8 +63,13 @@
         text="{i18n>attention.none}"
         state="Success"
         icon="sap-icon://sys-enter-2"
-        visible="{= ${home>/tester} &amp;&amp; ${home>/attention}.length === 0 }"
+        visible="{= ${home>/tester} &amp;&amp; ${home>/attention}.length === 0 &amp;&amp; !${home>/dismissedCount} }"
         class="aemHomeAllGood" />
+      <!-- notices the user clicked OK on: not hidden for good, one click brings them back -->
+      <HBox renderType="Bare" alignItems="Center" visible="{= ${home>/dismissedCount} > 0 }" class="aemHomeDismissed">
+        <Text text="{home>/dismissedText}" class="sapUiTinyMarginEnd" />
+        <Link text="{i18n>attention.showAgain}" press=".onShowDismissed" />
+      </HBox>
 
       <!-- the apps -->
       <Title text="{i18n>apps.title}" level="H2" class="aemHomeSectionTitle" />

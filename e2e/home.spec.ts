@@ -19,6 +19,32 @@ test.describe('home (admin)', () => {
     await expect(page.getByText('Latest Runs')).toBeVisible()
   })
 
+  test('a notice can be dismissed with OK, stays hidden, and comes back with "Show again"', async ({ page, request }) => {
+    // no local broker: the connection test fails and the broker is marked as failing - a notice on the start page
+    const LOCAL_DOCKER = 'b1000000-0000-4000-8000-000000000001'
+    await request.post(`/odata/v4/admin/Brokers(ID=${LOCAL_DOCKER},IsActiveEntity=true)/AdminService.testConnection`, { data: { password: 'wrong' } })
+
+    await openApp(page, apps.home)
+    await expectAppOpen(page, apps.home)
+    const notice = page.getByText('Broker "local-docker" failed its last connection test')
+    await expect(notice).toBeVisible()
+
+    await page.getByRole('listitem').filter({ has: notice }).getByRole('button', { name: 'OK' }).click()
+    await expect(notice).toHaveCount(0)
+    await expect(page.getByText(/^[0-9]+ notices? hidden[.]$/)).toBeVisible()
+    // not the "all good" line: the broker is still failing
+
+    // stays hidden after a reload (remembered in this browser)
+    await page.reload()
+    await expectAppOpen(page, apps.home)
+    await expect(page.getByText(/^Good (morning|afternoon|evening), admin$/)).toBeVisible()
+    await expect(notice).toHaveCount(0)
+
+    await page.getByRole('link', { name: 'Show again' }).click()
+    await expect(notice).toBeVisible()
+    await expect(page.getByText(/notices? hidden[.]/)).toHaveCount(0)
+  })
+
   test('a tile opens its app', async ({ page }) => {
     await openApp(page, apps.home)
     await tile(page, 'Global Variables').getByText('Global Variables').click()

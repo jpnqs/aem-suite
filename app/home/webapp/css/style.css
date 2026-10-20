@@ -150,8 +150,20 @@
   padding: 0.75rem 1rem;
 }
 
+.aemHomeAttentionActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .aemHomeAllGood {
   padding: 0.25rem 0;
+}
+
+.aemHomeDismissed {
+  padding: 0.25rem 0;
+  color: var(--sapContent_LabelColor);
 }
 
 /* app tiles: icon + title + one line, as many columns as fit */

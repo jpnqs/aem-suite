@@ -5,9 +5,10 @@ sap.ui.define(
     "sap/ui/core/format/DateFormat",
     "com/aem/suite/home/shared/Navigation",
     "com/aem/suite/home/shared/Actions",
-    "com/aem/suite/home/shared/Apps"
+    "com/aem/suite/home/shared/Apps",
+    "com/aem/suite/home/shared/Prefs"
   ],
-  function (Controller, JSONModel, DateFormat, Navigation, Actions, Apps) {
+  function (Controller, JSONModel, DateFormat, Navigation, Actions, Apps, Prefs) {
     "use strict";
 
     /** The app tiles of the page, in this order; intent, icon and role come from shared/Apps.js. */
@@ -25,6 +26,8 @@ sap.ui.define(
       return Object.assign({}, Apps.get(a.key), a);
     });
     var LAST_RUNS = 3;
+    /** Prefs key (this browser): ids of the notices the user clicked OK on */
+    var DISMISSED_KEY = "homeDismissedNotices";
     /** while a run is in progress, the page follows it */
     var REFRESH_WHILE_RUNNING_MS = 10000;
 
@@ -64,6 +67,26 @@ sap.ui.define(
         open(item.target || item.key);
       },
 
+      /**
+       * "OK" on a notice: it is not shown again - as long as it stays the same. A notice is named after what it is about
+       * (e.g. "failedResults:5"): when the number or the broker changes, it is a new notice and shows up again.
+       */
+      onDismiss: function (event) {
+        var id = event.getSource().getBindingContext("home").getProperty("id");
+        var dismissed = Prefs.get(DISMISSED_KEY, []);
+        if (dismissed.indexOf(id) < 0) {
+          dismissed.push(id);
+          Prefs.set(DISMISSED_KEY, dismissed);
+        }
+        this._show(this._overview);
+      },
+
+      /** "Show again": the dismissed notices come back. */
+      onShowDismissed: function () {
+        Prefs.set(DISMISSED_KEY, []);
+        this._show(this._overview);
+      },
+
       onOpenKey: function (event) {
         open(event.getSource().data("app"));
       },
@@ -101,6 +124,15 @@ sap.ui.define(
 
       _show: function (o) {
         var that = this;
+        this._overview = o;
+        var notices = this._attention(o);
+        // dismissed notices that are gone (solved) are forgotten, so the list does not grow
+        var dismissed = Prefs.get(DISMISSED_KEY, []).filter(function (id) {
+          return notices.some(function (n) {
+            return n.id === id;
+          });
+        });
+        Prefs.set(DISMISSED_KEY, dismissed);
         var allowed = function (app) {
           return !app.role || (app.role === "tester" && o.tester) || (app.role === "admin" && o.admin);
         };
@@ -111,7 +143,11 @@ sap.ui.define(
           error: null,
           tester: !!o.tester,
           greeting: this._text(hour < 12 ? "greeting.morning" : hour < 18 ? "greeting.afternoon" : "greeting.evening", [o.user || ""]),
-          attention: this._attention(o),
+          attention: notices.filter(function (n) {
+            return dismissed.indexOf(n.id) < 0;
+          }),
+          dismissedCount: dismissed.length,
+          dismissedText: dismissed.length === 1 ? this._text("attention.dismissed.one") : this._text("attention.dismissed.many", [dismissed.length]),
           apps: APPS.filter(allowed).map(function (a) {
             return { key: a.key, title: that._text("app." + a.key + ".title"), line: that._line(a.key, o), icon: a.icon, color: a.color };
           }),
@@ -138,31 +174,32 @@ sap.ui.define(
       _attention: function (o) {
         var t = this._text.bind(this);
         if (!o.tester) {
-          return [{ text: t("attention.noRole"), state: "Information", icon: "sap-icon://message-information" }];
+          return [{ id: "noRole", text: t("attention.noRole"), state: "Information", icon: "sap-icon://message-information" }];
         }
         var items = [];
-        var error = function (text, action, target) {
-          items.push({ text: text, state: "Error", icon: "sap-icon://error", action: action, target: target });
+        // id: what the notice is about, with the facts that make it a different notice when they change
+        var error = function (id, text, action, target) {
+          items.push({ id: id, text: text, state: "Error", icon: "sap-icon://error", action: action, target: target });
         };
-        var info = function (text, action, target) {
-          items.push({ text: text, state: "Information", icon: "sap-icon://message-information", action: action, target: target });
+        var info = function (id, text, action, target) {
+          items.push({ id: id, text: text, state: "Information", icon: "sap-icon://message-information", action: action, target: target });
         };
         var brokersLink = o.admin ? "brokers" : null;
         if (o.resultsFailed) {
-          error(t("attention.failedResults", [o.resultsFailed]), t("action.runs"), "runs");
+          error("failedResults:" + o.resultsFailed, t("attention.failedResults", [o.resultsFailed]), t("action.runs"), "runs");
         }
         var failing = o.failingBrokers || [];
         if (failing.length === 1) {
-          error(t("attention.failingBroker", [failing[0]]), t("action.brokers"), brokersLink);
+          error("failingBrokers:" + failing.join("|"), t("attention.failingBroker", [failing[0]]), t("action.brokers"), brokersLink);
         }
         if (failing.length > 1) {
-          error(t("attention.failingBrokers", [failing.join(", ")]), t("action.brokers"), brokersLink);
+          error("failingBrokers:" + failing.join("|"), t("attention.failingBrokers", [failing.join(", ")]), t("action.brokers"), brokersLink);
         }
         if (!o.brokers) {
-          info(t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
+          info("noBroker", t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
         }
         if (!o.testCases) {
-          info(t("attention.noTestCases"), t("action.testcases"), "testcases");
+          info("noTestCases", t("attention.noTestCases"), t("action.testcases"), "testcases");
         }
         return items;
       },
