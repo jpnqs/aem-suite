@@ -26,13 +26,6 @@ async function open(page: Page, hash: string) {
 
 test.describe.configure({ mode: 'serial' })
 
-test('launchpad', async ({ page }) => {
-  await page.goto('/launchpad.html')
-  await expect(page.getByText('Test Cases').first()).toBeVisible()
-  await settle(page)
-  await page.screenshot({ path: out('launchpad') })
-})
-
 test('home', async ({ page }) => {
   await open(page, 'AEMSuiteHome-display')
   await page.screenshot({ path: out('home') })
@@ -71,12 +64,20 @@ test('payload suggestions', async ({ page }) => {
   await settle(page)
   const editor = page.locator('[id$="--payloadEditor"]').first()
   await editor.click()
-  await page.keyboard.press('Control+End')
-  await page.keyboard.press('ArrowLeft')
-  await page.keyboard.type(', "customer": "{{')
+  // a valid payload with an empty string for the customer; the cursor goes into it
+  await editor.evaluate((el: HTMLElement) => {
+    const ace = (el.querySelector('.ace_editor') as unknown as { env: { editor: { setValue(v: string, c: number): void; gotoLine(l: number, c: number): void; focus(): void } } }).env.editor
+    ace.setValue(['{', '  "ts": {{timestamp}},', '  "broker": "{{broker.name}}",', '  "customer": ""', '}'].join(String.fromCharCode(10)), -1)
+    ace.gotoLine(4, 15)
+    ace.focus()
+  })
+  await page.keyboard.type('{{')
   // the popup closes when the editor loses the focus: no settle() here, just the suggestions loaded
-  await expect(page.locator('.ace_autocomplete')).toContainText('Global')
+  await expect(page.locator('.ace_autocomplete:visible')).toContainText('Global', { timeout: 20_000 })
+  await page.waitForTimeout(500)
   await page.screenshot({ path: out('payload-suggestions') })
+  // the draft would show as "Saved Version" in the pictures after this one
+  await page.request.delete(`/odata/v4/test/TestCases(ID=${PING},IsActiveEntity=false)`)
 })
 
 test('folder variables', async ({ page }) => {
