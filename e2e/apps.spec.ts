@@ -73,4 +73,14 @@ test.describe('apps (admin)', () => {
     await page.getByPlaceholder('Search the help').fill('faker')
     await expect(page.getByText(/^\d+ of \d+ sections mention "faker"$/)).toBeVisible()
   })
+
+  test('Help shows the pictures of the click guides', async ({ page }) => {
+    await openApp(page, apps.help)
+    await expectAppOpen(page, apps.help)
+    await page.getByText('14. Click guides', { exact: true }).first().click()
+    // the pictures come from the backend (docs-images/): at least the first one loads and has a size
+    const picture = page.locator('img.aemDocImage').first()
+    await expect(picture).toBeVisible()
+    await expect.poll(() => picture.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(300)
+  })
 })

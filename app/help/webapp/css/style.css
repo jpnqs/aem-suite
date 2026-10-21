@@ -175,3 +175,14 @@
   padding-top: 1rem;
   border-top: 1px solid var(--sapGroup_ContentBorderColor);
 }
+
+/* pictures of the guide */
+.aemDocBody img.aemDocImage {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.75rem 0 1.25rem;
+  border: 1px solid var(--sapGroup_ContentBorderColor, #d9d9d9);
+  border-radius: 0.5rem;
+  box-shadow: var(--sapContent_Shadow0);
+}

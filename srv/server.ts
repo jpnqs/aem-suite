@@ -1,4 +1,6 @@
 import cds from '@sap/cds'
+import express from 'express'
+import { IMAGE_ROUTE, imagesDir } from './lib/help-content'
 import { registerMcpOAuth } from './lib/mcp-oauth'
 import { stopAll } from './lib/solace/subscription-hub'
 import { failRuns } from './lib/runs/test-runner'
@@ -15,7 +17,7 @@ cds.on('shutdown', () => stopAll())
 if (process.env.NODE_ENV !== 'production') {
   // The UI apps call odata/ and ws/ relative to their own path (in BTP each app's xs-app.json routes them
   // to the backend). Locally the apps are mounted at /<HTML5 app name>/ - strip that prefix here.
-  const appPrefix = /^\/comaemsuite[a-z]+\/(?=(odata|ws)\/)/
+  const appPrefix = /^\/comaemsuite[a-z]+\/(?=(odata|ws|docs-images)\/)/
 
   cds.on('bootstrap', (app) => {
     app.get('/launchpad.html', (_req, res) => res.redirect('/comaemsuitelaunchpad/index.html'))
@@ -42,5 +44,11 @@ if (process.env.NODE_ENV !== 'production') {
     })
   })
 }
+
+// The pictures of the user guide (docs/images, copied next to the server on deployment): public like the guide text.
+// After the path rewriting above: locally the Help app asks for /comaemsuite<app>/docs-images/...
+cds.on('bootstrap', (app) => {
+  app.use(`/${IMAGE_ROUTE}`, express.static(imagesDir(), { dotfiles: 'deny', index: false, maxAge: '1h' }))
+})
 
 export default cds.server

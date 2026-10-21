@@ -34,11 +34,19 @@ const INTRO_ID = 'overview'
 /** sections that only repeat the navigation */
 const SKIPPED = ['contents']
 
+/** Pictures in the guide are written as images/<path>.png (relative to docs/, so they also show on GitHub). */
+export const GUIDE_IMAGES = 'images/'
+/** ...and reach the Help app under this path (relative to the app; srv/server.ts serves the folder) */
+export const IMAGE_ROUTE = 'docs-images'
+
 /**
  * Location of the guide: docs/user-guide.md in the project (copied next to the server on deployment, see
  * scripts/build-docs.js). `cds.aemSuite.help.file` overrides it (relative to the project root).
  */
 export const guideFile = (): string => path.resolve(cds.root, config().help.file)
+
+/** The pictures of the guide: the images folder next to the guide file. */
+export const imagesDir = (): string => path.join(path.dirname(guideFile()), 'images')
 
 let cached: { mtimeMs: number; guide: Guide } | undefined
 
@@ -71,6 +79,16 @@ export function renderGuide(markdown: string): Guide {
   // wide tables scroll inside the page instead of breaking the layout
   md.renderer.rules.table_open = () => '<div class="aemDocTable"><table>\n'
   md.renderer.rules.table_close = () => '</table></div>\n'
+  // pictures: images/x.png -> docs-images/x.png (served by the backend), scaled to the page, loaded when scrolled to
+  md.renderer.rules.image = (tokens, idx) => {
+    const t = tokens[idx]
+    const src = String(t.attrGet('src') ?? '')
+    const local = src.startsWith(GUIDE_IMAGES) && !src.includes('..')
+    const alt = md.utils.escapeHtml(t.content)
+    const url = md.utils.escapeHtml(local ? IMAGE_ROUTE + '/' + src.slice(GUIDE_IMAGES.length) : '')
+    // a click opens the picture in full size in a new tab
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer"><img class="aemDocImage" src="${url}" alt="${alt}" title="${alt}" loading="lazy"></a>`
+  }
 
   const tokens = md.parse(markdown, {})
 
