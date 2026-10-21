@@ -36,6 +36,21 @@ save messages as **test cases**, send them to one or several brokers with one cl
 - [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
 - [12. Clean up old data (Admin)](#12-clean-up-old-data-admin)
 - [13. Tips and troubleshooting](#13-tips-and-troubleshooting)
+- [14. Click guides](#14-click-guides)
+  - [Get access and open the suite](#get-access-and-open-the-suite)
+  - [Add a broker with direct input (Admin)](#add-a-broker-with-direct-input-admin)
+  - [Add a broker from a BTP destination (Admin)](#add-a-broker-from-a-btp-destination-admin)
+  - [Create a global variable (Admin)](#create-a-global-variable-admin)
+  - [Create a number range (Admin)](#create-a-number-range-admin)
+  - [Create a folder and a test case](#create-a-folder-and-a-test-case)
+  - [Run test cases and read the result](#run-test-cases-and-read-the-result)
+  - [Repeat a message and pace it](#repeat-a-message-and-pace-it)
+  - [Watch a topic live and keep the setup](#watch-a-topic-live-and-keep-the-setup)
+  - [Turn a received message into a test case](#turn-a-received-message-into-a-test-case)
+  - [Move tests to another system](#move-tests-to-another-system)
+  - [Clean up old data (Admin)](#clean-up-old-data-admin)
+  - [Connect an AI assistant](#connect-an-ai-assistant)
+- [15. The screens at a glance](#15-the-screens-at-a-glance)
 
 ---
 
@@ -53,6 +68,7 @@ Open the launchpad – the suite's own start page, or your SAP Build Work Zone s
 | **Brokers** | connections to the brokers | Admin |
 | **Global Variables** | variables for all test cases | Admin |
 | **Number Ranges** | document numbers (like SAP) for your messages | Admin |
+| **Data Cleanup** | delete old runs, messages and setups | Admin |
 | **Help** | this guide, inside the app | everyone |
 
 The **Home** page groups the apps by role: **Testing** (Test Cases, Test Runs, Live Subscriber, Saved Messages) and, if you are an administrator, **Administration** (Brokers, Global Variables, Number Ranges, Data Cleanup). The user guide is the **Help** button of the page. It also lists what **needs attention** (failed results, a broker whose connection test failed, ...). Click **OK** on a notice to hide it - it stays hidden in this browser until the situation changes (for example more results fail, or another broker fails). **Show again** brings hidden notices back.
@@ -60,6 +76,8 @@ The **Home** page groups the apps by role: **Testing** (Test Cases, Test Runs, L
 **Help is always at hand:** every page has a **Help** button (top right) that opens the matching part of this guide in a new tab, so you do not lose what you are doing. The **Help** tile shows the whole guide with a contents list on the left and a **search** that highlights what it finds.
 
 Your administrator assigns the roles (**AEM_Suite_Tester** or **AEM_Suite_Admin**). Admins can do everything testers can.
+
+**Prefer to be led by the hand?** Chapter [14. Click guides](#14-click-guides) shows every setup step by step, with a picture for the important screens (the element to click is framed in orange). Chapter [15. The screens at a glance](#15-the-screens-at-a-glance) explains what is on each page.
 
 **Typical workflow**
 
@@ -624,3 +642,268 @@ Deleting cannot be undone. Every cleanup is recorded on the tab **History**: whe
 | I don't see test cases or runs of colleagues | Remove the "Created By" / "Started By" filter. |
 | Live Subscriber shows "WebSocket offline" | Connection to the server lost – it reconnects automatically; reload the page if it persists. |
 | Run is still RUNNING after a long time | Brokers that do not answer are timed out by the connect timeout of the broker; check *Test Runs* again later. |
+
+---
+
+## 14. Click guides
+
+Step by step, in the order you will probably need them. **Admin** in a title means the steps need the Admin role; all others work with the Tester role. The pictures were made with the demo data of the suite; the element to click is framed in orange.
+
+> **About the pictures of runs:** they were made without a broker that answers, so the messages end with an *error* (red). With a reachable broker you see the green **PASSED** instead - everything else looks the same.
+
+### Get access and open the suite
+
+1. Ask your BTP administrator for the role collection **AEM_Suite_Tester** (testing) or **AEM_Suite_Admin** (testing and setup). Administrators assign it in the BTP cockpit: *your subaccount → Security → Role Collections →* click the role collection *→ Edit → Users →* enter the user ID (and the identity provider) *→ Save*.
+2. Open the launchpad of the suite (the link your administrator gives you) and sign in. If you have just received a role, **sign out and in again** - the roles are part of your login.
+3. The **Home** page opens. Click a tile to open an app. No tiles, or "You have no role for the AEM Test Suite yet"? The role collection is not assigned to you yet, or you have not logged in again.
+4. Every page has a **Help** button at the top right: it opens this guide at the matching place in a new tab.
+
+### Add a broker with direct input (Admin)
+
+Use this when the broker is entered in the app and the password is typed whenever it is needed (it is never saved).
+
+1. Open **Brokers** (Home → *Administration* → **Brokers**) and click **Create**.
+
+   ![The Brokers list with the Create button](images/guides/broker-1-list.png)
+
+2. Fill in the form:
+   - **Name** - how you will find the broker everywhere, e.g. `Dev broker`.
+   - **Credentials** - leave **DIRECT** (the other choice, DESTINATION, is the next guide).
+   - **URL** - the host is enough, e.g. `mr-abc123.messaging.solace.cloud`.
+   - **Message VPN** - e.g. `dev-vpn`.
+   - **Username** - the client username, e.g. `solace-cloud-client`. Leave it empty if every user should enter their own when running.
+   - Leave **Active** ticked. Open the tab *Broker Variables* if values should differ per broker (see [Variables and templates](#10-variables-and-templates)).
+
+   ![The filled form of a direct broker](images/guides/broker-2-form.png)
+
+   Where do I find the connection data? In the AEM console: *Cluster Manager → your service → Connect → Solace Web Messaging* (host, message VPN, username).
+3. Click **Create** at the bottom. The broker is saved and its page opens.
+
+   ![The saved broker with the Test Connection button](images/guides/broker-3-saved.png)
+
+4. Check that it works: click **Test Connection**, enter the **password** and click **Test**. The result shows in the header (*Last Connection Test*): **OK**, or the reason (wrong password, VPN, host not reachable ...).
+
+   ![The password dialog of the connection test](images/guides/broker-4-test-connection.png)
+
+### Add a broker from a BTP destination (Admin)
+
+Use this when nobody should ever type a password: the technical user and its password are kept in BTP.
+
+1. In the **BTP cockpit**: *your subaccount → Connectivity → Destinations → Create Destination* (or **Import Destination** with the file from [Brokers from a BTP destination](#brokers-from-a-btp-destination)).
+2. Fill in: **Name** (e.g. `aem-dev`), **Type** `HTTP`, **URL** `https://<host of the broker>:443`, **Proxy Type** `Internet`, **Authentication** `BasicAuthentication`, **User** and **Password** of the technical user. Click **New Property** and add `msgVpn` = the message VPN. **Save**.
+3. In the suite open **Brokers → Create**. Enter a **Name**, set **Credentials** to **DESTINATION** and choose your destination in **Destination** (the list shows the URL and VPN of each).
+4. Click **Create** at the bottom. The connection is tested right away; the result shows in the header.
+5. Decide whether an AI assistant may use this broker: **Available for AI Agents** is on by default - switch it off for production brokers.
+
+### Create a global variable (Admin)
+
+A global variable is a value every test case can use, written `{{name}}` in a topic or payload.
+
+1. Open **Global Variables** and click **Create**.
+
+   ![The Global Variables list](images/guides/variables-1-list.png)
+
+2. Enter a **Name** (letters, digits, `_`, `.`, `-`) and a **Value**, e.g. `customer` = `ACME`. Click **Create** at the bottom.
+
+   ![A new global variable](images/guides/variables-2-form.png)
+
+3. Use it in a test case as `{{customer}}`. Values that should differ per broker go to the tab *Broker Variables* of that broker, values for a group of tests to the *Variables* of a folder.
+
+### Create a number range (Admin)
+
+A number range hands out numbers like SAP document numbers (`SH-00001000`, `SH-00001001`, ...), one more with every message.
+
+1. Open **Number Ranges** and click **Create**.
+2. Enter **Name** (this is how you use it: `{{numberRange.SHIPMENTS}}`), **Prefix** (`SH-`), **Digits** (`8` - the number is filled with zeros), **First Number** (`1000`). **Step** and **Last Allowed Number** are optional.
+
+   ![The form of a number range](images/guides/numberrange-1-form.png)
+
+3. Click **Create** at the bottom. The page shows what the **next number** looks like and the **last number issued**.
+
+   ![A saved number range with its status](images/guides/numberrange-2-saved.png)
+
+4. Use `{{numberRange.SHIPMENTS}}` in a topic or payload. The buttons **Count Up**, **Count Down** and **Reset** move the counter, for example to start a test series again.
+
+### Create a folder and a test case
+
+1. Open **Test Cases**. To put the test case into a folder, first create the folder: click **Create ▾ → Folder**, enter a **Folder name**, click **Create** at the bottom. (Select a folder in the list first to create a folder inside it.)
+2. Select the folder (click its row) and click **Create ▾ → Test Case**.
+
+   ![The Create menu of the test case list](images/guides/testcase-1-create-menu.png)
+
+3. Enter the **Topic**, e.g. `shop/orders/{{region}}/created/v1/{{uuid}}`. The **Name** follows the topic until you type your own. Wildcards (`*`, `>`) are not allowed in a topic you publish to.
+
+   ![The topic of a test case](images/guides/testcase-2-topic.png)
+
+4. Scroll to **Payload** and change the JSON. Type `{{` and a list of everything you can use opens - variables, built-ins, number ranges, faker data. Keep typing to narrow it, press **Enter** to take an entry.
+
+   ![Suggestions while typing {{ in the payload](images/guides/testcase-3-suggestions.png)
+
+5. Click **Preview**, choose a broker and click **Resolve**: you see the topic, payload and properties exactly as they would be sent - nothing is sent yet.
+
+   ![The preview of a test case](images/guides/testcase-4-preview.png)
+
+6. Click **Create** at the bottom to save. (Under *Show more* / the tabs **Advanced**, **User Properties** and **Variables** you find delivery mode, time to live, user properties and variables of this test case.)
+
+### Run test cases and read the result
+
+1. In **Test Cases** tick the test cases or folders you want to run (a folder runs everything inside it) and click **Run…**. On a test case page, click **Run…** at the top.
+
+   ![Rows selected, the Run button](images/guides/run-1-select.png)
+
+2. In the dialog, tick the **brokers**. For every *direct* broker a **Password** field appears (and a *Username* field if the broker has none) - used for this run only. Destination brokers need nothing.
+3. Click **Run**. The progress shows live (`3 / 6`, passed / failed).
+
+   ![The run dialog with the advanced settings open](images/guides/run-2-dialog.png)
+
+4. When it is **Finished**, the dialog lists the problems (test case @ broker + reason). Click **Open Results**.
+
+   ![A finished run](images/guides/run-3-finished.png)
+
+5. The run opens with one row per test case and broker. Click a row to see the **resolved payload** that was really sent, the topic, the ACK latency and - if it failed - the error text.
+
+   ![The results of a run](images/guides/results-1-run.png)
+
+6. Later you find all runs under **Test Runs** (newest first; your own by default). Filter by test case, broker or status; click a test case or broker name to open it.
+
+   ![The Test Runs list](images/guides/results-2-list.png)
+
+What do PASSED, FAILED and ERROR mean? See [What do the results mean?](#what-do-the-results-mean).
+
+### Repeat a message and pace it
+
+For load, for flows over time, or to see how stable a broker is:
+
+1. Select the test cases and click **Run…**, tick the brokers.
+2. Click **Advanced settings** and set:
+   - **Repetitions** - how often every test case is sent to every broker (up to 1000);
+   - **Pause between messages** - in milliseconds, between two messages to the same broker;
+   - **Order** - *Whole selection* (a, b, c, a, b, c) or *Each test case* (a, a, a, b, b, b);
+   - **Stop at the first failure** - the rest of that broker is skipped after a failed message.
+3. The dialog tells you what you are about to start ("30 or more messages ... the pauses alone take about 2 min"). Click **Run**.
+4. Need to end it early? Click **Stop run** - messages not sent yet are skipped.
+
+Variables, `{{uuid}}`, number ranges and faker values are resolved anew for **every** message, so every repetition differs.
+
+### Watch a topic live and keep the setup
+
+1. Open **Live Subscriber**. Choose the **Broker** and enter the password (and username) if it is a direct broker.
+2. Under **Source** choose **Topics**, type a topic, e.g. `shop/orders/>`, and click **Add**. Add more topics the same way (`*` is one level, `>` everything below).
+
+   ![Topics entered in the Live Subscriber](images/guides/subscriber-1-topics.png)
+
+3. Click **Start**. Messages appear on the left; click one to see payload, properties and delivery mode on the right.
+4. So you do not have to enter all of this again: click **Save as…**, give the setup a name and click **Save**. Next time pick it in **Saved setup**. A setup keeps the broker, topics and username - never the password.
+
+   ![Saving a setup](images/guides/subscriber-2-save-setup.png)
+
+5. Click **Stop** when you are done. A forgotten subscription ends by itself about 5 minutes after you close the page.
+
+**End-to-end check:** start the subscription on your test topics, run your test cases in another tab and watch the messages arrive.
+
+### Turn a received message into a test case
+
+1. In the **Live Subscriber** select a message and click **Save** (keeps it in *Saved Messages*) or **Save as Test Case** (does both).
+2. Open **Saved Messages**; click a message.
+
+   ![The list of saved messages](images/guides/messages-1-list.png)
+
+3. Click **Create Test Case**. The test case (topic, payload, properties) appears at the top level of **Test Cases** - drag it into a folder.
+
+   ![A saved message with the Create Test Case button](images/guides/messages-2-page.png)
+
+### Move tests to another system
+
+To copy test cases from dev to test, share them with a colleague or keep them in Git:
+
+1. In **Test Cases** tick the folders or test cases (nothing ticked exports everything) and click **Export**. A JSON file is downloaded.
+
+   ![Export and Import in the toolbar of the test case list](images/guides/export-1-toolbar.png)
+
+2. In the other system open **Test Cases**, select the folder the tests should go into (or none for the top level), click **Import** and choose the file. The file is checked first; you confirm what will be added. Nothing is imported if anything is wrong.
+3. Brokers, global variables and number ranges have **Export** and **Import** in their own apps (no passwords are in the file).
+
+### Clean up old data (Admin)
+
+1. Open **Data Cleanup**.
+2. Switch on what to clean (test runs, run payloads, saved messages, subscriber setups, orphans) and set **older than** (days, weeks, months, years) or **before** a date.
+3. Click **Preview**: you see how many rows would be deleted, per kind.
+
+   ![The Data Cleanup page](images/guides/cleanup-1-form.png)
+
+4. Click **Delete…** and confirm. The cleanup is recorded on the tab **History**. A selection you use often can be kept with **Save as…** (*Saved rule*).
+
+### Connect an AI assistant
+
+1. Ask your administrator for the address of the suite and the client ID and secret for the assistant (see [Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)).
+2. **GitHub Copilot (VS Code):** create `.vscode/mcp.json` in your workspace with the server address (`type: http`, `url: https://<your app>/mcp/agent`), click **Start** above the entry, open the Copilot chat in **Agent** mode and check that the `aem-suite` tools appear.
+3. **Claude Code:** run `claude mcp add --transport http aem-suite https://<your app>/mcp/agent` and authenticate with `/mcp`.
+4. Log in with your normal BTP login when the browser asks. Then ask in plain language, e.g. *"Run all tests in the folder Orders on aem-dev and tell me what failed."*
+
+---
+
+## 15. The screens at a glance
+
+### Home
+
+The start page. At the top the **greeting** and shortcuts (*Open Test Cases*, *Watch live*, *User guide*). **Needs attention** lists what is wrong (failed results, a broker that failed its last test) - **OK** hides a notice until the situation changes. The tiles open the apps, grouped into **Testing** and **Administration**; **Latest Runs** shows the last runs (click one to open it).
+
+### Test Cases
+
+| Area | What it does |
+|---|---|
+| Filter bar | search, *Created By* (starts with your own entries), name, topic, delivery mode |
+| Toolbar | **Run…**, **Copy**, **Export**, **Import**, **Create ▾** (Folder / Test Case), **Delete**, **Cut**, **Paste**, **Move Up / Move Down** |
+| Tree table | folders and test cases; the icon shows the type; **Last Result** and **Last Run At** show the latest outcome |
+| Test case page | header with *Last Result* and the buttons **Edit**, **Delete**, **Run…**, **Copy**, **Export**, **Help**, **Preview**; tabs **Message**, **Payload**, **Advanced**, **User Properties**, **Variables** |
+| Folder page | **Folder name** and the **Variables** that apply to everything inside |
+
+### Test Runs
+
+A list with one row per test case and broker (columns: run, test case, broker, repetition, status, ACK latency, delivery mode, topic, error, started by). Click a name to open the test case or broker, click the run to see all its results, click a row for the **resolved payload** in a read-only code editor.
+
+### Live Subscriber
+
+| Area | What it does |
+|---|---|
+| **Saved setup** | pick, **Save as…** or delete a setup (broker, source, topics, username) |
+| **Broker**, password / username | where to listen; direct brokers ask for the password here |
+| **Source** | **Topics**, **Browse Queue** (does not remove messages) or **Consume Queue** (removes them) |
+| Topic list | enter a topic, **Add**; ✕ removes one |
+| **Start** / **Stop** | begins and ends the subscription; **Active Subscriptions** lists your running ones |
+| Message list and detail | **Pause**, **Clear**, a filter field; the detail shows payload, properties and **Save** / **Save as Test Case** |
+
+### Saved Messages
+
+The messages you kept: broker, topic, source, received at. Open one for payload and properties (code editors), **Create Test Case** turns it into a test case, **Delete** removes it.
+
+### Brokers (Admin)
+
+| Area | What it does |
+|---|---|
+| List | name, status of the last connection test, URL, VPN, credentials; **Create**, **Test Connection**, **Delete**, **Export**, **Import** |
+| Page, tab **Connection** | **General** (Name, Description, Credentials, Active, Available for AI Agents), **Direct Connection** (URL, Message VPN, Username) or **BTP Destination**, **Advanced** (Client Name Prefix, Connect Timeout) |
+| Tab **Broker Variables** | values that apply only to this broker |
+| Header | **Last Connection Test**: status, time, message |
+
+### Global Variables (Admin)
+
+A list of **Name** and **Value**; **Create**, **Delete**, **Export**, **Import**.
+
+### Number Ranges (Admin)
+
+| Field | Meaning |
+|---|---|
+| **Name** | used as `{{numberRange.NAME}}` |
+| **Prefix** / **Suffix** | text before / after the number |
+| **Digits** | length, filled with leading zeros |
+| **First Number**, **Step**, **Last Allowed Number** | where it starts, how it grows, where it ends |
+| **Status** | next number, last number issued, last use; buttons **Count Up**, **Count Down**, **Reset** |
+
+### Data Cleanup (Admin)
+
+The tab **Clean Up** (what to delete and how old, **Preview**, **Delete…**, saved rules) and the tab **History** (every cleanup: when, by whom, what, how many).
+
+### Help
+
+This guide with the contents on the left and a search that highlights what it finds. Pictures can be clicked to read them larger in a new tab.
