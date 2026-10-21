@@ -8,6 +8,8 @@ Save messages as test cases, send them to several brokers at once, see immediate
 
 ![Home](docs/images/home.png)
 
+**New here?** The [user guide](docs/user-guide.md) walks you through every task click by click, with pictures – start with [Getting started](docs/user-guide.md#1-getting-started). The same guide is built into the app (**Help** on every page).
+
 ## Why use it
 
 - **Know if the broker really took it.** A result passes only when the broker acknowledges the message (persistent delivery), with the measured ACK latency.
@@ -106,9 +108,26 @@ The suite offers an MCP endpoint (`/mcp/agent`). Connect GitHub Copilot, Claude 
 
 | Document | For whom | Content |
 |---|---|---|
-| [User guide](docs/user-guide.md) | testers, admins | how to use every app, variables, runs, live subscriber, AI assistant, troubleshooting |
+| [User guide](docs/user-guide.md) | testers, admins | how to use every app, variables, runs, live subscriber, AI assistant, troubleshooting - every chapter starts with the clicks, step by step, with pictures |
 | [Technical documentation](docs/technical-documentation.md) | developers, operators | architecture, data model, APIs, security, configuration, deployment, extension points |
 | [Local broker](local/README.md) | developers | Solace PubSub+ in Docker with demo users and queues |
+
+**The user guide by task**
+
+| I want to … | Chapter |
+|---|---|
+| get access, know the apps and the terms | [1. Getting started](docs/user-guide.md#1-getting-started) |
+| add a broker (direct or from a BTP destination) | [2. Set up brokers](docs/user-guide.md#2-set-up-brokers-admin) · [Brokers from a BTP destination](docs/user-guide.md#brokers-from-a-btp-destination) |
+| define values for all test cases | [3. Global variables](docs/user-guide.md#3-global-variables-admin) |
+| organize, copy, export and import test cases | [4. Organize test cases in folders](docs/user-guide.md#4-organize-test-cases-in-folders) |
+| create or change a test case | [5. Create and edit a test case](docs/user-guide.md#5-create-and-edit-a-test-case) |
+| run tests, repeat and pace them | [6. Run tests](docs/user-guide.md#6-run-tests) · [Advanced settings](docs/user-guide.md#advanced-settings) |
+| understand results | [What do the results mean?](docs/user-guide.md#what-do-the-results-mean) · [7. Check results](docs/user-guide.md#7-check-results) |
+| watch topics and queues live | [8. Live Subscriber](docs/user-guide.md#8-watch-messages-live-live-subscriber) · [9. Saved messages](docs/user-guide.md#9-saved-messages) |
+| use variables, SAP-like numbers and test data | [10. Variables and templates](docs/user-guide.md#10-variables-and-templates) · [Number ranges](docs/user-guide.md#number-ranges-admin) · [faker](docs/user-guide.md#test-data-with-faker) |
+| let an AI assistant plan and run tests | [11. Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp) |
+| delete old runs and messages | [12. Clean up old data](docs/user-guide.md#12-clean-up-old-data-admin) |
+| fix an error message | [13. Tips and troubleshooting](docs/user-guide.md#13-tips-and-troubleshooting) |
 
 ## Technology
 

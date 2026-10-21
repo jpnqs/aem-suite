@@ -16,3 +16,10 @@ if (!fs.existsSync(path.join(root, 'gen', 'srv'))) throw new Error('gen/srv not 
 fs.mkdirSync(path.dirname(target), { recursive: true })
 fs.copyFileSync(source, target)
 console.log(`Copied ${path.relative(root, source)} to ${path.relative(root, target)}`)
+
+// the pictures of the guide (docs/images)
+const images = path.join(root, 'docs', 'images')
+if (fs.existsSync(images)) {
+  fs.cpSync(images, path.join(path.dirname(target), 'images'), { recursive: true })
+  console.log(`Copied ${path.relative(root, images)} to ${path.relative(root, path.join(path.dirname(target), 'images'))}`)
+}

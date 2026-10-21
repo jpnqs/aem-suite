@@ -120,3 +120,27 @@ describe('help (user guide rendered from Markdown)', () => {
     })
   })
 })
+
+describe('pictures in the guide', () => {
+  it('writes images/... as an image served under docs-images/, and refuses anything else', () => {
+    const html = renderGuide('# T\n\n## A\n\n![The list](images/guides/list.png)\n\n![Elsewhere](https://example.org/x.png)\n\n![Up](images/../secret.png)\n').sections[1].html
+    expect(html).toContain('<a href="docs-images/guides/list.png" target="_blank" rel="noopener noreferrer"><img class="aemDocImage" src="docs-images/guides/list.png" alt="The list" title="The list" loading="lazy"></a>')
+    // not a picture of the guide: no source at all
+    expect(html).not.toContain('example.org')
+    expect(html).not.toContain('secret.png')
+  })
+
+  it('serves the pictures of docs/images', async () => {
+    const res = await GET('/docs-images/home.png', { responseType: 'arraybuffer' } as object)
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toBe('image/png')
+    expect((await GET('/docs-images/nothing.png')).status).toBe(404)
+    // no way out of the folder
+    expect((await GET('/docs-images/..%2f..%2fpackage.json')).status).toBeGreaterThanOrEqual(400)
+  })
+
+  it('every picture the guide uses exists', () => {
+    const markdown = fs.readFileSync(path.join(root, 'docs/user-guide.md'), 'utf8')
+    for (const m of markdown.matchAll(/!\[[^\]]*\]\((images\/[^)]+)\)/g)) expect(fs.existsSync(path.join(root, 'docs', m[1]))).toBe(true)
+  })
+})
