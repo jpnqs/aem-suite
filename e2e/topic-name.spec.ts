@@ -53,6 +53,9 @@ test('the topic is one line and suggests template expressions', async ({ page })
   const popup = page.locator('.ace_autocomplete')
   await expect(popup).toContainText('e2eRegion')
   await page.keyboard.type('e2eReg')
+  // the suggestions are loaded asynchronously: on a slow machine the list still has the entries of an earlier key
+  // when Enter arrives and takes the wrong one - wait until the narrowed list has selected the entry we mean
+  await expect(popup.locator('.ace_selected')).toContainText('e2eRegion')
   await page.keyboard.press('Enter')
   await expect(editor).toContainText('e2e/topic/{{e2eRegion}}')
   // Tab leaves the field and the topic is saved in the draft
