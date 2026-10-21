@@ -106,7 +106,7 @@ The suite offers an MCP endpoint (`/mcp/agent`). Connect GitHub Copilot, Claude 
 
 | Document | For whom | Content |
 |---|---|---|
-| [User guide](docs/user-guide.md) | testers, admins | how to use every app, variables, runs, live subscriber, AI assistant, troubleshooting - with [click guides](docs/user-guide.md#14-click-guides) (step by step, with pictures) for every setup |
+| [User guide](docs/user-guide.md) | testers, admins | how to use every app, variables, runs, live subscriber, AI assistant, troubleshooting - every chapter starts with the clicks, step by step, with pictures |
 | [Technical documentation](docs/technical-documentation.md) | developers, operators | architecture, data model, APIs, security, configuration, deployment, extension points |
 | [Local broker](local/README.md) | developers | Solace PubSub+ in Docker with demo users and queues |
 

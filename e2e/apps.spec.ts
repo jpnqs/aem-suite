@@ -74,10 +74,10 @@ test.describe('apps (admin)', () => {
     await expect(page.getByText(/^\d+ of \d+ sections mention "faker"$/)).toBeVisible()
   })
 
-  test('Help shows the pictures of the click guides', async ({ page }) => {
+  test('Help shows the pictures of the step-by-step guides', async ({ page }) => {
     await openApp(page, apps.help)
     await expectAppOpen(page, apps.help)
-    await page.getByText('14. Click guides', { exact: true }).first().click()
+    await page.getByText('2. Set up brokers (Admin)', { exact: true }).first().click()
     // the pictures come from the backend (docs-images/): at least the first one loads and has a size
     const picture = page.locator('img.aemDocImage').first()
     await expect(picture).toBeVisible()

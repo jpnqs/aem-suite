@@ -2,7 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
 import path from 'node:path'
 
 /**
- * The pictures of the click guides (docs/user-guide.md, chapter "Click guides"): the spec walks the steps of each
+ * The pictures of the step-by-step parts of the user guide (docs/user-guide.md): the spec walks the steps of each
  * guide in the running app and takes a picture where the guide says "you see ..." - what a guide describes is
  * thereby checked against the real screens. The element to click is framed in orange.
  *
