@@ -12,5 +12,6 @@ export interface AppTarget {
 declare const Navigation: {
   inLaunchpad(): boolean;
   toApp(target: AppTarget): void;
+  handleAppLinks(): void;
 };
 export default Navigation;

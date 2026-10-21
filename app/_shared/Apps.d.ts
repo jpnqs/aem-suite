@@ -1,4 +1,4 @@
-export type AppKey = "home" | "testcases" | "runs" | "subscriber" | "messages" | "brokers" | "variables" | "numberranges" | "help";
+export type AppKey = "home" | "testcases" | "runs" | "subscriber" | "messages" | "brokers" | "variables" | "numberranges" | "cleanup" | "help";
 
 export interface AppInfo {
   /** launchpad intent, e.g. "AEMSuiteTestRuns-display" */
@@ -12,5 +12,6 @@ export interface AppInfo {
 declare const Apps: {
   APPS: Record<AppKey, AppInfo>;
   get(key: AppKey): AppInfo;
+  byIntent(intent: string): AppKey | undefined;
 };
 export default Apps;

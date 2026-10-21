@@ -30,6 +30,13 @@ sap.ui.define([], function () {
         throw new Error("Unknown app " + key);
       }
       return app;
+    },
+
+    /** The key of the app with this launchpad intent ("AEMSuiteTestRuns-display" -> "runs"), or undefined. */
+    byIntent: function (intent) {
+      return Object.keys(APPS).filter(function (key) {
+        return APPS[key].intent === intent;
+      })[0];
     }
   };
 });
