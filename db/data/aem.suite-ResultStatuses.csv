@@ -1,0 +1,6 @@
+code;name;descr;position
+PASSED;Passed;Sent and acknowledged as expected;1
+FAILED;Failed;Not acknowledged as expected (rejected, timeout);2
+ERROR;Error;Could not be sent (connection, unknown variable, invalid payload);3
+SKIPPED;Not Sent;The run was stopped, or an earlier message failed (stop at first failure);4
+PENDING;Pending;Not sent yet - the run is still in progress;5

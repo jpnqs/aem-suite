@@ -25,6 +25,13 @@ entity PropertyTypes : CodeList {
   key code : PropertyType;
 }
 
+@singular: 'ResultStatusCode'
+entity ResultStatuses : CodeList {
+  key code     : ResultStatus;
+      /** order in dropdowns: the outcomes first */
+      position : Integer;
+}
+
 /*
  * @assert.range on the enum types: CAP rejects other values on every OData write (the UI only offers them as
  * dropdowns). Direct database writes (agent, import, copy) are checked by lib/testcases/node-validation.ts.
@@ -242,6 +249,9 @@ entity TestRuns : cuid, managed {
   stopOnFailure : Boolean default false;
   results     : Composition of many RunResults
                   on results.run = $self;
+  /** the name of createdBy (see TestCases.creator) */
+  creator     : Association to one Users
+                  on creator.ID = $self.createdBy;
 }
 
 entity RunResults : cuid {
@@ -263,6 +273,11 @@ entity RunResults : cuid {
   ackLatencyMs    : Integer;
   errorMessage    : String(2000);
   executedAt      : Timestamp;
+  /** the texts of status and deliveryMode (the code lists), so lists show "Passed" instead of PASSED */
+  statusInfo      : Association to one ResultStatuses
+                      on statusInfo.code = $self.status;
+  deliveryModeInfo : Association to one DeliveryModes
+                      on deliveryModeInfo.code = $self.deliveryMode;
 }
 
 /** Messages captured by the live subscriber that a user decided to keep. */
