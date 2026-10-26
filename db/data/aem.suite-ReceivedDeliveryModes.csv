@@ -1,0 +1,4 @@
+code;name;descr
+DIRECT;Direct;Sent without broker acknowledgement
+NON_PERSISTENT;Non-Persistent;Guaranteed delivery, not kept on disk
+PERSISTENT;Persistent (Guaranteed);Guaranteed delivery, kept on disk

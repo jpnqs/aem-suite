@@ -43,6 +43,76 @@ service SubscribeService {
       action createTestCase() returns TestCaseRef;
     };
 
+  /** Names of the users (ReceivedMessages.creator: the text of createdBy). */
+  @readonly
+  entity Users as projection on db.Users;
+
+  // dropdowns show the name only, source types in their own order (UI.PresentationVariant #byPosition)
+  @readonly
+  entity SourceTypes as projection on db.SourceTypes;
+
+  @readonly
+  entity ReceivedDeliveryModes as projection on db.ReceivedDeliveryModes;
+
+  annotate SourceTypes with @UI.PresentationVariant #byPosition: {SortOrder: [{Property: position}]} {
+    code     @Common.Text: name  @Common.TextArrangement: #TextOnly;
+    position @UI.Hidden;
+  };
+
+  annotate ReceivedDeliveryModes with {
+    code @Common.Text: name  @Common.TextArrangement: #TextOnly;
+  };
+
+  // ---- value helps of the saved message filters: the values of the saved messages ----
+
+  /** The users that saved messages. */
+  @readonly
+  @cds.redirection.target: false
+  entity MessageSavers as
+    select from db.ReceivedMessages distinct {
+      key createdBy    as ID   : String(255) @title: '{i18n>User}',
+          creator.name as name : String(511) @title: '{i18n>Name}'
+    }
+    where
+      createdBy is not null;
+
+  @readonly
+  @cds.redirection.target: false
+  entity MessageBrokers as
+    select from db.ReceivedMessages distinct {
+      key brokerName
+    }
+    where
+      brokerName is not null;
+
+  @readonly
+  @cds.redirection.target: false
+  entity MessageTopics as
+    select from db.ReceivedMessages distinct {
+      key topic
+    }
+    where
+      topic is not null;
+
+  /** subscriptions and queues the messages were received on */
+  @readonly
+  @cds.redirection.target: false
+  entity MessageSources as
+    select from db.ReceivedMessages distinct {
+      key source
+    }
+    where
+      source is not null;
+
+  @readonly
+  @cds.redirection.target: false
+  entity MessageContentTypes as
+    select from db.ReceivedMessages distinct {
+      key contentType
+    }
+    where
+      contentType is not null;
+
   /** The user's saved setups of the live subscriber (broker, source, topics, username - never a password). */
   @restrict: [{
     grant: ['READ', 'CREATE', 'UPDATE', 'DELETE'],

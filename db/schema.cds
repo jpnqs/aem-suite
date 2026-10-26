@@ -32,6 +32,18 @@ entity ResultStatuses : CodeList {
       position : Integer;
 }
 
+@singular: 'SourceTypeCode'
+entity SourceTypes : CodeList {
+  key code     : SourceType;
+      /** order in dropdowns: topics first */
+      position : Integer;
+}
+
+@singular: 'ReceivedDeliveryModeCode'
+entity ReceivedDeliveryModes : CodeList {
+  key code : ReceivedDeliveryMode;
+}
+
 /*
  * @assert.range on the enum types: CAP rejects other values on every OData write (the UI only offers them as
  * dropdowns). Direct database writes (agent, import, copy) are checked by lib/testcases/node-validation.ts.
@@ -295,6 +307,14 @@ entity ReceivedMessages : cuid, managed {
   correlationId  : String(200);
   deliveryMode   : ReceivedDeliveryMode;
   receivedAt     : Timestamp;
+  /** the name of createdBy (see TestCases.creator) */
+  creator        : Association to one Users
+                     on creator.ID = $self.createdBy;
+  /** the texts of sourceType and deliveryMode (the code lists) */
+  sourceTypeInfo : Association to one SourceTypes
+                     on sourceTypeInfo.code = $self.sourceType;
+  deliveryModeInfo : Association to one ReceivedDeliveryModes
+                     on deliveryModeInfo.code = $self.deliveryMode;
 }
 
 /**

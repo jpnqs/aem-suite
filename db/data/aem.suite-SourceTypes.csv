@@ -1,0 +1,4 @@
+code;name;descr;position
+TOPIC;Topic Subscription;Received on topic subscriptions;1
+QUEUE_BROWSE;Queue (Browse);Browsed from a queue - the messages stay on the queue;2
+QUEUE_CONSUME;Queue (Consume);Consumed from a queue - the messages are removed from the queue;3
