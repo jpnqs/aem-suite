@@ -1,6 +1,7 @@
 import cds from '@sap/cds'
 import express from 'express'
 import { IMAGE_ROUTE, imagesDir } from './lib/help-content'
+import { registerMcpJson } from './lib/mcp-json'
 import { registerMcpOAuth } from './lib/mcp-oauth'
 import { stopAll } from './lib/solace/subscription-hub'
 import { failRuns } from './lib/runs/test-runner'
@@ -8,6 +9,9 @@ import { rememberUser } from './lib/core/users'
 
 // AI clients log in against XSUAA themselves (OAuth discovery for /mcp/agent).
 cds.on('bootstrap', (app) => registerMcpOAuth(app))
+
+// MCP answers as plain JSON: proxies on the way to Cloud Foundry may hold an event stream back.
+cds.on('bootstrap', (app) => registerMcpJson(app))
 
 // Runs execute in memory of this (single, see mta.yaml) instance: whatever was RUNNING when it stopped never finishes.
 cds.on('served', () => failRuns({}, 'The server restarted while the run was in progress'))

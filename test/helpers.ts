@@ -100,7 +100,7 @@ export function useDestinations(list: object[]): void {
 
 export const MCP_HEADERS = { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' }
 
-/** One MCP JSON-RPC request to the agent endpoint (the server answers as an event stream); auth null = anonymous. */
+/** One MCP JSON-RPC request to the agent endpoint (plain JSON answer, srv/lib/mcp-json.ts); auth null = anonymous. */
 export async function mcpRpc(POST: Post, method: string, params: object = {}, auth: object | null = users.tester) {
   const res = await POST(
     '/mcp/agent',
