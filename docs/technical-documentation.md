@@ -86,7 +86,7 @@ srv/
     testcases/                tree, node reads/writes and validation, copy, export/import, fields, property types
     config/                   rules of number ranges and brokers, export/import of brokers, global variables, number ranges
     runs/                     test runner, test case -> publish spec, preview, template hints for the payload editor
-    help-content.ts, mcp-oauth.ts   Help app content, MCP OAuth discovery
+    help-content.ts, mcp-oauth.ts, mcp-json.ts   Help app content, MCP OAuth discovery, MCP answers as JSON
   types/solclientjs.d.ts      typings for solclientjs (the package ships none)
 test/
   *.test.ts                   Jest: unit, service and consistency tests (section 11)
@@ -304,7 +304,7 @@ srv/
     testcases/                tree, node reads/writes and validation, copy, export/import, fields, property types
     config/                   rules of number ranges and brokers, export/import of brokers, global variables, number ranges
     runs/                     test runner, test case -> publish spec, preview, template hints for the payload editor
-    help-content.ts, mcp-oauth.ts   Help app content, MCP OAuth discovery
+    help-content.ts, mcp-oauth.ts, mcp-json.ts   Help app content, MCP OAuth discovery, MCP answers as JSON
   types/solclientjs.d.ts      typings for solclientjs (the package ships none)
 test/
   *.test.ts                   Jest: unit, service and consistency tests (section 11)
@@ -546,6 +546,8 @@ The plugin turns the service into three generic tools (names are prefixed, `cds.
 - VS Code's login: it registers, opens XSUAA's login page in the browser and receives the code on its loopback server `http://127.0.0.1:33418/` or through `https://vscode.dev/redirect` (both in `mta.yaml`). If port 33418 is taken VS Code falls back to a random port, which XSUAA refuses (no port wildcards) - free the port and retry. Other clients (Claude Code: random callback port unless `--callback-port`) work in spaces deployed with `dev.mtaext`, which adds `http://localhost:8765/**`.
 - Without the binding's `clientsecret` (e.g. X.509 credentials) there is no registration endpoint and the metadata names XSUAA's own token endpoint; clients then need their own client ID and secret as before.
 - Locally: URL `http://localhost:4004/mcp/agent` with HTTP Basic (`tester:tester`).
+
+**Plain JSON answers.** The plugin answers every request as an event stream (`text/event-stream`, no option to change it). Proxies between the client and Cloud Foundry (company web filters, VPNs) may hold such a stream back, and the client waits forever for the answer to `initialize`. `srv/lib/mcp-json.ts` (registered in `srv/server.ts`) therefore collects the stream of `POST /mcp/agent` and sends its JSON-RPC response as `application/json` (allowed by the streamable HTTP transport; the endpoint is stateless and sends nothing else). Progress notifications and keep-alive comments are dropped; the longest call (`getRunSummary`, at most 30 s wait) stays well within the approuter timeout (120 s). Answers without a stream (202 for notifications, 401, errors) pass unchanged. Tests: `test/mcp-json.test.ts`.
 
 `cds.mcp.autowire` is **off**: the plugin would otherwise write mock logins into `~/.claude.json` and the OpenCode config whenever `cds watch` starts.
 
