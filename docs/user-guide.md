@@ -188,7 +188,7 @@ Names may contain letters, digits, `_ . -` and must be unique. Values that diffe
 
 ## 4. Organize test cases in folders
 
-The **Test Cases** list is a tree: folders contain test cases and other folders. The list opens with **your** entries (filter *Created By*); remove the filter (✕) to see those of your colleagues.
+The **Test Cases** list is a tree: folders contain test cases and other folders. The list opens with **My Test Cases**; switch to **All Test Cases** above the table to see those of your colleagues too.
 
 | To … | do this |
 |---|---|
@@ -558,7 +558,7 @@ Runs, results and saved messages pile up. **Data Cleanup** deletes what is no lo
 | *Payload is not valid JSON* | Fix the JSON, or clear *Content Type* for plain text. |
 | *Number range "…" is exhausted* | **Reset** the range or raise *Last Allowed Number* (Admin). |
 | **Run…** is disabled | Save your draft, or select at least one row. |
-| I don't see the test cases or runs of colleagues | Remove the filter *Created By* / *Started By*. |
+| I don't see the test cases or runs of colleagues | Test cases: switch to **All Test Cases**. Runs: remove the filter *Started By*. |
 | *WebSocket offline* in the Live Subscriber | The connection to the server dropped; it reconnects – reload the page if it stays. |
 | A run stays *RUNNING* | A broker that does not answer is given up after its connect timeout; look again later or **Stop run**. |
 | The app looks old after an update | Reload without cache: **Ctrl+F5** (Mac: **Cmd+Shift+R**). |

@@ -47,4 +47,13 @@ describe('Test Cases filters: names of the users, value helps', () => {
     const topics = await GET('/odata/v4/test/Topics?$orderby=topic', users.tester)
     expect(topics.data.value.map((r: { topic: string }) => r.topic)).toEqual(['a', 'b', 'c'])
   })
+
+  it('flags the test cases of the logged-in user for the quick variant "My Test Cases"', async () => {
+    const mine = async (auth: object) => {
+      const { data } = await GET('/odata/v4/test/TestCases?$select=name&$filter=IsActiveEntity eq true and createdByMe eq true&$orderby=name', auth)
+      return data.value.map((t: { name: string }) => t.name)
+    }
+    expect(await mine(ada)).toEqual(['a', 'b'])
+    expect(await mine(users.tester)).toEqual(['a', 'c', 'Orders'])
+  })
 })

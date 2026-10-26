@@ -19,6 +19,9 @@ service TestService {
     projection on db.TestCases {
       *,
       case when kind = 'FOLDER' then 'Folder' else 'Test Case' end as kindText : String(20),
+      // the quick variant "My Test Cases" of the list (a selection variant cannot name the logged-in user)
+      @title: '{i18n>CreatedByMe}'
+      case when createdBy = $user then true else false end         as createdByMe : Boolean,
       // computed by CAP for hierarchy requests of the tree table
       null as LimitedDescendantCount : Int16,
       null as DistanceFromRoot       : Int16,
