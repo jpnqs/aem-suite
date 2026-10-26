@@ -8,6 +8,20 @@ sap.ui.define(
     var SCROLL_RETRIES = 8;
     var MAX_SECTIONS = 200;
 
+    /**
+     * The pictures come as relative URLs (docs-images/...). The browser would resolve them against the page - in the
+     * launchpad that is the launchpad app, whose routes (xs-app.json) do not reach the backend. Resolve them against
+     * this app instead, like the OData requests.
+     */
+    var IMAGES = sap.ui.require.toUrl("com/aem/suite/help/docs-images/");
+
+    /** The section HTML with the picture URLs resolved against this app. */
+    function withImageUrls(html) {
+      return String(html || "").replace(/(src|href)="docs-images\//g, function (match, attr) {
+        return attr + '="' + IMAGES;
+      });
+    }
+
     /** Plain text for case-insensitive searching. */
     function lower(text) {
       return String(text || "").toLowerCase();
@@ -70,7 +84,7 @@ sap.ui.define(
                   number: s.number,
                   title: s.title,
                   // one root element: the HTML control only knows its first element, links / search / scrolling need all of it
-                  html: '<div class="aemDocBody">' + s.html + "</div>",
+                  html: '<div class="aemDocBody">' + withImageUrls(s.html) + "</div>",
                   headings: headings,
                   search: lower(s.title + "\n" + s.text)
                 };
