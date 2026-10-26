@@ -490,16 +490,24 @@ Connect an AI assistant (e.g. Claude Code, or GitHub Copilot for local developme
 
 **Connect (deployed suite)**
 
-1. Ask your administrator for the address (`https://<your app>/mcp/agent`) and the **client ID** and **client secret** of the app (the same for everyone; they identify the app, not you).
-2. Add the server, e.g. in Claude Code (it asks for the secret):
+All you need is the address: `https://<your app>/mcp/agent` (the URL of the launchpad with `/mcp/agent` instead of the rest). There is no client ID and no secret to enter.
 
-   ```sh
-   claude mcp add --transport http --client-id <client ID> --client-secret --callback-port 8765 aem-suite https://<your app>/mcp/agent
+**VS Code (GitHub Copilot)**
+
+1. Run **MCP: Add Server…** from the Command Palette, choose **HTTP**, paste the address and name it `aem-suite`. Or add it to your `mcp.json` yourself:
+
+   ```json
+   { "servers": { "aem-suite": { "type": "http", "url": "https://<your app>/mcp/agent" } } }
    ```
 
-3. In Claude Code run `/mcp`, choose `aem-suite`, **Authenticate**, and sign in with your BTP login in the browser.
+2. Start the server. VS Code asks to sign in: **Allow**, and log in with your BTP user in the browser that opens.
+3. Back in VS Code, switch Copilot Chat to **Agent** mode – `aem-suite` appears under the tools.
 
-Other assistants with MCP and OAuth work the same way (address, client ID, secret, callback `http://localhost:8765/callback`). The login needs a space deployed for development and testing; ask your administrator if it fails with a redirect error.
+VS Code remembers the login and renews it on its own. To sign out, open the **Accounts** menu (bottom left) and sign out of the suite's entry.
+
+**Claude Code** works the same way: `claude mcp add --transport http aem-suite https://<your app>/mcp/agent`, then `/mcp` → `aem-suite` → **Authenticate**. Other assistants with MCP login support (OAuth with dynamic client registration) only need the address too.
+
+If the login fails with a redirect error, the suite only accepts the login callbacks of VS Code. Other assistants work in spaces deployed for development and testing, there with the callback port `8765` (e.g. `--callback-port 8765` in Claude Code). Ask your administrator.
 
 **Local development** (`npm run watch`, demo login `tester:tester`):
 
