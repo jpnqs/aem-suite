@@ -66,19 +66,12 @@ annotate service.TestCases with @(
     {Value: dmqEligible}
   ]},
   UI.Facets            : [
-    // topic + name: custom section "message" (full width, see manifest)
+    // topic + name: custom section "message", then "payload" (full width, see manifest)
     {
-      $Type        : 'UI.CollectionFacet',
-      ID           : 'AdvancedSection',
-      Label        : '{i18n>Advanced}',
-      ![@UI.Hidden]: (kind = 'FOLDER'),
-      Facets: [{
-        $Type              : 'UI.ReferenceFacet',
-        ID                 : 'Advanced',
-        Target             : '@UI.FieldGroup#Advanced',
-        Label              : '{i18n>OptionalSettings}',
-        ![@UI.PartOfPreview]: false
-      }]
+      $Type : 'UI.ReferenceFacet',
+      ID    : 'Variables',
+      Target: 'variables/@UI.LineItem',
+      Label : '{i18n>Variables}'
     },
     {
       $Type        : 'UI.ReferenceFacet',
@@ -88,10 +81,16 @@ annotate service.TestCases with @(
       ![@UI.Hidden]: (kind = 'FOLDER')
     },
     {
-      $Type : 'UI.ReferenceFacet',
-      ID    : 'Variables',
-      Target: 'variables/@UI.LineItem',
-      Label : '{i18n>Variables}'
+      $Type        : 'UI.CollectionFacet',
+      ID           : 'AdvancedSection',
+      Label        : '{i18n>Advanced}',
+      ![@UI.Hidden]: (kind = 'FOLDER'),
+      Facets: [{
+        $Type : 'UI.ReferenceFacet',
+        ID    : 'Advanced',
+        Target: '@UI.FieldGroup#Advanced',
+        Label : '{i18n>OptionalSettings}'
+      }]
     }
   ]
 ) {
