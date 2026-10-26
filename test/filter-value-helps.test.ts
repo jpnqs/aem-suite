@@ -1,3 +1,4 @@
+import cds from '@sap/cds'
 import { resetDatabase, startServer, users, waitFor } from './helpers'
 
 const { GET } = startServer()
@@ -55,5 +56,85 @@ describe('Test Cases filters: names of the users, value helps', () => {
     }
     expect(await mine(ada)).toEqual(['a', 'b'])
     expect(await mine(users.tester)).toEqual(['a', 'c', 'Orders'])
+  })
+})
+
+// after the Test Cases block: the name of ada is kept already
+describe('Test Runs filters: names of the users, value helps', () => {
+  beforeAll(async () => {
+    const [r1, r2] = [cds.utils.uuid(), cds.utils.uuid()]
+    await INSERT.into('aem.suite.TestRuns').entries([
+      { ID: r1, summary: 'one', status: 'DONE', createdBy: 'ada' },
+      { ID: r2, summary: 'two', status: 'DONE', createdBy: 'tester' }
+    ])
+    await INSERT.into('aem.suite.RunResults').entries([
+      { run_ID: r1, testCaseName: 'Order created', brokerName: 'dev', status: 'PASSED', sequence: 1 },
+      { run_ID: r1, testCaseName: 'Order created', brokerName: 'qa', status: 'FAILED', sequence: 1 },
+      { run_ID: r2, testCaseName: 'Ping', brokerName: 'dev', status: 'PASSED', sequence: 1 }
+    ])
+  })
+
+  it('shows the name of the user that started the run', async () => {
+    const { data } = await GET('/odata/v4/test/RunResults?$select=testCaseName,brokerName,runStartedBy,runStartedByName&$orderby=testCaseName,brokerName', users.tester)
+    expect(data.value.map((r: Record<string, string | null>) => [r.testCaseName, r.brokerName, r.runStartedBy, r.runStartedByName])).toEqual([
+      ['Order created', 'dev', 'ada', 'Ada Lovelace'],
+      ['Order created', 'qa', 'ada', 'Ada Lovelace'],
+      ['Ping', 'dev', 'tester', null]
+    ])
+    const run = await GET('/odata/v4/test/TestRuns?$select=summary&$expand=creator($select=name)&$filter=summary eq \'one\'', users.tester)
+    expect(run.data.value[0].creator).toMatchObject({ name: 'Ada Lovelace' })
+  })
+
+  it('offers each starter, test case and broker of the results once as value help', async () => {
+    const values = async (path: string, key: string) => (await GET(`/odata/v4/test/${path}?$orderby=${key}`, users.tester)).data.value
+    expect(await values('RunStarters', 'ID')).toEqual([
+      { ID: 'ada', name: 'Ada Lovelace' },
+      { ID: 'tester', name: null }
+    ])
+    expect((await values('ResultTestCaseNames', 'testCaseName')).map((r: { testCaseName: string }) => r.testCaseName)).toEqual(['Order created', 'Ping'])
+    expect((await values('ResultBrokerNames', 'brokerName')).map((r: { brokerName: string }) => r.brokerName)).toEqual(['dev', 'qa'])
+  })
+
+  it('offers the result statuses as fixed values', async () => {
+    const { data } = await GET('/odata/v4/test/ResultStatuses?$select=code,name&$orderby=code', users.tester)
+    expect(data.value.map((s: { code: string }) => s.code)).toEqual(['ERROR', 'FAILED', 'PASSED', 'PENDING', 'SKIPPED'])
+  })
+})
+
+describe('Saved Messages filters: names of the users, value helps', () => {
+  beforeAll(async () => {
+    await INSERT.into('aem.suite.ReceivedMessages').entries([
+      { brokerName: 'dev', source: 'acme/>', sourceType: 'TOPIC', topic: 'acme/orders', contentType: 'application/json', deliveryMode: 'PERSISTENT', createdBy: 'ada' },
+      { brokerName: 'dev', source: 'acme/>', sourceType: 'TOPIC', topic: 'acme/orders', contentType: 'application/json', deliveryMode: 'DIRECT', createdBy: 'ada' },
+      { brokerName: 'qa', source: 'q.orders', sourceType: 'QUEUE_BROWSE', topic: 'acme/invoices', contentType: 'text/plain', createdBy: 'tester' }
+    ])
+  })
+
+  const values = async (path: string, key: string) =>
+    (await GET(`/odata/v4/subscribe/${path}?$orderby=${key}`, users.tester)).data.value.map((r: Record<string, unknown>) => r[key])
+
+  it('shows the name of the user that saved the message and the names of the codes', async () => {
+    const { data } = await GET(
+      '/odata/v4/subscribe/ReceivedMessages?$select=createdBy&$expand=creator($select=name),sourceTypeInfo($select=name),deliveryModeInfo($select=name)&$orderby=createdBy,deliveryMode',
+      users.tester
+    )
+    expect(data.value.map((m: any) => [m.createdBy, m.creator?.name ?? null, m.sourceTypeInfo?.name ?? null, m.deliveryModeInfo?.name ?? null])).toEqual([
+      ['ada', 'Ada Lovelace', 'Topic Subscription', 'Direct'],
+      ['ada', 'Ada Lovelace', 'Topic Subscription', 'Persistent (Guaranteed)'],
+      ['tester', null, 'Queue (Browse)', null]
+    ])
+  })
+
+  it('offers each value of the saved messages once as value help', async () => {
+    expect(await values('MessageSavers', 'ID')).toEqual(['ada', 'tester'])
+    expect(await values('MessageBrokers', 'brokerName')).toEqual(['dev', 'qa'])
+    expect(await values('MessageTopics', 'topic')).toEqual(['acme/invoices', 'acme/orders'])
+    expect(await values('MessageSources', 'source')).toEqual(['acme/>', 'q.orders'])
+    expect(await values('MessageContentTypes', 'contentType')).toEqual(['application/json', 'text/plain'])
+  })
+
+  it('offers source types and delivery modes as fixed values', async () => {
+    expect(await values('SourceTypes', 'position')).toHaveLength(3)
+    expect(await values('ReceivedDeliveryModes', 'code')).toEqual(['DIRECT', 'NON_PERSISTENT', 'PERSISTENT'])
   })
 })

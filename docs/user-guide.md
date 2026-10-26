@@ -310,7 +310,7 @@ PASSED means the broker **accepted** the message – not that a consumer process
 
 ## 7. Check results
 
-**Test Runs** has one row per message: test case, broker, repetition, status, ACK latency, topic and error. Newest first; **your** runs by default (filter *Started By*).
+**Test Runs** has one row per message: test case, broker, repetition, status, ACK latency, topic and error. Newest first; **your** runs by default (filter *Started By*). The filters *Test Case*, *Broker* and *Started By* offer the values of the existing results, *Status* is a dropdown.
 
 ![The Test Runs list](images/guides/results-2-list.png)
 

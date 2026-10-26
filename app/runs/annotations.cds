@@ -63,7 +63,24 @@ annotate service.TestRuns with @(
     Label : '{i18n>Results}'
   }]
 ) {
-  createdBy         @UI.HiddenFilter: false;
+  // name of the user that started the run; the user id alone if that user has not logged in since names are kept
+  createdBy         @UI.HiddenFilter: false
+                    @Common.Text: creator.name
+                    @Common.TextArrangement: #TextFirst
+                    @Common.ValueList: {
+                      CollectionPath: 'RunStarters',
+                      Parameters    : [
+                        {
+                          $Type            : 'Common.ValueListParameterInOut',
+                          LocalDataProperty: createdBy,
+                          ValueListProperty: 'ID'
+                        },
+                        {
+                          $Type            : 'Common.ValueListParameterDisplayOnly',
+                          ValueListProperty: 'name'
+                        }
+                      ]
+                    };
   createdAt         @UI.HiddenFilter: false;
   statusCriticality @UI.Hidden;
 };
@@ -199,7 +216,76 @@ annotate service.RunResults with @(
   resolvedTopic     @UI.MultiLineText;
   resolvedPayload   @UI.MultiLineText;
   runStartedAt      @UI.HiddenFilter: false;
-  runStartedBy      @UI.HiddenFilter: false;
+  // value helps of the filters: the values of the existing results and runs
+  runStartedBy      @UI.HiddenFilter: false
+                    @Common.Text: runStartedByName
+                    @Common.TextArrangement: #TextFirst
+                    @Common.ValueList: {
+                      CollectionPath: 'RunStarters',
+                      Parameters    : [
+                        {
+                          $Type            : 'Common.ValueListParameterInOut',
+                          LocalDataProperty: runStartedBy,
+                          ValueListProperty: 'ID'
+                        },
+                        {
+                          $Type            : 'Common.ValueListParameterDisplayOnly',
+                          ValueListProperty: 'name'
+                        }
+                      ]
+                    };
+  runStartedByName  @UI.Hidden  @UI.HiddenFilter;
+  testCaseName      @Common.ValueList: {
+                      CollectionPath: 'ResultTestCaseNames',
+                      Parameters    : [{
+                        $Type            : 'Common.ValueListParameterInOut',
+                        LocalDataProperty: testCaseName,
+                        ValueListProperty: 'testCaseName'
+                      }]
+                    };
+  brokerName        @Common.ValueList: {
+                      CollectionPath: 'ResultBrokerNames',
+                      Parameters    : [{
+                        $Type            : 'Common.ValueListParameterInOut',
+                        LocalDataProperty: brokerName,
+                        ValueListProperty: 'brokerName'
+                      }]
+                    };
+  status            @Common.Text: statusInfo.name
+                    @Common.TextArrangement: #TextOnly
+                    @Common.ValueListWithFixedValues
+                    @Common.ValueList: {
+                      CollectionPath              : 'ResultStatuses',
+                      PresentationVariantQualifier: 'byPosition',
+                      Parameters                  : [
+                        {
+                          $Type            : 'Common.ValueListParameterInOut',
+                          LocalDataProperty: status,
+                          ValueListProperty: 'code'
+                        },
+                        {
+                          $Type            : 'Common.ValueListParameterDisplayOnly',
+                          ValueListProperty: 'name'
+                        }
+                      ]
+                    };
+  deliveryMode      @Common.Text: deliveryModeInfo.name
+                    @Common.TextArrangement: #TextOnly
+                    @Common.ValueListWithFixedValues
+                    @Common.ValueList: {
+                      CollectionPath: 'DeliveryModes',
+                      Parameters    : [
+                        {
+                          $Type            : 'Common.ValueListParameterInOut',
+                          LocalDataProperty: deliveryMode,
+                          ValueListProperty: 'code'
+                        },
+                        {
+                          $Type            : 'Common.ValueListParameterDisplayOnly',
+                          ValueListProperty: 'name'
+                        }
+                      ]
+                    };
   statusCriticality @UI.Hidden;
   testCaseLink      @UI.Hidden  @UI.HiddenFilter;
   brokerLink        @UI.Hidden  @UI.HiddenFilter;
@@ -207,4 +293,6 @@ annotate service.RunResults with @(
   run               @UI.Hidden;
   testCase          @UI.Hidden;
   broker            @UI.Hidden;
+  statusInfo        @UI.Hidden;
+  deliveryModeInfo  @UI.Hidden;
 };

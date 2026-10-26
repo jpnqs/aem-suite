@@ -145,6 +145,7 @@ service TestService {
       run.createdAt as runStartedAt,
       @title: '{i18n>StartedBy}'
       run.createdBy as runStartedBy,
+      run.creator.name as runStartedByName : String(511),
       // navigation targets (launchpad intents) for the link columns
       '#AEMSuiteTestCases-manage&/TestCases(ID=' || testCase.ID || ',IsActiveEntity=true)' as testCaseLink : String,
       '#AEMSuiteBrokers-manage&/Brokers(ID=' || broker.ID || ',IsActiveEntity=true)'       as brokerLink   : String,
@@ -209,6 +210,52 @@ service TestService {
 
   @readonly
   entity PropertyTypes as projection on db.PropertyTypes;
+
+  @readonly
+  entity ResultStatuses as projection on db.ResultStatuses;
+
+  // dropdowns show the name only, the result statuses in their own order (UI.PresentationVariant #byPosition)
+  annotate DeliveryModes with {
+    code @Common.Text: name  @Common.TextArrangement: #TextOnly;
+  };
+
+  annotate ResultStatuses with @UI.PresentationVariant #byPosition: {SortOrder: [{Property: position}]} {
+    code     @Common.Text: name  @Common.TextArrangement: #TextOnly;
+    position @UI.Hidden;
+  };
+
+  // ---- value helps of the result list filters (Test Runs app): the values of the existing results ----
+
+  /** The users that started runs. */
+  @readonly
+  @cds.redirection.target: false
+  entity RunStarters as
+    select from db.TestRuns distinct {
+      key createdBy    as ID   : String(255) @title: '{i18n>User}',
+          creator.name as name : String(511) @title: '{i18n>Name}'
+    }
+    where
+      createdBy is not null;
+
+  /** The test case names of the results (snapshots: also of deleted or renamed test cases). */
+  @readonly
+  @cds.redirection.target: false
+  entity ResultTestCaseNames as
+    select from db.RunResults distinct {
+      key testCaseName
+    }
+    where
+      testCaseName is not null;
+
+  /** The broker names of the results (snapshots). */
+  @readonly
+  @cds.redirection.target: false
+  entity ResultBrokerNames as
+    select from db.RunResults distinct {
+      key brokerName
+    }
+    where
+      brokerName is not null;
 
   /**
    * Copies test cases and folders (folders with everything below them: subfolders, test cases, variables,
