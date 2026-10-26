@@ -4,12 +4,16 @@ import { IMAGE_ROUTE, imagesDir } from './lib/help-content'
 import { registerMcpOAuth } from './lib/mcp-oauth'
 import { stopAll } from './lib/solace/subscription-hub'
 import { failRuns } from './lib/runs/test-runner'
+import { rememberUser } from './lib/core/users'
 
 // AI clients log in against XSUAA themselves (OAuth discovery for /mcp/agent).
 cds.on('bootstrap', (app) => registerMcpOAuth(app))
 
 // Runs execute in memory of this (single, see mta.yaml) instance: whatever was RUNNING when it stopped never finishes.
 cds.on('served', () => failRuns({}, 'The server restarted while the run was in progress'))
+
+// names of the logged-in users for the "Created By" columns (the token has them, the database only the user id)
+cds.on('serving', (srv) => srv.before('*', (req) => rememberUser(req.user)))
 
 // live subscriptions hold broker sessions
 cds.on('shutdown', () => stopAll())

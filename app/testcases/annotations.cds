@@ -38,6 +38,7 @@ annotate service.TestCases with @(
       Label: '{i18n>LastRunAt}'
     },
     {Value: deliveryMode},
+    {Value: createdBy},
     {Value: modifiedAt}
   ],
   UI.HeaderFacets      : [{
@@ -120,7 +121,41 @@ annotate service.TestCases with @(
                     }
                   ]
                 };
-  createdBy     @UI.HiddenFilter: false;
+  // value helps of the filters: the values of the existing test cases
+  name          @Common.ValueList: {
+                  CollectionPath: 'TestCaseNames',
+                  Parameters    : [{
+                    $Type            : 'Common.ValueListParameterInOut',
+                    LocalDataProperty: name,
+                    ValueListProperty: 'name'
+                  }]
+                };
+  topic         @Common.ValueList: {
+                  CollectionPath: 'Topics',
+                  Parameters    : [{
+                    $Type            : 'Common.ValueListParameterInOut',
+                    LocalDataProperty: topic,
+                    ValueListProperty: 'topic'
+                  }]
+                };
+  // name of the creator; the user id alone if that user has not logged in since names are kept
+  createdBy     @UI.HiddenFilter: false
+                @Common.Text: creator.name
+                @Common.TextArrangement: #TextFirst
+                @Common.ValueList: {
+                  CollectionPath: 'Creators',
+                  Parameters    : [
+                    {
+                      $Type            : 'Common.ValueListParameterInOut',
+                      LocalDataProperty: createdBy,
+                      ValueListProperty: 'ID'
+                    },
+                    {
+                      $Type            : 'Common.ValueListParameterDisplayOnly',
+                      ValueListProperty: 'name'
+                    }
+                  ]
+                };
 };
 
 // name follows the topic until it is changed by the user
