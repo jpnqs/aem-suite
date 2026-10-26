@@ -21,7 +21,9 @@ cds.on('shutdown', () => stopAll())
 if (process.env.NODE_ENV !== 'production') {
   // The UI apps call odata/ and ws/ relative to their own path (in BTP each app's xs-app.json routes them
   // to the backend). Locally the apps are mounted at /<HTML5 app name>/ - strip that prefix here.
-  const appPrefix = /^\/comaemsuite[a-z]+\/(?=(odata|ws|docs-images)\/)/
+  // Not for the launchpad: its xs-app.json has no backend routes, so a call relative to the launchpad page
+  // (instead of to the app) must fail here as it does in BTP.
+  const appPrefix = /^\/comaemsuite(?!launchpad\/)[a-z]+\/(?=(odata|ws|docs-images)\/)/
 
   cds.on('bootstrap', (app) => {
     app.get('/launchpad.html', (_req, res) => res.redirect('/comaemsuitelaunchpad/index.html'))
