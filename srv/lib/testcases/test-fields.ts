@@ -23,4 +23,4 @@ export type TestField = keyof typeof TEST_FIELDS
 export const FOLDER_FIELDS: readonly TestField[] = ['name', 'description']
 
 /** Elements of aem.suite.TestCases that are no user input: keys, tree, managed fields, compositions, statistics. */
-export const TECHNICAL_ELEMENTS = ['ID', 'kind', 'parent', 'children', 'sortOrder', 'userProperties', 'variables', 'lastResult', 'createdAt', 'createdBy', 'modifiedAt', 'modifiedBy']
+export const TECHNICAL_ELEMENTS = ['ID', 'kind', 'parent', 'children', 'sortOrder', 'userProperties', 'variables', 'lastResult', 'creator', 'createdAt', 'createdBy', 'modifiedAt', 'modifiedBy']

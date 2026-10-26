@@ -180,6 +180,21 @@ entity TestCases : cuid, managed {
    */
   lastResult     : Association to one TestCaseStats
                      on lastResult.testCase = $self;
+  /** the name of createdBy, if that user has logged in since names are kept */
+  creator        : Association to one Users
+                     on creator.ID = $self.createdBy;
+}
+
+/**
+ * Names of the users, from their login (token claims given_name / family_name): the token only has the name of
+ * the user logged in, so a user is listed after their first request. Written by lib/core/users.ts.
+ */
+entity Users {
+  key ID        : String(255);
+      firstName : String(255);
+      lastName  : String(255);
+      /** "first last" */
+      name      : String(511);
 }
 
 /** Latest run outcome per test case - written by the test runner. */
@@ -387,6 +402,13 @@ annotate TestCases with {
   createdBy     @title: '{i18n>CreatedBy}';
   modifiedAt    @title: '{i18n>ChangedAt}';
   modifiedBy    @title: '{i18n>ChangedBy}';
+};
+
+annotate Users with {
+  ID        @title: '{i18n>User}';
+  firstName @title: '{i18n>FirstName}';
+  lastName  @title: '{i18n>LastName}';
+  name      @title: '{i18n>Name}';
 };
 
 annotate TestCaseProperties with {

@@ -19,6 +19,9 @@ service TestService {
     projection on db.TestCases {
       *,
       case when kind = 'FOLDER' then 'Folder' else 'Test Case' end as kindText : String(20),
+      // the quick variant "My Test Cases" of the list (a selection variant cannot name the logged-in user)
+      @title: '{i18n>CreatedByMe}'
+      case when createdBy = $user then true else false end         as createdByMe : Boolean,
       // computed by CAP for hierarchy requests of the tree table
       null as LimitedDescendantCount : Int16,
       null as DistanceFromRoot       : Int16,
@@ -168,6 +171,41 @@ service TestService {
 
   @readonly
   entity DeliveryModes as projection on db.DeliveryModes;
+
+  /** Names of the users (TestCases.creator: the text of createdBy). */
+  @readonly
+  entity Users as projection on db.Users;
+
+  /** The users that created test cases - value help of the "Created By" filter. */
+  @readonly
+  @cds.redirection.target: false
+  entity Creators as
+    select from db.TestCases distinct {
+      key createdBy    as ID   : String(255) @title: '{i18n>User}',
+          creator.name as name : String(511) @title: '{i18n>Name}'
+    }
+    where
+      createdBy is not null;
+
+  /** The names of test cases and folders - value help of the "Name" filter. */
+  @readonly
+  @cds.redirection.target: false
+  entity TestCaseNames as
+    select from db.TestCases distinct {
+      key name
+    }
+    where
+      name is not null;
+
+  /** The topics of test cases - value help of the "Topic" filter. */
+  @readonly
+  @cds.redirection.target: false
+  entity Topics as
+    select from db.TestCases distinct {
+      key topic
+    }
+    where
+      topic is not null;
 
   @readonly
   entity PropertyTypes as projection on db.PropertyTypes;

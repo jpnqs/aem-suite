@@ -24,6 +24,22 @@ annotate service.TestCases with @(
     ],
     Visualizations: ['@UI.LineItem']
   },
+  // quick variants of the list (segmented button in the table toolbar, see manifest): own ones first
+  UI.SelectionVariant #mine: {
+    Text         : '{i18n>MyTestCases}',
+    SelectOptions: [{
+      PropertyName: createdByMe,
+      Ranges      : [{
+        Sign  : #I,
+        Option: #EQ,
+        Low   : true
+      }]
+    }]
+  },
+  UI.SelectionVariant #all : {
+    Text         : '{i18n>AllTestCases}',
+    SelectOptions: []
+  },
   UI.LineItem          : [
     {Value: name},
     // "Type" is a custom icon column (ext/TypeColumn.fragment.xml, see manifest)
@@ -38,6 +54,7 @@ annotate service.TestCases with @(
       Label: '{i18n>LastRunAt}'
     },
     {Value: deliveryMode},
+    {Value: createdBy},
     {Value: modifiedAt}
   ],
   UI.HeaderFacets      : [{
@@ -119,7 +136,42 @@ annotate service.TestCases with @(
                     }
                   ]
                 };
-  createdBy     @UI.HiddenFilter: false;
+  // value helps of the filters: the values of the existing test cases
+  name          @Common.ValueList: {
+                  CollectionPath: 'TestCaseNames',
+                  Parameters    : [{
+                    $Type            : 'Common.ValueListParameterInOut',
+                    LocalDataProperty: name,
+                    ValueListProperty: 'name'
+                  }]
+                };
+  topic         @Common.ValueList: {
+                  CollectionPath: 'Topics',
+                  Parameters    : [{
+                    $Type            : 'Common.ValueListParameterInOut',
+                    LocalDataProperty: topic,
+                    ValueListProperty: 'topic'
+                  }]
+                };
+  // name of the creator; the user id alone if that user has not logged in since names are kept
+  createdByMe   @UI.HiddenFilter;
+  createdBy     @UI.HiddenFilter: false
+                @Common.Text: creator.name
+                @Common.TextArrangement: #TextFirst
+                @Common.ValueList: {
+                  CollectionPath: 'Creators',
+                  Parameters    : [
+                    {
+                      $Type            : 'Common.ValueListParameterInOut',
+                      LocalDataProperty: createdBy,
+                      ValueListProperty: 'ID'
+                    },
+                    {
+                      $Type            : 'Common.ValueListParameterDisplayOnly',
+                      ValueListProperty: 'name'
+                    }
+                  ]
+                };
 };
 
 // name follows the topic until it is changed by the user

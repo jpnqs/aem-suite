@@ -163,7 +163,8 @@ const TABLES = [
   'ReceivedMessages',
   'SubscriberPresets',
   'NumberRanges',
-  'Brokers'
+  'Brokers',
+  'Users'
 ]
 
 /** Empties all tables - test/data holds demo rows for local development, which every cds.test server deploys. */

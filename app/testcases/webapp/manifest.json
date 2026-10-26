@@ -52,9 +52,6 @@
   },
   "sap.ui5": {
     "flexEnabled": false,
-    "config": {
-      "myEntriesFilter": "createdBy"
-    },
     "dependencies": {
       "minUI5Version": "1.148.0",
       "libs": {
@@ -159,6 +156,18 @@
                   "tableSettings": {
                     "type": "TreeTable",
                     "hierarchyQualifier": "TestTree",
+                    "quickVariantSelection": {
+                      "paths": [
+                        {
+                          "annotationPath": "com.sap.vocabularies.UI.v1.SelectionVariant#mine"
+                        },
+                        {
+                          "annotationPath": "com.sap.vocabularies.UI.v1.SelectionVariant#all"
+                        }
+                      ],
+                      "hideTableTitle": false,
+                      "showCounts": false
+                    },
                     "selectionMode": "Multi",
                     "isMoveToPositionAllowed": "com.aem.suite.testcases.ext.TreeRules.isMoveToPositionAllowed",
                     "creationMode": {
@@ -267,9 +276,6 @@
         "sap.ui.controllerExtensions": {
           "sap.fe.templates.ObjectPage.ObjectPageController#com.aem.suite.testcases::TestCasesObjectPage": {
             "controllerName": "com.aem.suite.testcases.ext.ObjectPageExt"
-          },
-          "sap.fe.templates.ListReport.ListReportController#com.aem.suite.testcases::TestCasesList": {
-            "controllerName": "com.aem.suite.testcases.shared.MyEntriesFilter"
           }
         }
       }
