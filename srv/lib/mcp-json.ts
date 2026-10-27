@@ -39,7 +39,7 @@ function contentType(res: Response, headers: unknown): string {
 }
 
 function jsonAnswers(_req: Request, res: Response, next: NextFunction) {
-  const { writeHead, write, end } = res
+  const { writeHead, write, end, flushHeaders } = res
   let chunks: Buffer[] | undefined
   let status = 200
   let headers: OutgoingHttpHeaders = {}
@@ -52,6 +52,11 @@ function jsonAnswers(_req: Request, res: Response, next: NextFunction) {
     headers = own ?? {}
     return this
   } as typeof res.writeHead
+
+  // the MCP SDK (@hono/node-server) flushes the headers while it waits for the first event: they go with the JSON
+  res.flushHeaders = function (this: Response) {
+    if (!chunks) flushHeaders.call(this)
+  }
 
   res.write = function (this: Response, chunk: unknown, ...rest: unknown[]) {
     if (!chunks) return (write as (...a: unknown[]) => boolean).call(this, chunk, ...rest)

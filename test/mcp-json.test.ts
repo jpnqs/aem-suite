@@ -1,4 +1,6 @@
-import { eventStreamMessages } from '../srv/lib/mcp-json'
+import express from 'express'
+import type { AddressInfo } from 'node:net'
+import { eventStreamMessages, registerMcpJson } from '../srv/lib/mcp-json'
 import { MCP_HEADERS, startServer, users } from './helpers'
 
 const { POST } = startServer()
@@ -34,6 +36,31 @@ describe('MCP answers as plain JSON', () => {
     expect(notification.status).toBe(202)
     const anonymous = await raw({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }, null)
     expect(anonymous.status).toBe(401)
+  })
+})
+
+describe('a stream that is not ready at once', () => {
+  // @hono/node-server (MCP SDK) flushes the headers when the first event is not there yet (slow tool, database)
+  it('still answers as JSON after flushHeaders', async () => {
+    const app = express()
+    registerMcpJson(app)
+    app.post('/mcp/agent', (_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+      res.flushHeaders()
+      setTimeout(() => {
+        res.write('event: message\ndata: {"jsonrpc":"2.0","id":3,"result":{}}\n\n')
+        res.end()
+      }, 20)
+    })
+    const server = app.listen(0)
+    try {
+      const { port } = server.address() as AddressInfo
+      const res = await fetch(`http://127.0.0.1:${port}/mcp/agent`, { method: 'POST' })
+      expect(res.headers.get('content-type')).toMatch(/^application\/json/)
+      expect(await res.json()).toEqual({ jsonrpc: '2.0', id: 3, result: {} })
+    } finally {
+      server.close()
+    }
   })
 })
 
