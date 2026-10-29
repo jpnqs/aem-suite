@@ -217,6 +217,29 @@
             "settings": {
               "editableHeaderContent": false,
               "contextPath": "/TestCases",
+              "controlConfiguration": {
+                "children/@com.sap.vocabularies.UI.v1.LineItem#Children": {
+                  "columns": {
+                    "typeIcon": {
+                      "header": "{{column.type}}",
+                      "template": "com.aem.suite.testcases.ext.TypeColumn",
+                      "width": "5rem",
+                      "horizontalAlign": "Center",
+                      "properties": [
+                        "kind",
+                        "kindText"
+                      ],
+                      "position": {
+                        "placement": "After",
+                        "anchor": "DataFieldWithUrl::name"
+                      }
+                    }
+                  },
+                  "tableSettings": {
+                    "type": "ResponsiveTable"
+                  }
+                }
+              },
               "content": {
                 "header": {
                   "actions": {
@@ -252,7 +275,7 @@
                       "title": "{{section.message}}",
                       "position": {
                         "placement": "Before",
-                        "anchor": "Variables"
+                        "anchor": "Children"
                       }
                     },
                     "payload": {

@@ -82,8 +82,49 @@ annotate service.TestCases with @(
     {Value: priority},
     {Value: dmqEligible}
   ]},
+  // folder contents: the subfolders and test cases directly below a folder, in tree order
+  UI.LineItem #Children: [
+    {
+      $Type: 'UI.DataFieldWithUrl',
+      Value: name,
+      Url  : nodeLink
+    },
+    // "Type" is the icon column of the tree (see manifest)
+    {Value: topic},
+    {
+      Value      : lastResult.status,
+      Criticality: lastResult.criticality,
+      Label      : '{i18n>LastResult}'
+    },
+    {
+      Value: lastResult.runAt,
+      Label: '{i18n>LastRunAt}'
+    },
+    {Value: modifiedAt}
+  ],
+  UI.PresentationVariant #Children: {
+    SortOrder     : [
+      {Property: kind},
+      {Property: sortOrder},
+      {Property: name}
+    ],
+    Visualizations: ['@UI.LineItem#Children']
+  },
+  // nodes are created and deleted in the tree of the list, not in the contents table
+  Capabilities.NavigationRestrictions: {RestrictedProperties: [{
+    NavigationProperty: children,
+    InsertRestrictions: {Insertable: false},
+    DeleteRestrictions: {Deletable: false}
+  }]},
   UI.Facets            : [
     // topic + name: custom section "message", then "payload" (full width, see manifest)
+    {
+      $Type        : 'UI.ReferenceFacet',
+      ID           : 'Children',
+      Target       : 'children/@UI.PresentationVariant#Children',
+      Label        : '{i18n>Contents}',
+      ![@UI.Hidden]: (kind <> 'FOLDER')
+    },
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Variables',
@@ -155,6 +196,7 @@ annotate service.TestCases with @(
                 };
   // name of the creator; the user id alone if that user has not logged in since names are kept
   createdByMe   @UI.HiddenFilter;
+  nodeLink      @UI.Hidden;
   createdBy     @UI.HiddenFilter: false
                 @Common.Text: creator.name
                 @Common.TextArrangement: #TextFirst
