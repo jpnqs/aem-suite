@@ -54,7 +54,7 @@ Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
 2. `createRun` validates the input, expands folders to test cases (tree order), and inserts `TestRuns` plus one `PENDING` `RunResults` row per message – test case × broker × repetition (advanced settings, section 7.6) – in the request transaction.
 3. After commit (`req.on('succeeded')`) `executeRunInBackground` starts. Brokers are processed **in parallel**, the test cases of one broker **sequentially** over one session.
 4. Each result row is updated in its own transaction (PASSED, FAILED, ERROR, or SKIPPED when the run was stopped) and a `runProgress` event goes to WebSocket context = run ID.
-5. At the end the run gets status `DONE` (or `STOPPED` when its user stopped it with `cancelRun`), counters, and `TestCaseStats` (last result per test case) is upserted. If storing a result fails, or the run crashes, it ends `FAILED` instead and its open results get `ERROR` (`failRuns`); runs left `RUNNING` by a server restart are ended the same way on the next start.
+5. At the end the run gets status `DONE` (or `STOPPED` when its user stopped it with `cancelRun`), counters, and `TestCaseStats` (last result per test case) is upserted. If storing a result fails, or the run crashes, it ends `FAILED` instead and its open results get `ERROR` (`failRuns`); when the server stops (SIGTERM on deployment or restart) `stopAllRuns` stops every run like `cancelRun` (the rest `SKIPPED`: *the server was stopped while the run was in progress*) and waits up to 8 s for it to end `STOPPED`; runs still left `RUNNING` (crash, kill) are ended `FAILED` on the next start. Before a run is created, `checkActiveRuns` limits the runs in progress per user (`runs.maxActivePerUser`) and on the server (`runs.maxActive`), HTTP 429 above them.
 
 ## 4. Repository layout
 
@@ -489,6 +489,8 @@ Each HTML5 app is deployed on its own, so every app needs the modules it uses un
 - AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
 - Local development uses mocked users (`package.json` → `cds.requires.[development].auth`): `admin/admin` (Admin+Tester), `tester/tester` (Tester). The WebSocket is anonymous locally (plugin behaviour with mocked auth); events are isolated by context IDs.
 
+- **Monitoring.** `/health` (CAP, no login) is the liveness check of Cloud Foundry (`mta.yaml`). `/health/db` (no login, no data) answers 200 `{"status":"UP"}` when the database answers, else 503 - for an external monitor; it is not the CF health check, so a database outage does not restart the app. Administrators see the **System** section on Home (`HomeService.overview().system`, `lib/core/metrics.ts`): version, uptime, runs in progress, live subscriptions of all users, runs started and messages passed / failed since the start, memory.
+
 ## 10. Configuration
 
 | Key / variable | Default | Purpose |
@@ -507,6 +509,8 @@ Each HTML5 app is deployed on its own, so every app needs the modules it uses un
 | `cds.aemSuite.mcp.launchpadUrl` | the app's own launchpad | launchpad address for the links an agent hands out (set it to the Work Zone site when users work there) |
 | env `AEM_SUITE_LAUNCHPAD_URL` | – | the same, as an environment variable; wins over `mcp.launchpadUrl`. E.g. in `mta.yaml` (module `aem-suite-srv`, `properties: AEM_SUITE_LAUNCHPAD_URL: https://<site>`) or `cf set-env aem-suite-srv AEM_SUITE_LAUNCHPAD_URL https://<site>` + restart |
 | `cds.aemSuite.runs.maxRepetitions` / `maxDelayMs` / `maxResults` | 1000 / 60000 / 5000 | limits of the advanced run settings: repetitions, pause between messages (ms), messages per run |
+| `cds.aemSuite.runs.maxActivePerUser` / `maxActive` | 5 / 20 | runs in progress at the same time: per user / on the server (HTTP 429 above) |
+| `cds.aemSuite.runs.maxPayloadBytes` | 1048576 | size of a payload: a larger template cannot be saved, a larger resolved payload is not sent (ERROR) |
 | `cds.aemSuite.faker.locale` | `en` | Language of `{{faker...}}` test data (`de`, `fr`, `es`, `en_GB`, ...). |
 | `cds.mcp.prefix` / `cds.mcp.autowire` | true / false | MCP plugin: prefix tool names with the service name; do not register the endpoint in local AI clients automatically |
 | env `destinations` | – | local destinations (JSON array, SAP Cloud SDK format + `msgVpn`/`smfUrl`) |

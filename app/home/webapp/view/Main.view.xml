@@ -116,6 +116,19 @@
             press=".onOpenRun" />
         </List>
       </VBox>
+      <!-- administrators: the server process since its last start -->
+      <VBox renderType="Bare" visible="{= !!${home>/system} }" class="aemHomeRunsSection">
+        <HBox renderType="Bare" alignItems="Baseline" class="aemHomeSectionTitle">
+          <Title text="{i18n>system.title}" level="H2" />
+          <Text text="{i18n>system.description}" class="aemHomeGroupText" />
+        </HBox>
+        <FlexBox renderType="Bare" wrap="Wrap" items="{path: 'home>/system', templateShareable: false}">
+          <VBox renderType="Bare" class="sapUiSmallMarginEnd sapUiSmallMarginBottom">
+            <Label text="{home>label}" />
+            <Text text="{home>value}" />
+          </VBox>
+        </FlexBox>
+      </VBox>
     </VBox>
   </Page>
 </mvc:View>

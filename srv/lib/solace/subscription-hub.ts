@@ -184,6 +184,11 @@ export async function stopSubscription(id: string, owner: string): Promise<void>
   await close(sub, 'STOPPED', 'Stopped by user')
 }
 
+/** Live subscriptions of all users on this server. */
+export function subscriptionCount(): number {
+  return subscriptions.size
+}
+
 export function listSubscriptions(owner: string): SubscriptionInfo[] {
   return [...subscriptions.values()]
     .filter((s) => s.owner === owner)

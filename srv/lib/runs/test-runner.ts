@@ -11,6 +11,7 @@ import { config } from '../core/config'
 import { emitLive } from '../core/live'
 import { columnLength } from '../core/model'
 import { addBrokerDailyStats, healthOf, nextHistory, safely } from './trends'
+import { count } from '../core/metrics'
 
 const LOG = cds.log('aem-runner')
 
@@ -63,8 +64,8 @@ function normalizeOptions(o?: RunOptions | null): RunSettings {
   return { repetitions, delayMs, order, stopOnFailure: o?.stopOnFailure === true }
 }
 
-/** Runs that were stopped by their user: the messages not sent yet are skipped. */
-const cancelledRuns = new Set<string>()
+/** Runs that were stopped (by their user, or because the server stops) -> why: the messages not sent yet are skipped. */
+const cancelledRuns = new Map<string, string>()
 
 /**
  * Stops a running run (started by the same user, or by an administrator): what was not sent yet is skipped.
@@ -75,7 +76,19 @@ export async function cancelRun(runId: string, user: { id: string; is(role: stri
   if (!run) throw httpError(404, 'Run not found')
   if (run.createdBy !== user.id && !user.is('Admin')) throw httpError(403, 'Only the user who started the run (or an administrator) can stop it')
   if (run.status !== 'RUNNING' || !activeRuns.has(runId)) throw httpError(409, 'The run is not running (any more)')
-  cancelledRuns.add(runId)
+  cancelledRuns.set(runId, 'Skipped: the run was stopped')
+}
+
+/**
+ * The server is stopping (deployment, restart): every run stops sending, its messages not sent yet are SKIPPED and
+ * it ends STOPPED instead of being left RUNNING. Waits up to timeoutMs for the runs to store that.
+ */
+export async function stopAllRuns(timeoutMs: number): Promise<void> {
+  const running = [...activeRuns.entries()]
+  if (!running.length) return
+  for (const [runId] of running) cancelledRuns.set(runId, 'Skipped: the server was stopped while the run was in progress')
+  LOG.info(`Stopping ${running.length} run(s): the server stops`)
+  await Promise.race([Promise.allSettled(running.map(([, p]) => p)), new Promise((resolve) => setTimeout(resolve, timeoutMs).unref())])
 }
 
 /** Waits ms milliseconds, ends early when the run is stopped. */
@@ -154,6 +167,7 @@ async function createRun(
 
   const total = tcIds.length * brokers.length * settings.repetitions
   if (total > maxMessages) throw httpError(400, `A run may have at most ${maxMessages} messages (test cases x brokers x repetitions) - this one would have ${total}`)
+  await checkActiveRuns()
 
   const runId = cds.utils.uuid()
   const tcById = new Map(testCases.map((t) => [t.ID, t]))
@@ -199,6 +213,19 @@ async function createRun(
 }
 
 /**
+ * Limits of runs in progress: per user (runs.maxActivePerUser) and on this server (runs.maxActive) - one person or
+ * a loop of requests cannot tie up the brokers and the server.
+ */
+async function checkActiveRuns(): Promise<void> {
+  const limits = config().runs
+  const user = cds.context?.user?.id
+  const running = (await SELECT.from(TestRuns).columns('createdBy').where({ status: 'RUNNING' })) as { createdBy?: string | null }[]
+  if (running.length >= limits.maxActive) throw httpError(429, `${running.length} runs are in progress (limit ${limits.maxActive}) - try again when one has finished`)
+  const mine = running.filter((r) => r.createdBy === user).length
+  if (user && mine >= limits.maxActivePerUser) throw httpError(429, `You have ${mine} runs in progress (limit ${limits.maxActivePerUser}) - wait for one to finish or stop it`)
+}
+
+/**
  * Creates a run for the request and executes it once the request's transaction is committed.
  * Passwords (and entered usernames) stay in memory of this run only - never persisted or logged.
  * maxMessages: a lower limit than cds.aemSuite.runs.maxResults (runs started by an AI agent).
@@ -213,6 +240,7 @@ export async function startRun(
 ): Promise<RunRef> {
   const run = await createRun(testCaseIds, brokerIds, credentials, options, Math.min(maxMessages, config().runs.maxResults))
   const jwt = currentJwt()
+  count('runsStarted')
   req.on('succeeded', () => void executeRunInBackground(run.runId, jwt, credentials))
   return run
 }
@@ -258,6 +286,7 @@ class RunProgress {
     this.counts.done++
     if (status === 'PASSED') this.counts.passed++
     else this.counts.failed++
+    count(status === 'PASSED' ? 'messagesPassed' : 'messagesFailed')
     await cds.db.tx(() => UPDATE(RunResults, r.ID).with({ status, executedAt: new Date().toISOString(), ...data }))
     await this.progressed(r.ID)
   }
@@ -385,11 +414,11 @@ async function runBroker(brokerId: string, results: PendingResult[], ctx: RunCon
     let stopReason: string | undefined
     for (let i = 0; i < results.length; i++) {
       const r = results[i]
-      if (!stopReason && cancelledRuns.has(ctx.runId)) stopReason = 'Skipped: the run was stopped'
+      if (!stopReason && cancelledRuns.has(ctx.runId)) stopReason = cancelledRuns.get(ctx.runId)
       // the pause between two messages to the same broker (not before the first); ends at once when the run is stopped
       if (!stopReason && i > 0 && ctx.delayMs > 0) {
         await pause(ctx.delayMs, ctx.runId)
-        if (cancelledRuns.has(ctx.runId)) stopReason = 'Skipped: the run was stopped'
+        if (cancelledRuns.has(ctx.runId)) stopReason = cancelledRuns.get(ctx.runId)
       }
       if (stopReason) {
         await progress.skip(r, stopReason)
@@ -414,6 +443,9 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
   let spec
   try {
     spec = buildSpec(tc, await withGenerated(tc, scopeFor(tc, broker, ctx.vars), 'consume'))
+    const maxBytes = config().runs.maxPayloadBytes
+    const bytes = Buffer.byteLength(spec.payload ?? '', 'utf8')
+    if (bytes > maxBytes) throw new TemplateError(`The payload has ${bytes} bytes - at most ${maxBytes} are sent (cds.aemSuite.runs.maxPayloadBytes)`)
   } catch (e) {
     await progress.finish(r, 'ERROR', { errorMessage: errorText(errMsg(e)), deliveryMode: tc.deliveryMode })
     return false

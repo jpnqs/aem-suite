@@ -144,6 +144,7 @@ sap.ui.define(
           busy: false,
           error: null,
           tester: !!o.tester,
+          system: o.system ? this._system(o.system) : null,
           greeting: this._text(hour < 12 ? "greeting.morning" : hour < 18 ? "greeting.afternoon" : "greeting.evening", [o.firstName || o.user || ""]),
           attention: notices.filter(function (n) {
             return dismissed.indexOf(n.id) < 0;
@@ -183,6 +184,21 @@ sap.ui.define(
         });
       },
 
+      /** The figures of the System section (administrators). */
+      _system: function (s) {
+        var t = this._text.bind(this);
+        var hours = Math.floor((s.uptimeSeconds || 0) / 3600);
+        return [
+          { label: t("system.version"), value: s.version || "–" },
+          { label: t("system.uptime"), value: hours >= 24 ? t("system.days", [Math.floor(hours / 24)]) : t("system.hours", [hours]) },
+          { label: t("system.runsInProgress"), value: String(s.runsInProgress) },
+          { label: t("system.liveSubscriptions"), value: String(s.liveSubscriptions) },
+          { label: t("system.runsStarted"), value: String(s.runsStarted) },
+          { label: t("system.messages"), value: t("system.messagesValue", [s.messagesPassed, s.messagesFailed]) },
+          { label: t("system.memory"), value: s.memoryMB + " MB" }
+        ];
+      },
+
       /** Only what needs to be done - empty when all is well. */
       _attention: function (o) {
         var t = this._text.bind(this);
@@ -210,6 +226,16 @@ sap.ui.define(
         }
         if (!o.brokers) {
           info("noBroker", t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
+        }
+        if (o.flakyTestCases) {
+          items.push({
+            id: "flaky:" + o.flakyTestCases,
+            text: t(o.flakyTestCases === 1 ? "attention.flaky.one" : "attention.flaky.many", [o.flakyTestCases]),
+            state: "Warning",
+            icon: "sap-icon://alert",
+            action: t("action.testcases"),
+            target: "testcases"
+          });
         }
         if (!o.testCases) {
           info("noTestCases", t("attention.noTestCases"), t("action.testcases"), "testcases");

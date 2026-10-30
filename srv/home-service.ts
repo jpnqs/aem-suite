@@ -1,14 +1,17 @@
 import cds from '@sap/cds'
-import { Brokers, ReceivedMessages, TestCases, TestRuns } from '#cds-models/aem/suite'
-import { listSubscriptions } from './lib/solace/subscription-hub'
-import { runOutcome } from './lib/runs/test-runner'
+import fs from 'node:fs'
+import path from 'node:path'
+import { Brokers, ReceivedMessages, TestCases, TestCaseStats, TestRuns } from '#cds-models/aem/suite'
+import { metrics } from './lib/core/metrics'
+import { listSubscriptions, subscriptionCount } from './lib/solace/subscription-hub'
+import { activeRunIds, runOutcome } from './lib/runs/test-runner'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RECENT_DAYS = 7
 const LAST_RUNS = 5
 
 /** count(1) of an entity (the typed query API has no overload for a union of entities, hence the cast) */
-const count = async (entity: typeof TestCases | typeof TestRuns | typeof ReceivedMessages, where?: Record<string, unknown>): Promise<number> => {
+const count = async (entity: typeof TestCases | typeof TestRuns | typeof ReceivedMessages | typeof TestCaseStats, where?: Record<string, unknown>): Promise<number> => {
   const query = SELECT.one.from(entity as typeof TestCases).columns('count(1) as n')
   const row = (await (where ? query.where(where) : query)) as { n: number } | undefined
   return Number(row?.n ?? 0)
@@ -71,9 +74,39 @@ export default class HomeService extends cds.ApplicationService {
         brokersUntested: brokers.filter((b) => !b.lastConnectionStatus).length,
         failingBrokers: brokers.filter((b) => b.lastConnectionStatus === 'ERROR').map((b) => b.name),
         savedMessages,
-        liveSubscriptions: listSubscriptions(user).length
+        liveSubscriptions: listSubscriptions(user).length,
+        flakyTestCases: await count(TestCaseStats, { flaky: true }),
+        system: admin ? systemStatus() : null
       }
     })
     return super.init()
   }
+}
+
+function systemStatus() {
+  const m = metrics()
+  return {
+    version: appVersion(),
+    startedAt: m.startedAt,
+    uptimeSeconds: m.uptimeSeconds,
+    runsInProgress: activeRunIds().length,
+    liveSubscriptions: subscriptionCount(),
+    runsStarted: m.runsStarted,
+    messagesPassed: m.messagesPassed,
+    messagesFailed: m.messagesFailed,
+    memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024)
+  }
+}
+
+let version: string | null | undefined
+/** the version of package.json (deployed: the one next to the server, written by cds build) */
+function appVersion(): string | null {
+  if (version === undefined) {
+    try {
+      version = (JSON.parse(fs.readFileSync(path.join(cds.root, 'package.json'), 'utf8')) as { version?: string }).version ?? null
+    } catch {
+      version = null
+    }
+  }
+  return version
 }

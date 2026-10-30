@@ -47,6 +47,25 @@ service HomeService {
     savedMessages     : Integer;
     /** live subscriptions of this user */
     liveSubscriptions : Integer;
+    /** test cases that passed and failed in their last runs (TestCaseStats.flaky) */
+    flakyTestCases    : Integer;
+    // ---- role Admin
+    system            : SystemStatus;
+  }
+
+  /** The state of the server process (administrators): since its last start. */
+  type SystemStatus {
+    version            : String(50);
+    startedAt          : Timestamp;
+    uptimeSeconds      : Integer;
+    runsInProgress     : Integer;
+    /** of all users */
+    liveSubscriptions  : Integer;
+    runsStarted        : Integer;
+    messagesPassed     : Integer;
+    messagesFailed     : Integer;
+    /** memory of the process (resident set), MB */
+    memoryMB           : Integer;
   }
 
   function overview() returns Overview;

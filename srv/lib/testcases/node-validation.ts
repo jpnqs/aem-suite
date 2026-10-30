@@ -6,6 +6,7 @@ import { TEST_FIELDS } from './test-fields'
 import type { TestCaseRecord } from '../runs/test-case-spec'
 import { loadTree } from './tree'
 import { columnLength, elementOf, enumValues, rangeOf } from '../core/model'
+import { config } from '../core/config'
 
 /**
  * Rules for creating / changing test cases and folders - shared by the UI service (TestService),
@@ -108,6 +109,9 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
     if (!p.type) p.type = inferPropertyType(p.value)
   })
   if (d.payload) {
+    const maxBytes = config().runs.maxPayloadBytes
+    const bytes = Buffer.byteLength(d.payload, 'utf8')
+    if (bytes > maxBytes) reject(400, `The payload has ${bytes} bytes - at most ${maxBytes} are allowed`, 'in/payload')
     // placeholders are replaced by 0 so templated numbers ({{count}}) stay valid JSON
     const probe = d.payload.replace(/\{\{[^}]*\}\}/g, '0')
     const isJson = !d.contentType || /json/i.test(d.contentType)

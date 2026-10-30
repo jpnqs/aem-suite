@@ -4,7 +4,7 @@ import { IMAGE_ROUTE, imagesDir } from './lib/help-content'
 import { registerMcpJson } from './lib/mcp-json'
 import { registerMcpOAuth } from './lib/mcp-oauth'
 import { stopAll } from './lib/solace/subscription-hub'
-import { failRuns } from './lib/runs/test-runner'
+import { failRuns, stopAllRuns } from './lib/runs/test-runner'
 import { rememberUser } from './lib/core/users'
 
 // AI clients log in against XSUAA themselves (OAuth discovery for /mcp/agent).
@@ -19,8 +19,20 @@ cds.on('served', () => failRuns({}, 'The server restarted while the run was in p
 // names of the logged-in users for the "Created By" columns (the token has them, the database only the user id)
 cds.on('serving', (srv) => srv.before('*', (req) => rememberUser(req.user)))
 
-// live subscriptions hold broker sessions
-cds.on('shutdown', () => stopAll())
+// live subscriptions hold broker sessions; runs stop sending and end STOPPED (Cloud Foundry allows ~10 s after SIGTERM)
+cds.on('shutdown', () => Promise.all([stopAll(), stopAllRuns(8000)]))
+
+// readiness for monitoring: the database answers (no data, no login - CAP's /health stays the liveness check of CF)
+cds.on('bootstrap', (app) => {
+  app.get('/health/db', async (_req, res) => {
+    try {
+      await cds.db.run(SELECT.one.from('aem.suite.Brokers').columns('1 as ok'))
+      res.json({ status: 'UP' })
+    } catch {
+      res.status(503).json({ status: 'DOWN' })
+    }
+  })
+})
 
 if (process.env.NODE_ENV !== 'production') {
   // The UI apps call odata/ and ws/ relative to their own path (in BTP each app's xs-app.json routes them

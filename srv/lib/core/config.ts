@@ -34,6 +34,12 @@ export interface AemSuiteConfig {
     maxDelayMs: number
     /** messages (test cases x brokers x repetitions) of one run */
     maxResults: number
+    /** runs one user may have in progress at the same time */
+    maxActivePerUser: number
+    /** runs in progress on the server at the same time */
+    maxActive: number
+    /** size of a resolved payload that is still sent (and of a payload template that can be saved) */
+    maxPayloadBytes: number
   }
   faker: {
     /** language of {{faker...}} test data: en, de, fr, es, en_GB, ... (the locales of faker.js) */
@@ -54,7 +60,7 @@ export const DEFAULTS: AemSuiteConfig = {
   subscriptions: { maxPerUser: 5, idleTimeoutMs: 5 * 60 * 1000, maxMessagesPerSecond: 100, maxPayloadBytes: 512 * 1024 },
   help: { file: 'docs/user-guide.md' },
   agent: { maxRunResults: 100, maxActiveRuns: 2, maxRunsPerHour: 30 },
-  runs: { maxRepetitions: 1000, maxDelayMs: 60_000, maxResults: 5000 },
+  runs: { maxRepetitions: 1000, maxDelayMs: 60_000, maxResults: 5000, maxActivePerUser: 5, maxActive: 20, maxPayloadBytes: 1024 * 1024 },
   faker: { locale: 'en' },
   mcp: {}
 }
