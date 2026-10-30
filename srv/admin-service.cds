@@ -37,6 +37,18 @@ service AdminService {
 
   entity BrokerVariables as projection on db.Variables;
 
+  /** Messages and acknowledgement latency per broker and day (section "Last Days" of a broker). */
+  @readonly
+  entity BrokerDailyStats as
+    projection on db.BrokerDailyStats {
+      *,
+      @title: '{i18n>PassRate}'
+      case when messages > 0 then cast(round(100.0 * passed / messages, 0) as Integer) else null end as passRate : Integer,
+      @title: '{i18n>ACKLatencyAvgMs}'
+      case when ackCount > 0 then cast(round(1.0 * ackSumMs / ackCount, 0) as Integer) else null end as ackAvgMs : Integer,
+      case when messages > 0 and passed = messages then 3 when messages > 0 and passed = 0 then 1 when messages > 0 then 2 else 0 end as criticality : Integer
+    };
+
   @readonly
   entity CredentialModes as projection on db.CredentialModes;
 

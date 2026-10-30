@@ -319,7 +319,9 @@ PASSED means the broker **accepted** the message – not that a consumer process
 
    ![The results of a run](images/guides/results-1-run.png)
 
-- The **Last Result** of each test case is also shown in the test case list and on its page.
+- The **Last Result** of each test case is also shown in the test case list and on its page – with **Last Runs** (the outcomes of its last 20 runs, oldest first: `P` passed, `F` failed, `E` error), the **Pass Rate** and **Flaky**: the test passed and failed within its last 10 runs, changing at least twice. A flaky test points at timing, order or shared data problems rather than at a plain regression.
+- **Compare…** on a run's page compares it with an earlier run (the one before it is preselected): per test case and broker it shows what **broke**, what was **fixed**, what is **new** or **no longer run**, and the ACK latency before and now.
+- On a broker's page (**Brokers**, admins) **Runs per Day** shows how many messages it got per day, how many passed, and the average and highest ACK latency.
 
 ---
 

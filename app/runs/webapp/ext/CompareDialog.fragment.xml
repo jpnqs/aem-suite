@@ -1,0 +1,62 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m">
+  <!-- Compares this run with another one per test case and broker: what broke, what was fixed (RunActions.compare). -->
+  <Dialog
+    title="{i18n>compare.title}"
+    contentWidth="60rem"
+    contentHeight="70%"
+    resizable="true"
+    draggable="true">
+    <content>
+      <VBox class="sapUiSmallMargin">
+        <HBox alignItems="Center" wrap="Wrap">
+          <Label text="{i18n>compare.with}" labelFor="compareBase" class="sapUiSmallMarginEnd" />
+          <Select
+            id="compareBase"
+            width="32rem"
+            forceSelection="false"
+            selectedKey="{compare>/baseRunId}"
+            items="{path: 'compare>/runs', templateShareable: false}"
+            change=".onCompare">
+            <core:Item key="{compare>ID}" text="{compare>label}" />
+          </Select>
+        </HBox>
+        <MessageStrip
+          text="{compare>/summary}"
+          visible="{= !!${compare>/summary} }"
+          type="{= ${compare>/broken} > 0 ? 'Error' : 'Information' }"
+          showIcon="true"
+          class="sapUiSmallMarginTopBottom" />
+        <Table
+          items="{path: 'compare>/rows', templateShareable: false}"
+          busy="{compare>/busy}"
+          noDataText="{i18n>compare.noData}"
+          growing="true"
+          growingThreshold="100">
+          <columns>
+            <Column><Text text="{i18n>compare.change}" /></Column>
+            <Column><Text text="{i18n>compare.testCase}" /></Column>
+            <Column><Text text="{i18n>compare.broker}" /></Column>
+            <Column><Text text="{i18n>compare.before}" /></Column>
+            <Column><Text text="{i18n>compare.now}" /></Column>
+            <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>compare.latency}" /></Column>
+          </columns>
+          <items>
+            <ColumnListItem>
+              <ObjectStatus text="{compare>changeText}" state="{compare>state}" />
+              <Text text="{compare>testCase}" />
+              <Text text="{compare>broker}" />
+              <Text text="{compare>baseStatus}" />
+              <Text text="{compare>otherStatus}" />
+              <Text text="{compare>latency}" />
+            </ColumnListItem>
+          </items>
+        </Table>
+      </VBox>
+    </content>
+    <endButton>
+      <Button text="{i18n>compare.close}" press=".onClose" />
+    </endButton>
+  </Dialog>
+</core:FragmentDefinition>

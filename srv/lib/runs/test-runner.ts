@@ -10,6 +10,7 @@ import { TemplateError } from '../template/resolve'
 import { config } from '../core/config'
 import { emitLive } from '../core/live'
 import { columnLength } from '../core/model'
+import { addBrokerDailyStats, healthOf, nextHistory, safely } from './trends'
 
 const LOG = cds.log('aem-runner')
 
@@ -283,6 +284,7 @@ class RunProgress {
       })
     )
     await updateTestCaseStats(this.runId, this.perTestCase)
+    await safely('broker statistics', () => addBrokerDailyStats(this.runId))
     this.stop()
     await this.emit(undefined, status)
     LOG.info(`Run ${this.runId} ${status === 'STOPPED' ? 'stopped' : 'finished'}: ${passed}/${this.total} passed`)
@@ -473,9 +475,14 @@ export async function failRuns(where: Record<string, unknown>, reason: string): 
   }
 }
 
-/** Stores the latest outcome per test case: PASSED only if all brokers passed. */
+/** Stores the latest outcome per test case (PASSED only if all brokers passed) and adds it to its history. */
 async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outcome[]>) {
   const runAt = new Date().toISOString()
+  const ids = [...perTestCase.keys()]
+  const before = ids.length
+    ? ((await cds.db.tx(() => SELECT.from(TestCaseStats).columns('testCase_ID', 'history').where({ testCase_ID: { in: ids } }))) as { testCase_ID: string; history?: string | null }[])
+    : []
+  const historyOf = new Map(before.map((r) => [r.testCase_ID, r.history]))
   const rows = [...perTestCase].map(([testCaseId, outcomes]) => {
     const bad = outcomes.filter((o) => o.status !== 'PASSED')
     const status: ResultStatus = !bad.length ? 'PASSED' : bad.some((o) => o.status === 'FAILED') ? 'FAILED' : 'ERROR'
@@ -485,7 +492,8 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
       runAt,
       run_ID: runId,
       brokers: truncate(outcomes.map((o) => o.broker).join(', '), columnLength('TestCaseStats', 'brokers')),
-      message: bad.length ? truncate(bad.map((o) => `${o.broker}: ${o.error ?? o.status}`).join('; '), columnLength('TestCaseStats', 'message')) : null
+      message: bad.length ? truncate(bad.map((o) => `${o.broker}: ${o.error ?? o.status}`).join('; '), columnLength('TestCaseStats', 'message')) : null,
+      ...trendOf(nextHistory(historyOf.get(testCaseId), status))
     }
   })
   try {
@@ -494,3 +502,5 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
     LOG.warn('Cannot update test case stats', e)
   }
 }
+
+const trendOf = (history: string) => ({ history, ...healthOf(history) })

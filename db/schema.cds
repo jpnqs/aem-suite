@@ -150,6 +150,9 @@ entity Brokers : cuid, managed {
   lastConnectionMessage  : String(1000);
   variables              : Composition of many Variables
                              on variables.broker = $self;
+  /** messages and latencies per day (written when runs finish) */
+  dailyStats             : Association to many BrokerDailyStats
+                             on dailyStats.broker = $self;
 }
 
 /** Template variables. Without broker = global, with broker = broker specific (overrides global). */
@@ -225,6 +228,25 @@ entity TestCaseStats {
       run       : Association to TestRuns;
       brokers   : String(500);
       message   : String(1000);
+      /** outcomes of the last runs, oldest first: P passed, F failed, E error (lib/runs/trends.ts) */
+      history   : String(20);
+      /** percent of the outcomes in history that passed */
+      passRate  : Integer;
+      /** passed and failed within the last 10 runs, changing at least twice */
+      flaky     : Boolean;
+}
+
+/** Messages and latencies per broker and day (UTC) - added when a run finishes (lib/runs/trends.ts). */
+entity BrokerDailyStats {
+  key broker       : Association to Brokers;
+  key day          : Date;
+      /** snapshot, readable if the broker is renamed */
+      brokerName   : String(100);
+      messages     : Integer;
+      passed       : Integer;
+      ackCount     : Integer;
+      ackSumMs     : Integer64;
+      ackMaxMs     : Integer;
 }
 
 entity TestCaseProperties : cuid {
@@ -463,6 +485,17 @@ annotate TestCaseStats with {
   runAt   @title: '{i18n>RunAt}';
   brokers @title: '{i18n>Brokers}';
   message @title: '{i18n>Problems}';
+  history  @title: '{i18n>History}'  @Common.QuickInfo: '{i18n>InfoHistory}';
+  passRate @title: '{i18n>PassRate}'  @Common.QuickInfo: '{i18n>InfoPassRate}';
+  flaky    @title: '{i18n>Flaky}'  @Common.QuickInfo: '{i18n>InfoFlaky}';
+};
+
+annotate BrokerDailyStats with {
+  day        @title: '{i18n>Day}';
+  brokerName @title: '{i18n>Broker}';
+  messages   @title: '{i18n>Messages}';
+  passed     @title: '{i18n>Passed}';
+  ackMaxMs   @title: '{i18n>ACKLatencyMaxMs}';
 };
 
 annotate TestRuns with {

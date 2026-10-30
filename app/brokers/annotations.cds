@@ -104,6 +104,13 @@ annotate service.Brokers with @(
       ID    : 'Variables',
       Target: 'variables/@UI.LineItem',
       Label : '{i18n>BrokerVariables}'
+    },
+    // filled when runs finish: how the broker did per day
+    {
+      $Type : 'UI.ReferenceFacet',
+      ID    : 'DailyStats',
+      Target: 'dailyStats/@UI.PresentationVariant',
+      Label : '{i18n>RunsPerDay}'
     }
   ]
 ) {
@@ -158,3 +165,25 @@ annotate service.Brokers with @Common.SideEffects #connection: {
 
 
 // BrokerVariables: the layout of all variables lists, app/common.cds
+
+annotate service.BrokerDailyStats with @(
+  UI.PresentationVariant: {
+    SortOrder     : [{
+      Property  : day,
+      Descending: true
+    }],
+    Visualizations: ['@UI.LineItem']
+  },
+  UI.LineItem           : [
+    {Value: day},
+    {Value: messages},
+    {
+      Value      : passRate,
+      Criticality: criticality
+    },
+    {Value: ackAvgMs},
+    {Value: ackMaxMs}
+  ]
+) {
+  criticality @UI.Hidden;
+};

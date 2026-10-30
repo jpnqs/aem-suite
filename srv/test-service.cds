@@ -173,8 +173,26 @@ service TestService {
         when 'FAILED' then 1
         when 'ERROR'  then 1
         else 0
-      end as criticality : Integer
+      end as criticality : Integer,
+      // flaky is a warning
+      case when flaky = true then 2 else 0 end as flakyCriticality : Integer
     };
+
+  /**
+   * Compares two runs per test case and broker (repetitions folded into the worst outcome): BROKEN, FIXED, NEW,
+   * GONE, STILL_FAILING or STILL_PASSING - the changes first.
+   */
+  function compareRuns(baseRunId : UUID not null, otherRunId : UUID not null) returns many RunComparison;
+
+  type RunComparison {
+    testCase          : String;
+    broker            : String;
+    baseStatus        : String;
+    otherStatus       : String;
+    change            : String;
+    baseAckLatencyMs  : Integer;
+    otherAckLatencyMs : Integer;
+  }
 
   @readonly
   entity DeliveryModes as projection on db.DeliveryModes;

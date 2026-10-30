@@ -7,6 +7,7 @@ import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/core/defaults'
 import { copyNodes } from './lib/testcases/copy-nodes'
 import { documentationFromHtml, renderDocumentation } from './lib/testcases/documentation'
 import { exportNodes, importNodes } from './lib/testcases/export-import'
+import { compareRuns } from './lib/runs/compare'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/testcases/node-validation'
 import { selectNodeDeep } from './lib/testcases/nodes'
 import { columnLength } from './lib/core/model'
@@ -125,6 +126,11 @@ export default class TestService extends cds.ApplicationService {
     this.on('duplicate', TestCases, async (req) => {
       const [copy] = await copyNodes([idOf(req)])
       return SELECT.one.from(TestCases, copy.ID)
+    })
+
+    this.on('compareRuns', async (req) => {
+      const { baseRunId, otherRunId } = req.data as { baseRunId: string; otherRunId: string }
+      return compareRuns(baseRunId, otherRunId)
     })
 
     this.on('copyNodes', async (req) => copyNodes((req.data as { ids: string[] }).ids))

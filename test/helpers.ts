@@ -156,6 +156,7 @@ const TABLES = [
   'RunResults',
   'TestRuns',
   'TestCaseStats',
+  'BrokerDailyStats',
   'TestCaseProperties',
   'TestCaseVariables',
   'TestCases',

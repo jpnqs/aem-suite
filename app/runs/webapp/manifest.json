@@ -194,6 +194,10 @@
               "content": {
                 "header": {
                   "actions": {
+                    "compare": {
+                      "press": "com.aem.suite.runs.ext.RunActions.compare",
+                      "text": "{{action.compare}}"
+                    },
                     "help": {
                       "press": "com.aem.suite.runs.shared.Help.open",
                       "text": "{{action.help}}"
