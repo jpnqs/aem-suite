@@ -21,6 +21,7 @@ sap.ui.define(
       { key: "variables", color: "Accent3" },
       { key: "numberranges", color: "Accent2" },
       { key: "cleanup", color: "Accent7" },
+      { key: "auditlog", color: "Accent9" },
       { key: "help", color: "Accent10" }
     ].map(function (a) {
       return Object.assign({}, Apps.get(a.key), a);
@@ -261,6 +262,8 @@ sap.ui.define(
             return t("line.variables");
           case "numberranges":
             return t("line.numberranges");
+          case "auditlog":
+            return t("line.auditlog");
           case "cleanup":
             return t("line.cleanup");
           default:

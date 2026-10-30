@@ -1,0 +1,167 @@
+{
+  "_version": "1.65.0",
+  "sap.cloud": {
+    "public": true,
+    "service": "aemsuite"
+  },
+  "sap.app": {
+    "id": "com.aem.suite.auditlog",
+    "type": "application",
+    "i18n": {
+      "bundleUrl": "i18n/i18n.properties",
+      "supportedLocales": [
+        ""
+      ],
+      "fallbackLocale": ""
+    },
+    "applicationVersion": {
+      "version": "1.0.0"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "dataSources": {
+      "mainService": {
+        "uri": "odata/v4/admin/",
+        "type": "OData",
+        "settings": {
+          "odataVersion": "4.0"
+        }
+      }
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "intent": {
+          "semanticObject": "AEMSuiteAuditLog",
+          "action": "display",
+          "title": "{{appTitle}}",
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          }
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "flexEnabled": false,
+    "dependencies": {
+      "minUI5Version": "1.148.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.fe.templates": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "com.aem.suite.auditlog.i18n.i18n",
+          "supportedLocales": [
+            ""
+          ],
+          "fallbackLocale": ""
+        }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": {
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      }
+    },
+    "routing": {
+      "config": {},
+      "routes": [
+        {
+          "pattern": ":?query:",
+          "name": "AuditLogList",
+          "target": "AuditLogList"
+        },
+        {
+          "pattern": "AuditLog({key}):?query:",
+          "name": "AuditLogObjectPage",
+          "target": "AuditLogObjectPage"
+        }
+      ],
+      "targets": {
+        "AuditLogList": {
+          "type": "Component",
+          "id": "AuditLogList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/AuditLog",
+              "variantManagement": "Page",
+              "initialLoad": "Enabled",
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.auditlog.shared.Help.open",
+                      "text": "{{action.help}}"
+                    }
+                  }
+                }
+              },
+              "navigation": {
+                "AuditLog": {
+                  "detail": {
+                    "route": "AuditLogObjectPage"
+                  }
+                }
+              },
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "type": "ResponsiveTable"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "AuditLogObjectPage": {
+          "type": "Component",
+          "id": "AuditLogObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "editableHeaderContent": false,
+              "content": {
+                "header": {
+                  "actions": {
+                    "help": {
+                      "press": "com.aem.suite.auditlog.shared.Help.open",
+                      "text": "{{action.help}}"
+                    }
+                  }
+                }
+              },
+              "contextPath": "/AuditLog"
+            }
+          }
+        }
+      }
+    }
+  },
+  "sap.fiori": {
+    "registrationIds": [],
+    "archeType": "transactional"
+  }
+}

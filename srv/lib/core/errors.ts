@@ -22,3 +22,8 @@ export function errMsg(e: unknown): string {
 export function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 3) + '...' : s
 }
+
+/** The text with every occurrence of the secret replaced by *** (secrets of fewer than 3 characters are not searched). */
+export function masked(text: string, secret?: string | null): string {
+  return secret && secret.length >= 3 ? text.split(secret).join('***') : text
+}

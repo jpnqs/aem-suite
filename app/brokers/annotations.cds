@@ -27,6 +27,7 @@ annotate service.Brokers with @(
     {Value: url},
     {Value: msgVpn},
     {Value: credentialMode},
+    {Value: production},
     {Value: destinationName},
     {Value: active},
     {Value: lastConnectionAt}
@@ -50,7 +51,8 @@ annotate service.Brokers with @(
     {Value: name},
     {Value: description},
     {Value: credentialMode},
-    {Value: active}
+    {Value: active},
+    {Value: production}
   ]},
   UI.FieldGroup #Destination   : {Data: [
     {Value: destinationName},

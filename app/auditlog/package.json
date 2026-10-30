@@ -1,0 +1,11 @@
+{
+  "name": "aem-suite-auditlog",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "ui5 build --clean-dest --dest dist"
+  },
+  "devDependencies": {
+    "ui5-task-zipper": "^3.7.0"
+  }
+}

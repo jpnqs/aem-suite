@@ -145,6 +145,8 @@ entity Brokers : cuid, managed {
   active                 : Boolean default true;
   /** AI agents (MCP) may preview and run tests here - only effective for DESTINATION brokers (no password via AI) */
   agentAllowed           : Boolean default true;
+  /** a production broker: runs need an explicit confirmation, AI agents cannot use it, only administrators consume from its queues */
+  production             : Boolean default false;
   lastConnectionStatus   : ConnectionStatus;
   lastConnectionAt       : Timestamp;
   lastConnectionMessage  : String(1000);
@@ -388,6 +390,26 @@ type CleanupStatus : String(10) enum {
   FAILED;
 }
 
+/**
+ * Who changed or did what (Audit Log app, administrators): saves and deletes of brokers, variables, number ranges,
+ * test cases, cleanup rules; runs, connection tests, imports, cleanups. Never values: the names of the changed
+ * fields only - no payloads, no passwords.
+ */
+entity AuditLog : cuid {
+  at       : Timestamp @cds.on.insert: $now;
+  user     : Username;
+  /** CREATE, UPDATE, DELETE or the action (runTests, testConnection, ...) */
+  action   : String(50);
+  /** what it was done to, e.g. Brokers, TestCases */
+  target   : String(100);
+  targetId : String(100);
+  /** the name of the object, if it has one */
+  name     : String(200);
+  /** what was changed (field names) or the parameters that tell what was done */
+  details  : String(1000);
+  service  : String(50);
+}
+
 /** Every cleanup of the Data Cleanup app: who deleted what, with which selection (audit trail). */
 entity CleanupLogs : cuid, managed {
   /** e.g. "Test runs 120, Saved messages 14" */
@@ -412,6 +434,8 @@ entity CleanupRules : cuid, managed {
   /** the CleanupService.CleanupRequest as JSON */
   request     : LargeString @mandatory;
   lastRunAt   : Timestamp;
+  /** retention: the server applies the rule once a day (lib/cleanup/retention.ts) */
+  automatic   : Boolean default false;
 }
 
 // ---------------------------------------------------------------------------------------------- field titles
@@ -432,6 +456,8 @@ annotate Brokers with {
   clientNamePrefix      @title: '{i18n>ClientNamePrefix}';
   connectTimeoutMs      @title: '{i18n>ConnectTimeoutMs}';
   active                @title: '{i18n>Active}';
+  production            @title: '{i18n>ProductionBroker}'
+                        @Common.QuickInfo: '{i18n>InfoProductionBroker}';
   agentAllowed          @title: '{i18n>AvailableForAIAgents}'
                         @Common.QuickInfo: '{i18n>InfoAIAssistantsMCPMayPreviewAndRunTests}';
   lastConnectionStatus  @title: '{i18n>Status}';
@@ -572,4 +598,15 @@ annotate CleanupRules with {
   lastRunAt   @title: '{i18n>LastRunAt}';
   modifiedAt  @title: '{i18n>ChangedAt}';
   modifiedBy  @title: '{i18n>ChangedBy}';
+};
+
+annotate AuditLog with {
+  at       @title: '{i18n>At}';
+  user     @title: '{i18n>User}';
+  action   @title: '{i18n>Action}';
+  target   @title: '{i18n>Object}';
+  targetId @title: '{i18n>ObjectID}';
+  name     @title: '{i18n>Name}';
+  details  @title: '{i18n>Details}';
+  service  @title: '{i18n>Service}';
 };

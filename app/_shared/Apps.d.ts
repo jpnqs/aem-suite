@@ -1,4 +1,4 @@
-export type AppKey = "home" | "testcases" | "runs" | "subscriber" | "messages" | "brokers" | "variables" | "numberranges" | "cleanup" | "help";
+export type AppKey = "home" | "testcases" | "runs" | "subscriber" | "messages" | "brokers" | "variables" | "numberranges" | "cleanup" | "auditlog" | "help";
 
 export interface AppInfo {
   /** launchpad intent, e.g. "AEMSuiteTestRuns-display" */

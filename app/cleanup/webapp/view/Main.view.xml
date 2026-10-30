@@ -39,7 +39,7 @@
                   width="16rem"
                   change=".onRuleChange"
                   items="{path: '/CleanupRules', sorter: {path: 'name'}}">
-                  <core:ListItem key="{ID}" text="{name}" additionalText="{description}" />
+                  <core:ListItem key="{ID}" text="{name}" additionalText="{= ${automatic} ? ${i18n>rule.daily} : ${description} }" />
                 </Select>
                 <Button text="{i18n>rule.saveAs}" icon="sap-icon://save" press=".onSaveRule" enabled="{state>/hasSelection}" tooltip="{i18n>rule.saveAs.tooltip}" />
                 <Button icon="sap-icon://delete" press=".onDeleteRule" enabled="{= !!${state>/ruleId} }" tooltip="{i18n>rule.delete}" />

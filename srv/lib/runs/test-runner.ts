@@ -1,7 +1,7 @@
 import cds from '@sap/cds'
 import { Brokers, RunResults, TestCaseStats, TestRuns, type ResultStatus, type RunResult, type TestRun } from '#cds-models/aem/suite'
 import { BrokerRecord, currentJwt, loadBroker, needsPassword, needsUsername, resolveConnection } from '../broker/resolve'
-import { errMsg, httpError, truncate } from '../core/errors'
+import { errMsg, httpError, masked, truncate } from '../core/errors'
 import type { Publisher } from '../solace/session'
 import { connect } from '../solace/connector'
 import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord, withGenerated } from './test-case-spec'
@@ -42,6 +42,8 @@ export interface RunOptions {
   delayMs?: number | null
   order?: string | null
   stopOnFailure?: boolean | null
+  /** the user confirmed sending to production brokers */
+  confirmProduction?: boolean | null
 }
 
 /** The settings of a run with defaults, checked against the limits (cds.aemSuite.runs). */
@@ -154,12 +156,15 @@ async function createRun(
   const tcIds = tree.expandToTests(selected)
   if (!tcIds.length) throw httpError(400, 'The selected folders contain no test cases')
   const testCases = tcIds.map((id) => ({ ID: id, name: tree.byId.get(id)!.name ?? id }))
-  const brokers = await SELECT.from(Brokers).columns('ID', 'name', 'active', 'credentialMode', 'username').where({ ID: { in: brIds } })
+  const brokers = await SELECT.from(Brokers).columns('ID', 'name', 'active', 'credentialMode', 'username', 'production').where({ ID: { in: brIds } })
   if (brokers.length !== brIds.length) throw httpError(404, 'One or more brokers not found')
   // keep the user's selection order (summary, results)
   brokers.sort((a, b) => brIds.indexOf(a.ID!) - brIds.indexOf(b.ID!))
   const inactive = brokers.filter((b) => b.active === false).map((b) => b.name)
   if (inactive.length) throw httpError(400, `Broker(s) inactive: ${inactive.join(', ')}`)
+  const production = brokers.filter((b) => b.production === true).map((b) => b.name)
+  if (production.length && options?.confirmProduction !== true)
+    throw httpError(400, `${production.join(', ')} ${production.length > 1 ? 'are production brokers' : 'is a production broker'} - confirm sending to production to run`)
   const noUser = brokers.filter((b) => needsUsername(b) && !credentials.get(b.ID!)?.username).map((b) => b.name)
   if (noUser.length) throw httpError(400, `Username required for broker(s): ${noUser.join(', ')}`)
   const missing = brokers.filter((b) => needsPassword(b) && !credentials.get(b.ID!)?.password).map((b) => b.name)
@@ -401,12 +406,18 @@ async function runBroker(brokerId: string, results: PendingResult[], ctx: RunCon
   const { progress } = ctx
   let broker: BrokerRecord
   let publisher: Publisher
+  /** the password of the connection (entered or from the destination): masked in error texts */
+  let password: string | undefined
   try {
     broker = await cds.db.tx(() => loadBroker(brokerId))
     const entered = ctx.credentials.get(brokerId)
-    publisher = await connect(await resolveConnection(broker, ctx.jwt, entered?.password, entered?.username))
+    const conn = await resolveConnection(broker, ctx.jwt, entered?.password, entered?.username)
+    password = conn.password
+    publisher = await connect(conn)
   } catch (e) {
-    for (const r of results) await progress.finish(r, 'ERROR', { errorMessage: errorText(errMsg(e)) })
+    // a password entered for the run never ends up in a result, whatever the broker library put into its error
+    const text = masked(masked(errMsg(e), ctx.credentials.get(brokerId)?.password), password)
+    for (const r of results) await progress.finish(r, 'ERROR', { errorMessage: errorText(text) })
     return
   }
 

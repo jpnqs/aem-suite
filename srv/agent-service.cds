@@ -97,7 +97,7 @@ service TestAgentService {
       name,
       description,
       case
-        when credentialMode = 'DESTINATION' and active = true and (agentAllowed is null or agentAllowed = true) then true
+        when credentialMode = 'DESTINATION' and active = true and (agentAllowed is null or agentAllowed = true) and (production is null or production = false) then true
         else false
       end as canRun : Boolean
     };

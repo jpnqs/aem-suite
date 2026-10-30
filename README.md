@@ -127,7 +127,7 @@ The suite offers an MCP endpoint (`/mcp/agent`). Connect GitHub Copilot, Claude 
 | use variables, SAP-like numbers and test data | [10. Variables and templates](docs/user-guide.md#10-variables-and-templates) · [Number ranges](docs/user-guide.md#number-ranges-admin) · [faker](docs/user-guide.md#test-data-with-faker) |
 | let an AI assistant plan and run tests | [11. Use an AI assistant](docs/user-guide.md#11-use-an-ai-assistant-mcp) |
 | delete old runs and messages | [12. Clean up old data](docs/user-guide.md#12-clean-up-old-data-admin) |
-| fix an error message | [13. Tips and troubleshooting](docs/user-guide.md#13-tips-and-troubleshooting) |
+| fix an error message | [14. Tips and troubleshooting](docs/user-guide.md#14-tips-and-troubleshooting) |
 
 ## Technology
 

@@ -28,7 +28,8 @@ Every chapter starts with the clicks, step by step (the element to click is fram
   - [Test data with faker](#test-data-with-faker)
 - [11. Use an AI assistant (MCP)](#11-use-an-ai-assistant-mcp)
 - [12. Clean up old data (Admin)](#12-clean-up-old-data-admin)
-- [13. Tips and troubleshooting](#13-tips-and-troubleshooting)
+- [13. Audit log (Admin)](#13-audit-log-admin)
+- [14. Tips and troubleshooting](#14-tips-and-troubleshooting)
 
 ---
 
@@ -114,7 +115,8 @@ A broker is either entered here (**direct**: the password is typed whenever it i
 | **Message VPN** | e.g. `dev-vpn` |
 | **Username** | optional (often `solace-cloud-client`). Empty: every user enters a username together with the password |
 | **Active** | inactive brokers are not offered for runs and subscriptions |
-| **Available for AI Agents** | destination brokers only: may an AI assistant use it? Switch it off for production |
+| **Production** | a production system: every run asks *Send to Production?* first, AI assistants cannot use it, and only admins consume messages from its queues (browsing works for everyone) |
+| **Available for AI Agents** | destination brokers only: may an AI assistant use it? (never for production brokers) |
 | **Client Name Prefix**, **Connect Timeout (ms)** | under *Advanced*; rarely needed |
 
 Where is the connection data? In the AEM console: *Cluster Manager → your service → Connect → Solace Web Messaging*.
@@ -487,7 +489,7 @@ Connect an AI assistant (e.g. Claude Code, or GitHub Copilot for local developme
 | | |
 |---|---|
 | **Can** | read test cases, folders, brokers (name and description), runs and results; create, change, move and copy folders and test cases (same checks as the apps); preview; run and report what failed |
-| **Cannot** | delete anything; see global or broker variables, saved messages, connection data (shown as `<hidden>`) or who created what; use passwords – so it runs only on active **destination** brokers with *Available for AI Agents* on |
+| **Cannot** | delete anything; see global or broker variables, saved messages, connection data (shown as `<hidden>`) or who created what; use passwords – so it runs only on active **destination** brokers with *Available for AI Agents* on, never on production brokers |
 | **Limits** | 100 results per run, 2 runs at a time, 30 runs per hour per user |
 
 **Connect (deployed suite)**
@@ -554,7 +556,15 @@ Runs, results and saved messages pile up. **Data Cleanup** deletes what is no lo
 
 ---
 
-## 13. Tips and troubleshooting
+### Clean up automatically
+
+When you save a rule, tick **Apply automatically every day**: the server then cleans up what the rule selects once a day (e.g. *saved messages older than 30 days*). Every automatic cleanup is listed in the history like one you started, by *automatic cleanup*.
+
+## 13. Audit log (Admin)
+
+**Audit Log** lists who changed or did what, newest first: saving and deleting brokers, variables, number ranges, test cases and cleanup rules, runs started and stopped, connection tests, imports, copies, cleanups and live subscriptions – with the user, the time, the object and its name. For a change it names the fields that were changed, for an action what it was done to (e.g. *testCaseIds: 12, brokerIds: 2*). It never holds values: no payloads, no passwords. Only successful changes are listed. Filter by user, action, object or time.
+
+## 14. Tips and troubleshooting
 
 | Message / situation | What to do |
 |---|---|

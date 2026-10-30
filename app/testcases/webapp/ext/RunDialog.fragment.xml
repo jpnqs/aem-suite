@@ -22,7 +22,7 @@
           noDataText="{i18n>run.noActiveBrokersMaintainBrokersFirst}"
           updateFinished=".onBrokersLoaded"
           selectionChange=".onBrokerSelection"
-          items="{path: '/Brokers', parameters: {$select: 'name,msgVpn,username,credentialMode'}, sorter: {path: 'name'}, templateShareable: false}">
+          items="{path: '/Brokers', parameters: {$select: 'name,msgVpn,username,credentialMode,production'}, sorter: {path: 'name'}, templateShareable: false}">
           <!-- small icon in front of the name: cloud = BTP destination, key = direct input (password per run) -->
           <CustomListItem tooltip="{= ${credentialMode} === 'DESTINATION' ? ${i18n>run.btpDestination} : ${i18n>run.directInput} }">
             <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMarginBeginEnd sapUiTinyMarginTopBottom">
@@ -35,6 +35,12 @@
                   title="{name}"
                   text="{= ${credentialMode} === 'DESTINATION' ? ${i18n>run.btpDestination} : (${username} ? ${username} + ' @ ' + ${msgVpn} : ${i18n>run.vpn} + ' ' + ${msgVpn}) }" />
               </HBox>
+              <ObjectStatus
+                text="{i18n>run.production}"
+                state="Warning"
+                icon="sap-icon://alert"
+                visible="{= ${production} === true }"
+                class="sapUiSmallMarginEnd" />
               <ObjectStatus
                 text="{lastConnectionStatus}"
                 state="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />

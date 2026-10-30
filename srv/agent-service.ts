@@ -258,13 +258,15 @@ export default class TestAgentService extends cds.ApplicationService {
  */
 async function assertAgentBrokers(req: cds.Request, brokerIds: string[]): Promise<void> {
   const brokers = (await SELECT.from(Brokers)
-    .columns('name', 'credentialMode', 'active', 'agentAllowed')
-    .where({ ID: { in: [...new Set(brokerIds)] } })) as { name: string; credentialMode: string; active: boolean | null; agentAllowed: boolean | null }[]
-  const refused = brokers.filter((b) => b.credentialMode !== 'DESTINATION' || b.active === false || b.agentAllowed === false).map((b) => b.name)
+    .columns('name', 'credentialMode', 'active', 'agentAllowed', 'production')
+    .where({ ID: { in: [...new Set(brokerIds)] } })) as { name: string; credentialMode: string; active: boolean | null; agentAllowed: boolean | null; production: boolean | null }[]
+  const refused = brokers
+    .filter((b) => b.credentialMode !== 'DESTINATION' || b.active === false || b.agentAllowed === false || b.production === true)
+    .map((b) => b.name)
   if (refused.length)
     req.reject(
       403,
-      `Broker(s) ${refused.join(', ')} cannot be used by AI agents (canRun = false): only active brokers with a BTP destination that an administrator made available to AI agents. ` +
+      `Broker(s) ${refused.join(', ')} cannot be used by AI agents (canRun = false): only active brokers with a BTP destination that an administrator made available to AI agents, never production brokers. ` +
         'The others need a password that a person enters - ask the user to run these tests in the app.'
     )
 }

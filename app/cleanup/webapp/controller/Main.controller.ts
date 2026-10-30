@@ -11,6 +11,7 @@ import MessageToast from "sap/m/MessageToast";
 import Dialog from "sap/m/Dialog";
 import Button from "sap/m/Button";
 import Input from "sap/m/Input";
+import CheckBox from "sap/m/CheckBox";
 import Label from "sap/m/Label";
 import Text from "sap/m/Text";
 import VBox from "sap/m/VBox";
@@ -299,6 +300,7 @@ export default class Main extends Controller {
     const current = this.selectedRule();
     const name = new Input({ value: (current?.getProperty("name") as string) ?? "", maxLength: 100 });
     const description = new Input({ value: (current?.getProperty("description") as string) ?? "", maxLength: 500 });
+    const automatic = new CheckBox({ text: this.text("rule.automatic"), selected: !!current?.getProperty("automatic") });
     const save: Button = new Button({
       text: this.text("rule.save"),
       type: "Emphasized",
@@ -306,13 +308,13 @@ export default class Main extends Controller {
         const n = name.getValue().trim();
         if (!n) return name.setValueState("Error");
         dialog.close();
-        void this.saveRule(n, description.getValue().trim());
+        void this.saveRule(n, description.getValue().trim(), automatic.getSelected());
       }
     });
     const dialog: Dialog = new Dialog({
       title: this.text("rule.saveAs"),
       content: new VBox({
-        items: [new Label({ text: this.text("rule.name"), labelFor: name, required: true }), name, new Label({ text: this.text("rule.description"), labelFor: description }), description]
+        items: [new Label({ text: this.text("rule.name"), labelFor: name, required: true }), name, new Label({ text: this.text("rule.description"), labelFor: description }), description, automatic, new Text({ text: this.text("rule.automatic.info") }).addStyleClass("sapUiTinyMarginTop")]
       }).addStyleClass("sapUiSmallMargin"),
       beginButton: save,
       endButton: new Button({ text: this.text("dialog.cancel"), press: () => dialog.close() }),
@@ -323,15 +325,15 @@ export default class Main extends Controller {
   }
 
   /** same name as a saved rule: that one is updated */
-  private async saveRule(name: string, description: string): Promise<void> {
+  private async saveRule(name: string, description: string, automatic: boolean): Promise<void> {
     const request = JSON.stringify(this.request());
     const existing = (this.rules().getCurrentContexts() as Context[]).find((c) => (c.getProperty("name") as string).toLowerCase() === name.toLowerCase());
     try {
       if (existing) {
-        await Promise.all([existing.setProperty("request", request), existing.setProperty("description", description)]);
+        await Promise.all([existing.setProperty("request", request), existing.setProperty("description", description), existing.setProperty("automatic", automatic)]);
         this.state.setProperty("/ruleId", existing.getProperty("ID"));
       } else {
-        const created = this.rules().create({ name, description, request });
+        const created = this.rules().create({ name, description, request, automatic });
         await created.created();
         this.state.setProperty("/ruleId", created.getProperty("ID"));
       }

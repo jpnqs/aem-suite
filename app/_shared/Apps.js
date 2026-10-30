@@ -17,6 +17,7 @@ sap.ui.define([], function () {
     variables: { intent: "AEMSuiteVariables-manage", icon: "sap-icon://key-user-settings", role: "admin" },
     numberranges: { intent: "AEMSuiteNumberRanges-manage", icon: "sap-icon://numbered-text", role: "admin" },
     cleanup: { intent: "AEMSuiteCleanup-manage", icon: "sap-icon://eraser", role: "admin" },
+    auditlog: { intent: "AEMSuiteAuditLog-display", icon: "sap-icon://history", role: "admin" },
     help: { intent: "AEMSuiteHelp-display", icon: "sap-icon://sys-help", role: null }
   };
 

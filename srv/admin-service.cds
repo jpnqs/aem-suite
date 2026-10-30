@@ -37,6 +37,10 @@ service AdminService {
 
   entity BrokerVariables as projection on db.Variables;
 
+  /** Who changed or did what (Audit Log app) - written by srv/lib/core/audit.ts, never changed. */
+  @readonly
+  entity AuditLog as projection on db.AuditLog;
+
   /** Messages and acknowledgement latency per broker and day (section "Last Days" of a broker). */
   @readonly
   entity BrokerDailyStats as

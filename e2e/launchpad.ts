@@ -11,6 +11,7 @@ export const apps = {
   variables: { intent: 'AEMSuiteVariables-manage', title: 'AEM Suite – Global Variables' },
   numberRanges: { intent: 'AEMSuiteNumberRanges-manage', title: 'AEM Suite – Number Ranges' },
   cleanup: { intent: 'AEMSuiteCleanup-manage', title: 'AEM Suite – Data Cleanup' },
+  auditLog: { intent: 'AEMSuiteAuditLog-display', title: 'AEM Suite – Audit Log' },
   help: { intent: 'AEMSuiteHelp-display', title: 'AEM Suite – Help' }
 } as const
 

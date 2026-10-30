@@ -1,6 +1,6 @@
 import { loadBroker, resolveConnection } from './resolve'
 import { Brokers, type ConnectionStatus } from '#cds-models/aem/suite'
-import { errMsg, truncate } from '../core/errors'
+import { errMsg, masked, truncate } from '../core/errors'
 import { columnLength } from '../core/model'
 import { connect } from '../solace/connector'
 
@@ -26,16 +26,19 @@ export async function checkConnection(
   const started = Date.now()
   let ok = false
   let message: string
+  let resolvedPassword: string | undefined
   try {
     const broker = await loadBroker(brokerId)
     const conn = await resolveConnection(broker, jwt, password, username)
+    resolvedPassword = conn.password
     if (maxTimeoutMs) conn.connectTimeoutMs = Math.min(conn.connectTimeoutMs ?? maxTimeoutMs, maxTimeoutMs)
     const session = await connect(conn)
     await session.close()
     ok = true
     message = `Connected to ${conn.url} (VPN ${conn.vpnName}) as ${conn.userName}`
   } catch (e) {
-    message = errMsg(e)
+    // never a password in the stored message, whatever the broker library put into its error
+    message = masked(masked(errMsg(e), password), resolvedPassword)
   }
   const status = {
     lastConnectionStatus: ok ? ('OK' as const) : ('ERROR' as const),

@@ -10,6 +10,7 @@ sap.ui.define(["module", "./Navigation"], function (module, Navigation) {
     variables: "3-global-variables-admin",
     numberranges: "number-ranges-admin",
     cleanup: "12-clean-up-old-data-admin",
+    auditlog: "13-audit-log-admin",
     folders: "4-organize-test-cases-in-folders",
     testcases: "5-create-and-edit-a-test-case",
     run: "6-run-tests",

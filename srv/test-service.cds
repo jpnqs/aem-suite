@@ -117,6 +117,8 @@ service TestService {
       url,
       msgVpn,
       active,
+      /** runs need options.confirmProduction */
+      production,
       lastConnectionStatus
     }
     where active = true;
@@ -334,6 +336,8 @@ service TestService {
     delayMs       : Integer;
     order         : String;
     stopOnFailure : Boolean;
+    /** required when a production broker is selected (Brokers.production) */
+    confirmProduction : Boolean;
   }
 
   type BrokerCredential : api.BrokerCredential;

@@ -6,6 +6,8 @@ import { registerMcpOAuth } from './lib/mcp-oauth'
 import { stopAll } from './lib/solace/subscription-hub'
 import { failRuns, stopAllRuns } from './lib/runs/test-runner'
 import { rememberUser } from './lib/core/users'
+import { registerAudit } from './lib/core/audit'
+import { startRetention, stopRetention } from './lib/cleanup/retention'
 
 // AI clients log in against XSUAA themselves (OAuth discovery for /mcp/agent).
 cds.on('bootstrap', (app) => registerMcpOAuth(app))
@@ -16,11 +18,17 @@ cds.on('bootstrap', (app) => registerMcpJson(app))
 // Runs execute in memory of this (single, see mta.yaml) instance: whatever was RUNNING when it stopped never finishes.
 cds.on('served', () => failRuns({}, 'The server restarted while the run was in progress'))
 
+// retention: the cleanup rules marked "automatic", once a day
+cds.on('served', () => startRetention())
+
 // names of the logged-in users for the "Created By" columns (the token has them, the database only the user id)
 cds.on('serving', (srv) => srv.before('*', (req) => rememberUser(req.user)))
 
+// who changed or did what: aem.suite.AuditLog (Audit Log app)
+cds.on('serving', (srv) => registerAudit(srv))
+
 // live subscriptions hold broker sessions; runs stop sending and end STOPPED (Cloud Foundry allows ~10 s after SIGTERM)
-cds.on('shutdown', () => Promise.all([stopAll(), stopAllRuns(8000)]))
+cds.on('shutdown', () => Promise.all([stopAll(), stopAllRuns(8000), stopRetention()]))
 
 // readiness for monitoring: the database answers (no data, no login - CAP's /health stays the liveness check of CF)
 cds.on('bootstrap', (app) => {

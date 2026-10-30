@@ -322,6 +322,30 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
       Prefs.set("runDelayMs", options.delayMs);
       Prefs.set("runOrder", options.order);
       Prefs.set("runStopOnFailure", options.stopOnFailure);
+      // production brokers: only after an explicit yes, every time
+      const production = selectedBrokers()
+        .filter((c) => c.getProperty("production") === true)
+        .map((c) => c.getProperty("name") as string);
+      if (production.length) {
+        MessageBox.warning(t("run.confirmProduction", [production.join(", ")]), {
+          actions: [t("run.sendToProduction"), MessageBox.Action.CANCEL],
+          emphasizedAction: MessageBox.Action.CANCEL,
+          onClose: (action: string | null) => {
+            if (action === t("run.sendToProduction")) start({ ...options, confirmProduction: true });
+          }
+        });
+        return;
+      }
+      start(options);
+    },
+    onClose(): void {
+      dialog.close();
+    }
+  };
+
+  function start(options: { repetitions: number; delayMs: number; order: string; stopOnFailure: boolean; confirmProduction?: boolean }): void {
+      const brokerIds = selectedBrokers().map((c) => c.getProperty("ID") as string);
+      const credentials = state.getProperty("/credentials") as CredentialRow[];
       state.setProperty("/starting", true);
       Actions.invokeAction<{ runId: string; total: number }>(model, "/runTests(...)", {
         testCaseIds,
@@ -344,11 +368,7 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
         })
         .catch((e) => MessageBox.error(errorText(e)))
         .finally(() => state.setProperty("/starting", false));
-    },
-    onClose(): void {
-      dialog.close();
-    }
-  };
+  }
 
   return (
     api.loadFragment({

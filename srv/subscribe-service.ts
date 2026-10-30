@@ -38,6 +38,11 @@ export default class SubscribeService extends cds.ApplicationService {
         password?: string
         username?: string
       }
+      // consuming takes the messages off the queue: on a production broker only for administrators
+      if (sourceType === 'QUEUE_CONSUME' && !req.user.is('Admin')) {
+        const broker = await SELECT.one.from(Brokers).columns('production', 'name').where({ ID: brokerId })
+        if (broker?.production) return req.reject(403, `${broker.name} is a production broker - only administrators consume from its queues (browsing is possible)`)
+      }
       const subscriptionId = await startSubscription({
         brokerId,
         sourceType,

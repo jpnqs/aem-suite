@@ -120,6 +120,10 @@ modules:
           artifacts:
             - comaemsuitecleanup.zip
           target-path: resources/
+        - name: aem-suite-auditlog
+          artifacts:
+            - comaemsuiteauditlog.zip
+          target-path: resources/
         - name: aem-suite-help
           artifacts:
             - comaemsuitehelp.zip
@@ -247,6 +251,15 @@ modules:
   - name: aem-suite-cleanup
     type: html5
     path: app/cleanup
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm run build
+      supported-platforms: []
+  - name: aem-suite-auditlog
+    type: html5
+    path: app/auditlog
     build-parameters:
       build-result: dist
       builder: custom
