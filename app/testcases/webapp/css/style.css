@@ -74,3 +74,77 @@
   border: 1px solid var(--sapList_BorderColor);
   padding: 0.25rem 0.5rem;
 }
+
+/* tags as pills (ext/TagsInput.ts): rounded, each tag in one of the theme's indication colors */
+.aemTag.sapMToken {
+  border-radius: 1rem;
+  padding-inline: 0.625rem;
+  font-weight: 600;
+}
+
+.aemTag1.sapMToken {
+  background: var(--sapIndicationColor_1b_Background);
+  border-color: var(--sapIndicationColor_1b_BorderColor);
+  color: var(--sapIndicationColor_1b_TextColor);
+}
+.aemTag1.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_1b_TextColor); }
+
+.aemTag2.sapMToken {
+  background: var(--sapIndicationColor_2b_Background);
+  border-color: var(--sapIndicationColor_2b_BorderColor);
+  color: var(--sapIndicationColor_2b_TextColor);
+}
+.aemTag2.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_2b_TextColor); }
+
+.aemTag3.sapMToken {
+  background: var(--sapIndicationColor_3b_Background);
+  border-color: var(--sapIndicationColor_3b_BorderColor);
+  color: var(--sapIndicationColor_3b_TextColor);
+}
+.aemTag3.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_3b_TextColor); }
+
+.aemTag4.sapMToken {
+  background: var(--sapIndicationColor_4b_Background);
+  border-color: var(--sapIndicationColor_4b_BorderColor);
+  color: var(--sapIndicationColor_4b_TextColor);
+}
+.aemTag4.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_4b_TextColor); }
+
+.aemTag5.sapMToken {
+  background: var(--sapIndicationColor_5b_Background);
+  border-color: var(--sapIndicationColor_5b_BorderColor);
+  color: var(--sapIndicationColor_5b_TextColor);
+}
+.aemTag5.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_5b_TextColor); }
+
+.aemTag6.sapMToken {
+  background: var(--sapIndicationColor_6b_Background);
+  border-color: var(--sapIndicationColor_6b_BorderColor);
+  color: var(--sapIndicationColor_6b_TextColor);
+}
+.aemTag6.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_6b_TextColor); }
+
+.aemTag7.sapMToken {
+  background: var(--sapIndicationColor_7b_Background);
+  border-color: var(--sapIndicationColor_7b_BorderColor);
+  color: var(--sapIndicationColor_7b_TextColor);
+}
+.aemTag7.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_7b_TextColor); }
+
+.aemTag8.sapMToken {
+  background: var(--sapIndicationColor_8b_Background);
+  border-color: var(--sapIndicationColor_8b_BorderColor);
+  color: var(--sapIndicationColor_8b_TextColor);
+}
+.aemTag8.sapMToken .sapMTokenIcon { color: var(--sapIndicationColor_8b_TextColor); }
+
+/* read only (table, display mode): just the pills, no field around them */
+.aemTags.sapMInputBaseReadonly .sapMInputBaseContentWrapper,
+.aemTags.sapMInputBaseReadonly .sapMInputBaseContentWrapper::after {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.aemTags.sapMInputBaseReadonly .sapMInputBaseInner {
+  display: none;
+}

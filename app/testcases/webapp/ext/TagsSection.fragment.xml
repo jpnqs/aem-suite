@@ -1,0 +1,18 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:ext="com.aem.suite.testcases.ext">
+  <!-- Tags of a test case or folder as pills (ext/TagsInput.ts): typed in edit mode, read only otherwise -->
+  <VBox
+    core:require="{handler: 'com/aem/suite/testcases/ext/TagsSection'}"
+    width="100%">
+    <ext:TagsInput
+      tags="{tags}"
+      editable="{ui>/isEditable}"
+      width="100%"
+      placeholder="{parts: ['ui>/isEditable', 'i18n>tags.placeholder'], formatter: 'handler.placeholder'}"
+      invalidText="{i18n>tags.invalid}"
+      ariaLabelledBy="fe::CustomSection::tags" />
+    <Text text="{i18n>tags.none}" visible="{parts: ['ui>/isEditable', {path: 'tags', targetType: 'any'}], formatter: 'handler.showsNone'}" class="sapThemeMetaText" />
+  </VBox>
+</core:FragmentDefinition>

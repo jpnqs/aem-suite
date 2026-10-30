@@ -1,0 +1,6 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns:ext="com.aem.suite.testcases.ext">
+  <!-- Tags column of the test case tree: the tags as pills (ext/TagsInput.ts), read only -->
+  <ext:TagsInput tags="{tags}" editable="false" width="100%" />
+</core:FragmentDefinition>

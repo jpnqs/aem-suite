@@ -1,7 +1,8 @@
 <core:FragmentDefinition
   xmlns:core="sap.ui.core"
   xmlns="sap.m"
-  xmlns:f="sap.ui.layout.form">
+  xmlns:f="sap.ui.layout.form"
+  xmlns:ext="com.aem.suite.testcases.ext">
   <!-- "Edit Selected": changes many test cases at once (TestService.bulkUpdate). Empty fields stay unchanged. -->
   <Dialog
     title="{i18n>bulk.title}"
@@ -13,9 +14,9 @@
         <MessageStrip text="{bulk>/info}" type="Information" showIcon="true" class="sapUiSmallMarginBottom" />
         <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanM="4" labelSpanL="4">
           <Label text="{i18n>bulk.addTags}" />
-          <Input value="{bulk>/addTags}" placeholder="{i18n>bulk.tagsPlaceholder}" />
+          <ext:TagsInput tags="{bulk>/addTags}" placeholder="{i18n>bulk.tagsPlaceholder}" invalidText="{i18n>tags.invalid}" />
           <Label text="{i18n>bulk.removeTags}" />
-          <Input value="{bulk>/removeTags}" placeholder="{i18n>bulk.tagsPlaceholder}" />
+          <ext:TagsInput tags="{bulk>/removeTags}" placeholder="{i18n>bulk.tagsPlaceholder}" invalidText="{i18n>tags.invalid}" />
           <Label text="{i18n>bulk.deliveryMode}" />
           <Select selectedKey="{bulk>/deliveryMode}" forceSelection="false">
             <core:Item key="" text="{i18n>bulk.unchanged}" />

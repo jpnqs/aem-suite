@@ -45,7 +45,7 @@ annotate service.TestCases with @(
     {Value: name},
     // "Type" is a custom icon column (ext/TypeColumn.fragment.xml, see manifest)
     {Value: topic},
-    {Value: tags},
+    // "Tags" is a custom column of pills (ext/TagsColumn.fragment.xml, see manifest)
     {
       Value      : lastResult.status,
       Criticality: lastResult.criticality,
@@ -95,7 +95,6 @@ annotate service.TestCases with @(
     {Value: priority},
     {Value: dmqEligible}
   ]},
-  UI.FieldGroup #Tags: {Data: [{Value: tags}]},
   // folder contents: the subfolders and test cases directly below a folder, in tree order
   UI.LineItem #Children: [
     {
@@ -139,12 +138,7 @@ annotate service.TestCases with @(
       Label        : '{i18n>Contents}',
       ![@UI.Hidden]: (kind <> 'FOLDER')
     },
-    {
-      $Type : 'UI.ReferenceFacet',
-      ID    : 'Tags',
-      Target: '@UI.FieldGroup#Tags',
-      Label : '{i18n>Tags}'
-    },
+    // tags: custom section "tags" of pills (see manifest)
     {
       $Type : 'UI.ReferenceFacet',
       ID    : 'Variables',

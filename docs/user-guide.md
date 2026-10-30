@@ -262,7 +262,7 @@ Open it, click **Edit**, change, click **Save** at the bottom. **Discard Draft**
 | **Time to Live (ms)**, **Priority**, **DMQ Eligible** | empty | empty = no expiry / broker default |
 | **User Properties** | – | name, type and value of SMF user properties; values may use variables; an empty type is detected (`42` Integer, `true` Boolean, else String) |
 | **Variables** | – | values for this test case only – they win over all others |
-| **Tags** | – | words to find and run test cases by, e.g. `smoke, regression` (test cases and folders). Stored in lower case; one word each (letters, digits, `.` `_` `-`) |
+| **Tags** | – | words to find and run test cases by, e.g. `smoke`, `regression` (test cases and folders). Type a word and press Enter, a comma or a blank: it becomes a colored pill; × removes it. Stored in lower case; one word each (letters, digits, `.` `_` `-`) |
 
 Save before running – a draft cannot be run.
 

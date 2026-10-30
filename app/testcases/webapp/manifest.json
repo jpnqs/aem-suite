@@ -152,6 +152,18 @@
                         "placement": "After",
                         "anchor": "DataField::name"
                       }
+                    },
+                    "tags": {
+                      "header": "{{column.tags}}",
+                      "template": "com.aem.suite.testcases.ext.TagsColumn",
+                      "width": "14rem",
+                      "properties": [
+                        "tags"
+                      ],
+                      "position": {
+                        "placement": "After",
+                        "anchor": "DataField::topic"
+                      }
                     }
                   },
                   "tableSettings": {
@@ -290,6 +302,14 @@
                       "position": {
                         "placement": "After",
                         "anchor": "message"
+                      }
+                    },
+                    "tags": {
+                      "template": "com.aem.suite.testcases.ext.TagsSection",
+                      "title": "{{section.tags}}",
+                      "position": {
+                        "placement": "Before",
+                        "anchor": "Variables"
                       }
                     },
                     "documentation": {
