@@ -30,9 +30,28 @@ sap.ui.define(["module", "./Apps"], function (module, Apps) {
     return { target: { semanticObject: intent[0], action: intent[1] }, appSpecificRoute: "&/" + (target.path || "") };
   }
 
+  /**
+   * The address of the launchpad page that shows this app. In the suite's own launchpad that is this page. In SAP
+   * Build Work Zone the app runs in an iframe: this page is the app, the site is the window around it - a hash of
+   * the shell only means something there. Readable when the site and the app share the origin (Work Zone serves
+   * both from the site's host); otherwise the frame's referrer is the site page.
+   */
+  function launchpadPage() {
+    if (window.top && window.top !== window) {
+      try {
+        return window.top.location.href.split("#")[0];
+      } catch (e) {
+        if (document.referrer) {
+          return document.referrer.split("#")[0];
+        }
+      }
+    }
+    return window.location.href.split("#")[0];
+  }
+
   /** The address the launchpad of this page has for a hash ("#AEMSuite...") */
   function pageUrl(href) {
-    return href.charAt(0) === "#" ? window.location.href.split("#")[0] + href : href;
+    return href.charAt(0) === "#" ? launchpadPage() + href : href;
   }
 
   /**
