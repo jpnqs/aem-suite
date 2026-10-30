@@ -223,6 +223,14 @@ service TestService {
    */
   action bulkUpdate(ids : many UUID not null, changes : BulkChanges) returns BulkResult;
 
+  /** All tags in use, the most used first (value help of the tags field). */
+  function knownTags() returns many TagCount;
+
+  type TagCount {
+    tag   : String;
+    count : Integer;
+  }
+
   type BulkChanges {
     deliveryMode : String;
     ackTimeoutMs : Integer;

@@ -81,5 +81,16 @@ describe('versions, tags and bulk edit', () => {
     const partly = await POST('/odata/v4/test/bulkUpdate', { ids: [a.ID, b.ID], changes: { addTags: 'x' } }, tester)
     expect(partly.data).toEqual(expect.objectContaining({ updated: 1, skipped: ['b'] }))
     expect((await POST('/odata/v4/test/bulkUpdate', { ids: [a.ID], changes: {} }, tester)).status).toBe(400)
+
+  })
+
+  it('lists the tags in use with their counts, the most used first (value help)', async () => {
+    const res = await GET('/odata/v4/test/knownTags()', tester)
+    expect(res.status).toBe(200)
+    const tags = res.data.value as { tag: string; count: number }[]
+    const counts = Object.fromEntries(tags.map((t) => [t.tag, t.count]))
+    // from the tests above: a, the folder and the restored test case
+    expect(counts).toMatchObject({ regression: 2, x: 1 })
+    expect(tags.map((t) => t.count)).toEqual([...tags.map((t) => t.count)].sort((p, q) => q - p))
   })
 })
