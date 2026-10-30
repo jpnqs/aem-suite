@@ -106,7 +106,8 @@ export async function exportNodes(ids?: string[] | null): Promise<ExportResult> 
   const toDoc = (id: string): NodeDoc => {
     const r = byId.get(id)!
     const variables = sorted(r.variables)?.map((v) => compact({ name: v.name, value: v.value ?? '' }) as VariableDoc)
-    const fields = (names: readonly string[]) => Object.fromEntries(names.map((f) => [f, r[f]]))
+    // the documentation (description) is always in the file, empty if there is none
+    const fields = (names: readonly string[]) => Object.fromEntries(names.map((f) => [f, f === 'description' ? (r[f] ?? '') : r[f]]))
     if (r.kind === 'FOLDER') {
       folders++
       return compact({

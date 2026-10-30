@@ -24,6 +24,10 @@ service TestService {
       case when createdBy = $user then true else false end         as createdByMe : Boolean,
       // navigation target (launchpad intent) of the name column of the folder contents
       '#AEMSuiteTestCases-manage&/TestCases(ID=' || ID || ',IsActiveEntity=true)' as nodeLink : String,
+      // the documentation (description, Markdown) as HTML for the rich text editor - converted both ways by srv/test-service.ts
+      // written too (not computed): the editor sends its HTML here
+      @Core.Computed: false
+      virtual null as descriptionHtml : LargeString,
       // computed by CAP for hierarchy requests of the tree table
       null as LimitedDescendantCount : Int16,
       null as DistanceFromRoot       : Int16,

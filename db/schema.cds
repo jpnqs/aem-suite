@@ -173,7 +173,8 @@ entity TestCases : cuid, managed {
   sortOrder      : Integer default 0;
   /** empty = taken from the topic (test cases) */
   name           : String(200);
-  description    : String(1000);
+  /** documentation (Markdown) */
+  description    : LargeString;
   /** topic template, e.g. acme/orders/{{region}}/created/v1/{{uuid}} - required for test cases */
   topic          : String(500);
   /** JSON payload template */
@@ -424,7 +425,7 @@ annotate Variables with {
 annotate TestCases with {
   name          @title: '{i18n>Name}'  @Common.QuickInfo: '{i18n>InfoTestCasesEmptyTopic}';
   kind          @title: '{i18n>Type}';
-  description   @title: '{i18n>Description}';
+  description   @title: '{i18n>Documentation}';
   topic         @title: '{i18n>Topic}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur}';
   payload       @title: '{i18n>Payload}';
   contentType   @title: '{i18n>ContentType}'  @Common.QuickInfo: '{i18n>InfoDefaultApplicationJsonEmptyDetectedO}';

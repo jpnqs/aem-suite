@@ -215,7 +215,7 @@ To copy test cases to another system, share them or keep them in Git:
 
 2. In the other system select the target folder (or nothing for the top level), click **Import** and choose the file. It is checked and you confirm.
 
-- The file holds everything that defines a test – topic, payload, settings, user properties, variables (also of folders) – but no results, authors or broker data.
+- The file holds everything that defines a test – topic, payload, settings, documentation, user properties, variables (also of folders) – but no results, authors or broker data.
 - **Import only adds**: importing a file twice gives two copies. **All or nothing**: if anything is wrong, nothing is imported and every problem is listed with its place, e.g. `Orders / Order created: payload: Payload is not valid JSON`.
 
 ---
@@ -250,7 +250,7 @@ Open it, click **Edit**, change, click **Save** at the bottom. **Discard Draft**
 | **Topic** | – (required) | where to publish. Variables yes, wildcards (`*`, `>`) no. One line: **Enter** adds nothing, **Tab** moves on. |
 | **Name** | the topic | your own name stays once you typed it |
 | **Payload** | a small sample | JSON editor: **Valid / Invalid JSON** status, **Format**, **(?)** lists all expressions. Placeholders may also stand outside strings: `"qty": {{qty}}` |
-| **Description** | – | free text (under *Show more* / tab **Advanced**) |
+| **Documentation** | – | section **Documentation** (test cases and folders): what the test is for, with headings, lists, links and tables. Kept as Markdown – **Export as Markdown** saves it as a `.md` file named after the test case |
 | **Delivery Mode** | Persistent | **Persistent (Guaranteed)**: passes when the broker acknowledges. **Direct**: passes when sent. |
 | **Correlation ID** | `{{uuid}}` | set on the message |
 | **Content Type** | `application/json` | empty = detected from the payload |

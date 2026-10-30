@@ -72,8 +72,8 @@ annotate service.TestCases with @(
     {Value: lastResult.brokers},
     {Value: lastResult.message}
   ]},
+  // description: the documentation, custom section "documentation" (see manifest)
   UI.FieldGroup #Advanced: {Data: [
-    {Value: description},
     {Value: deliveryMode},
     {Value: correlationId},
     {Value: contentType},
@@ -197,6 +197,7 @@ annotate service.TestCases with @(
   // name of the creator; the user id alone if that user has not logged in since names are kept
   createdByMe   @UI.HiddenFilter;
   nodeLink      @UI.Hidden;
+  descriptionHtml @UI.Hidden;
   createdBy     @UI.HiddenFilter: false
                 @Common.Text: creator.name
                 @Common.TextArrangement: #TextFirst

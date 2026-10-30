@@ -5,6 +5,7 @@ import { templateHints } from './lib/runs/template-hints'
 import { BrokerCredential, cancelRun, RunOptions, startRun, toCredentials } from './lib/runs/test-runner'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/core/defaults'
 import { copyNodes } from './lib/testcases/copy-nodes'
+import { documentationFromHtml, renderDocumentation } from './lib/testcases/documentation'
 import { exportNodes, importNodes } from './lib/testcases/export-import'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/testcases/node-validation'
 import { selectNodeDeep } from './lib/testcases/nodes'
@@ -12,6 +13,8 @@ import { columnLength } from './lib/core/model'
 import { idOf, keyOf } from './lib/core/request'
 import type { TestCaseRecord } from './lib/runs/test-case-spec'
 import { moveBefore } from './lib/testcases/tree'
+
+type Documented = { description?: string | null; descriptionHtml?: string | null }
 
 export default class TestService extends cds.ApplicationService {
   async init() {
@@ -46,6 +49,24 @@ export default class TestService extends cds.ApplicationService {
       const parentOk = await validateParent(d, d.ID ?? keyOf(req).ID, reject)
       if (parentOk && req.event === 'CREATE' && !d.sortOrder) d.sortOrder = await nextSortOrder(d.parent_ID)
       validateNode(d, req.event, reject)
+    })
+
+    // documentation: stored as Markdown (description), edited as HTML in the rich text editor of the object page
+    // (descriptionHtml) - lib/testcases/documentation.ts converts both ways
+    this.before('UPDATE', TestCases.drafts!, (req) => {
+      const d = req.data as Documented
+      if (d.descriptionHtml === undefined) return
+      d.description = documentationFromHtml(d.descriptionHtml)
+      delete d.descriptionHtml
+    })
+    this.before('READ', [TestCases, TestCases.drafts!], (req) => {
+      const columns = (req.query as { SELECT?: { columns?: { ref?: string[] }[] } }).SELECT?.columns
+      const has = (name: string) => columns?.some((c) => c.ref?.length === 1 && c.ref[0] === name)
+      if (columns && has('descriptionHtml') && !has('description')) columns.push({ ref: ['description'] })
+    })
+    this.after(['READ', 'UPDATE'], [TestCases, TestCases.drafts!], (rows) => {
+      for (const row of (Array.isArray(rows) ? rows : [rows]) as (Documented | undefined)[])
+        if (row && typeof row === 'object' && row.description !== undefined) row.descriptionHtml = renderDocumentation(row.description)
     })
 
     // the latest outcome of a test case is an association (not part of the draft): remove the stats of deleted nodes

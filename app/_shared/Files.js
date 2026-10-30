@@ -5,9 +5,9 @@ sap.ui.define([], function () {
   var REVOKE_URL_MS = 1000;
 
   return {
-    /** Lets the browser save text as a JSON file. */
-    download: function (filename, text) {
-      var url = URL.createObjectURL(new window.Blob([text], { type: "application/json" }));
+    /** Lets the browser save text as a file - a JSON file unless another media type is given. */
+    download: function (filename, text, type) {
+      var url = URL.createObjectURL(new window.Blob([text], { type: type || "application/json" }));
       var link = document.createElement("a");
       link.href = url;
       link.download = filename;

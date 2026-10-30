@@ -103,7 +103,7 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
     kind: 'TEST',
     parent_ID: null,
     name: truncate(`From ${m.topic}`, columnLength('TestCases', 'name')),
-    description: truncate(`Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`, columnLength('TestCases', 'description')),
+    description: `Created from message received on ${m.source} (${m.brokerName ?? 'unknown broker'}) at ${m.receivedAt}`,
     topic: m.topic,
     payload,
     contentType: m.contentType || detectContentType(payload),

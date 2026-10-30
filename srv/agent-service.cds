@@ -174,6 +174,7 @@ service TestAgentService {
   action createFolder(
                       /** Folder name (required) */
                       name : String,
+                      /** Documentation (Markdown) */
                       description : String,
                       parentId : UUID,
                       variables : many VariableInput) returns NodeRef;
@@ -196,6 +197,7 @@ service TestAgentService {
                         priority : Integer,
                         correlationId : String,
                         ackTimeoutMs : Integer,
+                        /** Documentation (Markdown) */
                         description : String,
                         parentId : UUID,
                         userProperties : many PropertyInput,

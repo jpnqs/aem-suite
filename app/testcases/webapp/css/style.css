@@ -22,3 +22,55 @@
 .aemTopicEditor .ace_keyboard-focus:focus {
   box-shadow: none;
 }
+
+/* the rendered Markdown (srv/lib/testcases/documentation.ts) in the fonts and colors of the theme */
+.aemDocumentation {
+  font-family: var(--sapFontFamily);
+  font-size: var(--sapFontSize);
+  color: var(--sapTextColor);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.aemDocumentation h1,
+.aemDocumentation h2,
+.aemDocumentation h3,
+.aemDocumentation h4 {
+  font-family: var(--sapFontHeaderFamily);
+  color: var(--sapTitleColor);
+  margin: 1rem 0 0.5rem;
+}
+
+.aemDocumentation h1 { font-size: var(--sapFontHeader3Size); }
+.aemDocumentation h2 { font-size: var(--sapFontHeader4Size); }
+.aemDocumentation h3,
+.aemDocumentation h4 { font-size: var(--sapFontHeader5Size); }
+
+.aemDocumentation > :first-child { margin-top: 0; }
+
+.aemDocumentation a { color: var(--sapLinkColor); }
+
+.aemDocumentation code,
+.aemDocumentation pre {
+  font-family: var(--sapFontFamilyMonospace, monospace);
+  background: var(--sapNeutralBackgroundColor);
+  border-radius: 0.25rem;
+}
+
+.aemDocumentation code { padding: 0 0.25rem; }
+.aemDocumentation pre { padding: 0.5rem; overflow-x: auto; }
+.aemDocumentation pre code { padding: 0; background: none; }
+
+.aemDocumentation blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  border-left: 0.25rem solid var(--sapGroup_ContentBorderColor);
+  color: var(--sapContent_LabelColor);
+}
+
+.aemDocumentation table { border-collapse: collapse; }
+.aemDocumentation th,
+.aemDocumentation td {
+  border: 1px solid var(--sapList_BorderColor);
+  padding: 0.25rem 0.5rem;
+}

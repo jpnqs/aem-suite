@@ -60,6 +60,7 @@ describe('export / import of test cases and folders', () => {
       expect(eu.children[0]).toEqual({
         kind: 'TEST',
         name: 'Order created',
+        description: '', // the documentation is always in the file
         topic: '{{domain}}/{{region}}/created/{{uuid}}',
         payload: '{"id":"{{uuid}}","qty":{{randomInt(1,5)}}}',
         contentType: 'application/json',

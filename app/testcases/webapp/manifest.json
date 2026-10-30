@@ -59,6 +59,7 @@
         "sap.ui.core": {},
         "sap.fe.templates": {},
         "sap.ui.codeeditor": {},
+        "sap.ui.richtexteditor": {},
         "sap.ui.layout": {}
       }
     },
@@ -284,6 +285,14 @@
                       "position": {
                         "placement": "After",
                         "anchor": "message"
+                      }
+                    },
+                    "documentation": {
+                      "template": "com.aem.suite.testcases.ext.DocumentationSection",
+                      "title": "{{section.documentation}}",
+                      "position": {
+                        "placement": "After",
+                        "anchor": "UserProperties"
                       }
                     }
                   }
