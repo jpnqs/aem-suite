@@ -1,5 +1,0 @@
-code;name;descr;position
-NONE;Acknowledgement only;The broker accepted the message;1
-TOPIC;Message on a topic;A message arrives on a topic subscription;2
-QUEUE;Message on a queue;A message arrives on a queue (it is consumed);3
-REPLY;Reply;An answer to the message arrives on its reply-to topic (request/reply);4

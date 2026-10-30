@@ -82,13 +82,6 @@ annotate service.TestCases with @(
     {Value: priority},
     {Value: dmqEligible}
   ]},
-  // expected outcome: the message that has to arrive after sending, and its checks
-  UI.FieldGroup #Expectation: {Data: [
-    {Value: expectMode},
-    {Value: expectSource},
-    {Value: expectTimeoutMs},
-    {Value: expectCorrelation}
-  ]},
   // folder contents: the subfolders and test cases directly below a folder, in tree order
   UI.LineItem #Children: [
     {
@@ -139,26 +132,6 @@ annotate service.TestCases with @(
       Label : '{i18n>Variables}'
     },
     {
-      $Type        : 'UI.CollectionFacet',
-      ID           : 'ExpectedOutcome',
-      Label        : '{i18n>ExpectedOutcome}',
-      ![@UI.Hidden]: (kind = 'FOLDER'),
-      Facets       : [
-        {
-          $Type : 'UI.ReferenceFacet',
-          ID    : 'Expectation',
-          Target: '@UI.FieldGroup#Expectation',
-          Label : '{i18n>ExpectedMessage}'
-        },
-        {
-          $Type : 'UI.ReferenceFacet',
-          ID    : 'Checks',
-          Target: 'checks/@UI.LineItem',
-          Label : '{i18n>Checks}'
-        }
-      ]
-    },
-    {
       $Type        : 'UI.ReferenceFacet',
       ID           : 'UserProperties',
       Target       : 'userProperties/@UI.LineItem',
@@ -196,25 +169,6 @@ annotate service.TestCases with @(
                     {
                       $Type            : 'Common.ValueListParameterInOut',
                       LocalDataProperty: deliveryMode,
-                      ValueListProperty: 'code'
-                    },
-                    {
-                      $Type            : 'Common.ValueListParameterDisplayOnly',
-                      ValueListProperty: 'name'
-                    }
-                  ]
-                };
-  expectModeInfo @UI.Hidden;
-  expectMode    @Common.Text: expectModeInfo.name
-                @Common.TextArrangement: #TextOnly
-                @Common.ValueListWithFixedValues
-                @Common.ValueList: {
-                  CollectionPath   : 'ExpectModes',
-                  PresentationVariantQualifier: 'byPosition',
-                  Parameters       : [
-                    {
-                      $Type            : 'Common.ValueListParameterInOut',
-                      LocalDataProperty: expectMode,
                       ValueListProperty: 'code'
                     },
                     {
@@ -300,63 +254,6 @@ annotate service.TestCaseProperties with @(
             }
           ]
         };
-};
-
-annotate service.TestCaseChecks with @(
-  UI.HeaderInfo: {
-    TypeName      : '{i18n>Check}',
-    TypeNamePlural: '{i18n>Checks}'
-  },
-  UI.PresentationVariant: {
-    SortOrder     : [{Property: position}],
-    Visualizations: ['@UI.LineItem']
-  },
-  UI.LineItem  : [
-    {Value: position},
-    {Value: target},
-    {Value: path},
-    {Value: operator},
-    {Value: value}
-  ]
-) {
-  targetInfo   @UI.Hidden;
-  operatorInfo @UI.Hidden;
-  target   @Common.Text: targetInfo.name
-           @Common.TextArrangement: #TextOnly
-           @Common.ValueListWithFixedValues
-           @Common.ValueList: {
-             CollectionPath   : 'CheckTargets',
-             PresentationVariantQualifier: 'byPosition',
-             Parameters       : [
-               {
-                 $Type            : 'Common.ValueListParameterInOut',
-                 LocalDataProperty: target,
-                 ValueListProperty: 'code'
-               },
-               {
-                 $Type            : 'Common.ValueListParameterDisplayOnly',
-                 ValueListProperty: 'name'
-               }
-             ]
-           };
-  operator @Common.Text: operatorInfo.name
-           @Common.TextArrangement: #TextOnly
-           @Common.ValueListWithFixedValues
-           @Common.ValueList: {
-             CollectionPath   : 'CheckOperators',
-             PresentationVariantQualifier: 'byPosition',
-             Parameters       : [
-               {
-                 $Type            : 'Common.ValueListParameterInOut',
-                 LocalDataProperty: operator,
-                 ValueListProperty: 'code'
-               },
-               {
-                 $Type            : 'Common.ValueListParameterDisplayOnly',
-                 ValueListProperty: 'name'
-               }
-             ]
-           };
 };
 
 // TestCaseVariables: the layout of all variables lists, app/common.cds

@@ -110,17 +110,16 @@ mta.yaml, xs-security.json    deployment
 |---|---|---|
 | `Brokers` | Broker / message VPN | `credentialMode` DIRECT or DESTINATION; DIRECT keeps `url`, `msgVpn`, an optional `username` (if empty it is entered at run time) – **no password field**; `lastConnection*` holds the last connection test; `agentAllowed` (default true) lets AI agents use a DESTINATION broker. Composition `variables` (broker variables). |
 | `Variables` | Template variables | `broker` empty = global variable, set = broker variable. |
-| `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`; expected outcome `expectMode` (NONE/TOPIC/QUEUE/REPLY), `expectSource`, `expectTimeoutMs`, `expectCorrelation`. Compositions `userProperties`, `checks`, `variables`. Association `lastResult` → `TestCaseStats`. |
+| `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`. Compositions `userProperties`, `variables`. Association `lastResult` → `TestCaseStats`. |
 | `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
-| `TestCaseChecks` | Checks of the expected message | `target` (JSON_PATH, PAYLOAD, PROPERTY, TOPIC, CORRELATION_ID, CONTENT_TYPE), `path`, `operator` (EQUALS, NOT_EQUALS, CONTAINS, MATCHES, EXISTS, NOT_EXISTS), `value` (template), `position`. |
 | `TestCaseVariables` | Variables of a test case **or a folder** | Folder variables apply to all descendants. |
 | `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases (an association, so drafts do not copy it). `TestService` deletes the stats of deleted test cases. |
 | `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED/STOPPED (FAILED = aborted, `failRuns`; STOPPED = stopped by its user, `cancelRun`), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `repetitionOrder` (ROUND / EACH), `delayMs`, `stopOnFailure`. Composition `results`. |
-| `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message; with an expected outcome `expectMode`, `receivedTopic`, `receivedPayload`, `receiveLatencyMs` and the composition `checks` (`RunResultChecks`: description, passed, value found). Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
+| `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
 | `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
 | `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name (`@assert.unique`; the service also refuses the same name in another case), prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
 | `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
-| `CredentialModes`, `DeliveryModes`, `PropertyTypes`, `ExpectModes`, `CheckTargets`, `CheckOperators` | Code lists for dropdowns | CSV in `db/data`. |
+| `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
 
 All enum types carry `@assert.range`, and so do the numeric limits `ackTimeoutMs` (100–120 000), `priority` (0–255) and `connectTimeoutMs` (1 000–120 000): CAP rejects other values on every OData write. Writes that bypass OData (AI agent, import, copy, test case from a message) are checked by `srv/lib/testcases/node-validation.ts`, which reads the same limits from the model (`srv/lib/core/model.ts`).
 
@@ -394,10 +393,6 @@ Variables may reference other variables (depth 5, cycle detection). Unknown name
 ### 7.5 `runs/test-case-spec.ts`
 
 Loads test cases with properties and variables, builds the variable scopes (`loadVariableScopes`: global, per broker, per folder + the tree), computes the folder chain of a node (`scopeFor`) and turns a test case into a `PublishSpec` (`buildSpec`): rejects empty topics and wildcards, applies content-type detection and property-type inference as fallbacks.
-
-### 7.5a `runs/expectations.ts` – expected outcome
-
-A test case with `expectMode` other than NONE waits for a message after sending. `buildSpec` resolves `expectSource` and the check values with the **same** template resolver as the message, so `{{uuid}}` in a check is the uuid that was sent; REPLY without a source gets `aem-suite/reply/<uuid>` and sets it as reply-to of the message. The runner calls `Publisher.listen` **before** publishing (TOPIC/REPLY: a topic subscription on the run's session, filtered with `topicMatches`; QUEUE: a CLIENT-ack consumer that acknowledges only the accepted message), then waits the rest of `expectTimeoutMs`. With `expectCorrelation` only a message with the sent correlation ID is accepted. `evaluateChecks` compares; the result is PASSED only if the message arrived and every check held, the checks are stored in `RunResultChecks`. `checkProblem` is the save-time validation (path readable, regex valid unless templated).
 
 ### 7.6 `runs/test-runner.ts`
 

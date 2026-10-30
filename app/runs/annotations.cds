@@ -178,15 +178,7 @@ annotate service.RunResults with @(
       Criticality: statusCriticality
     },
     {Value: ackLatencyMs},
-    {Value: receiveLatencyMs},
     {Value: executedAt}
-  ]},
-  // the expected message (test cases with an expected outcome): what arrived and how the checks went
-  UI.FieldGroup #Received: {Data: [
-    {Value: expectMode},
-    {Value: receivedTopic},
-    {Value: receiveLatencyMs},
-    {Value: receivedPayload}
   ]},
   UI.FieldGroup #Message: {Data: [
     {
@@ -216,37 +208,13 @@ annotate service.RunResults with @(
       ID    : 'Message',
       Target: '@UI.FieldGroup#Message',
       Label : '{i18n>Message}'
-    },
-    // the payload: custom section with a code editor (app/runs/webapp/ext/ResolvedPayload), placed after "Message"
-    {
-      $Type        : 'UI.CollectionFacet',
-      ID           : 'ExpectedOutcome',
-      Label        : '{i18n>ExpectedOutcome}',
-      ![@UI.Hidden]: (expectMode = null),
-      Facets       : [
-        {
-          $Type : 'UI.ReferenceFacet',
-          ID    : 'Received',
-          Target: '@UI.FieldGroup#Received',
-          Label : '{i18n>ExpectedMessage}'
-        },
-        {
-          $Type : 'UI.ReferenceFacet',
-          ID    : 'Checks',
-          Target: 'checks/@UI.LineItem',
-          Label : '{i18n>Checks}'
-        }
-      ]
     }
+    // the payload: custom section with a code editor (app/runs/webapp/ext/ResolvedPayload)
   ]
 ) {
   sequence          @UI.Hidden;
   resolvedTopic     @UI.MultiLineText;
   resolvedPayload   @UI.MultiLineText;
-  receivedTopic     @UI.MultiLineText;
-  expectModeInfo    @UI.Hidden;
-  expectMode        @Common.Text: expectModeInfo.name  @Common.TextArrangement: #TextOnly;
-  receivedPayload   @UI.MultiLineText;
   runStartedAt      @UI.HiddenFilter: false;
   // value helps of the filters: the values of the existing results and runs
   runStartedBy      @UI.HiddenFilter: false
@@ -327,22 +295,4 @@ annotate service.RunResults with @(
   broker            @UI.Hidden;
   statusInfo        @UI.Hidden;
   deliveryModeInfo  @UI.Hidden;
-};
-
-annotate service.RunResultChecks with @(
-  UI.PresentationVariant: {
-    SortOrder     : [{Property: position}],
-    Visualizations: ['@UI.LineItem']
-  },
-  UI.LineItem: [
-    {
-      Value      : passed,
-      Criticality: criticality
-    },
-    {Value: description},
-    {Value: actual}
-  ]
-) {
-  position    @UI.Hidden;
-  criticality @UI.Hidden;
 };

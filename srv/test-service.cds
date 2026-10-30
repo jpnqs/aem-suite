@@ -220,39 +220,6 @@ service TestService {
   @readonly
   entity ResultStatuses as projection on db.ResultStatuses;
 
-  // the expected outcome of a test case: the checks of the message it waits for
-  @readonly
-  entity ExpectModes as projection on db.ExpectModes;
-
-  @readonly
-  entity CheckTargets as projection on db.CheckTargets;
-
-  @readonly
-  entity CheckOperators as projection on db.CheckOperators;
-
-  /** The checks of an expected message in a run result. */
-  @readonly
-  entity RunResultChecks as
-    projection on db.RunResultChecks {
-      *,
-      case when passed = true then 3 else 1 end as criticality : Integer
-    };
-
-  annotate ExpectModes with @UI.PresentationVariant #byPosition: {SortOrder: [{Property: position}]} {
-    code     @Common.Text: name  @Common.TextArrangement: #TextOnly;
-    position @UI.Hidden;
-  };
-
-  annotate CheckTargets with @UI.PresentationVariant #byPosition: {SortOrder: [{Property: position}]} {
-    code     @Common.Text: name  @Common.TextArrangement: #TextOnly;
-    position @UI.Hidden;
-  };
-
-  annotate CheckOperators with @UI.PresentationVariant #byPosition: {SortOrder: [{Property: position}]} {
-    code     @Common.Text: name  @Common.TextArrangement: #TextOnly;
-    position @UI.Hidden;
-  };
-
   // dropdowns show the name only, the result statuses in their own order (UI.PresentationVariant #byPosition)
   annotate DeliveryModes with {
     code @Common.Text: name  @Common.TextArrangement: #TextOnly;

@@ -25,7 +25,6 @@ type ImportResult {
   folders        : Integer;
   testCases      : Integer;
   userProperties : Integer;
-  checks         : Integer;
   variables      : Integer;
   roots          : many ImportRoot;
   /** name of the target folder, empty = top level */
@@ -40,8 +39,6 @@ type Preview {
   payload        : LargeString;
   correlationId  : String;
   userProperties : LargeString;
-  /** the message the test case waits for after sending, e.g. "reply on aem-suite/reply/... within 5000 ms" (empty = none) */
-  expectation    : String;
 }
 
 /**

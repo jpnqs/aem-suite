@@ -2,7 +2,6 @@ import { TestCases } from '#cds-models/aem/suite'
 import { detectContentType, SORT_STEP } from '../core/defaults'
 import { errMsg, httpError } from '../core/errors'
 import { inferPropertyType, propertyValueProblem } from './property-types'
-import { checkProblem } from '../runs/expectations'
 import { TEST_FIELDS } from './test-fields'
 import type { TestCaseRecord } from '../runs/test-case-spec'
 import { loadTree } from './tree'
@@ -72,14 +71,6 @@ export function validateEnums(d: NodeData, reject: Reject): void {
   d.userProperties?.forEach((p, i) => {
     if (p.type && !propertyTypes.includes(p.type)) reject(400, `type must be ${propertyTypes.join(', ')}`, `in/userProperties(${i})/type`)
   })
-  const expectModes = enumValues('TestCases', 'expectMode')
-  if (d.expectMode && !expectModes.includes(d.expectMode)) reject(400, `expectMode must be ${expectModes.join(', ')}`, 'in/expectMode')
-  const targets = enumValues('TestCaseChecks', 'target')
-  const operators = enumValues('TestCaseChecks', 'operator')
-  d.checks?.forEach((c, i) => {
-    if (c.target && !targets.includes(c.target)) reject(400, `target must be ${targets.join(', ')}`, `in/checks(${i})/target`)
-    if (c.operator && !operators.includes(c.operator)) reject(400, `operator must be ${operators.join(', ')}`, `in/checks(${i})/operator`)
-  })
 }
 
 /** Column sizes of db/schema.cds: OData requests are checked by CAP, direct database writes (copy, import, agent, from message) are not. */
@@ -93,10 +84,6 @@ function validateLengths(d: NodeData, reject: Reject): void {
   d.userProperties?.forEach((p, i) => {
     max('TestCaseProperties', 'name', p.name, 'user property name', `in/userProperties(${i})/name`)
     max('TestCaseProperties', 'value', p.value, `user property "${p.name}" value`, `in/userProperties(${i})/value`)
-  })
-  d.checks?.forEach((c, i) => {
-    max('TestCaseChecks', 'path', c.path, 'check path', `in/checks(${i})/path`)
-    max('TestCaseChecks', 'value', c.value, 'check value', `in/checks(${i})/value`)
   })
   d.variables?.forEach((v, i) => {
     max('TestCaseVariables', 'name', v.name, 'variable name', `in/variables(${i})/name`)
@@ -141,9 +128,6 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
   if (ack) reject(400, `ACK timeout must be between ${ack[0]} and ${ack[1]} ms`, 'in/ackTimeoutMs')
   const priority = outside(d.priority, 'priority')
   if (priority) reject(400, `Priority must be between ${priority[0]} and ${priority[1]}`, 'in/priority')
-  const expectTimeout = outside(d.expectTimeoutMs, 'expectTimeoutMs')
-  if (expectTimeout) reject(400, `The wait for the expected message must be between ${expectTimeout[0]} and ${expectTimeout[1]} ms`, 'in/expectTimeoutMs')
-  validateExpectation(d, reject)
 
   const seen = new Set<string>()
   d.userProperties?.forEach((p, i) => {
@@ -167,17 +151,5 @@ export function validateVariables(list: { name?: string | null }[] | null | unde
     if (!VAR_NAME.test(name)) reject(400, `Invalid variable name "${name}"`, `${targetPrefix}(${i})/name`)
     if (seen.has(name)) reject(400, `Duplicate variable "${name}"`, `${targetPrefix}(${i})/name`)
     seen.add(name)
-  })
-}
-
-/** The expected outcome: a source for TOPIC / QUEUE (REPLY may generate its topic), complete checks. */
-function validateExpectation(d: NodeData, reject: Reject): void {
-  const mode = d.expectMode
-  if ((mode === 'TOPIC' || mode === 'QUEUE') && d.expectSource !== undefined && !d.expectSource?.trim())
-    reject(400, mode === 'QUEUE' ? 'Enter the queue the expected message arrives on' : 'Enter the topic the expected message arrives on', 'in/expectSource')
-  if (mode === 'REPLY' && /[*>]/.test(d.expectSource?.replace(/\{\{[^}]*\}\}/g, '') ?? '')) reject(400, 'A reply topic cannot contain wildcards', 'in/expectSource')
-  d.checks?.forEach((c, i) => {
-    const problem = checkProblem(c)
-    if (problem) reject(400, `Check ${i + 1}: ${problem}`, `in/checks(${i})`)
   })
 }

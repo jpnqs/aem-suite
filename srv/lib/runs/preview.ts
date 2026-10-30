@@ -1,7 +1,6 @@
 import { loadBroker } from '../broker/resolve'
 import { buildSpec, loadVariableScopes, scopeFor, TestCaseRecord, withGenerated } from './test-case-spec'
 import { errMsg } from '../core/errors'
-import { describeCheck, type Expectation } from './expectations'
 
 export interface Preview {
   valid: boolean
@@ -10,7 +9,6 @@ export interface Preview {
   payload?: string
   correlationId?: string | null
   userProperties?: string
-  expectation?: string | null
 }
 
 /**
@@ -28,7 +26,6 @@ export async function buildPreview(tc: TestCaseRecord, brokerId?: string | null)
       payload: prettyJson(spec.payload),
       correlationId: spec.correlationId ?? null,
       userProperties: JSON.stringify(Object.fromEntries((spec.userProperties ?? []).map((p) => [p.name, p.value])), null, 2),
-      expectation: spec.expect ? describeExpectation(spec.expect) : null,
       valid: true,
       message: broker ? `Resolved for broker ${broker.name}` : 'Resolved with global variables only'
     }
@@ -43,12 +40,4 @@ function prettyJson(s: string): string {
   } catch {
     return s
   }
-}
-
-/** "Message on orders/> with correlation id 42 within 5000 ms; checks: JSON path id equals 42" */
-export function describeExpectation(e: Expectation): string {
-  const where = e.mode === 'QUEUE' ? `Message on queue ${e.source}` : e.mode === 'REPLY' ? `Reply on ${e.source}` : `Message on ${e.source}`
-  const filter = e.correlationId ? ` with correlation id ${e.correlationId}` : ''
-  const checks = e.checks.length ? `; checks: ${e.checks.map(describeCheck).join('; ')}` : ''
-  return `${where}${filter} within ${e.timeoutMs} ms${checks}`
 }

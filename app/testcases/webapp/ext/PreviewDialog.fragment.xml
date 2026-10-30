@@ -34,8 +34,6 @@
           <Text text="{preview>/topic}" />
           <Label text="{i18n>preview.correlationID}" />
           <Text text="{preview>/correlationId}" />
-          <Label text="{i18n>preview.expectation}" visible="{= !!${preview>/expectation} }" />
-          <Text text="{preview>/expectation}" visible="{= !!${preview>/expectation} }" />
         </f:SimpleForm>
         <Title text="{i18n>section.payload}" level="H5" visible="{preview>/valid}" class="sapUiTinyMarginTop" />
         <ce:CodeEditor type="json" value="{preview>/payload}" editable="false" height="260px" visible="{preview>/valid}" />

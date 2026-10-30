@@ -1,7 +1,6 @@
 import type { BrokerRecord } from '../broker/resolve'
-import { TestCaseVariables, Variables, type TestCase, type TestCaseCheck, type TestCaseProperty, type TestCaseVariable } from '#cds-models/aem/suite'
+import { TestCaseVariables, Variables, type TestCase, type TestCaseProperty, type TestCaseVariable } from '#cds-models/aem/suite'
 import type { PublishSpec } from '../solace/session'
-import type { Expectation } from './expectations'
 import type { TestField } from '../testcases/test-fields'
 import { TemplateResolver, TemplateScope, jsonError, TemplateError, generatedSlots } from '../template/resolve'
 import { allocateNumbers } from '../template/number-ranges'
@@ -23,11 +22,7 @@ export type TestCaseRecord = Pick<TestCase, TestField | 'kind' | 'parent_ID'> & 
   topic: string
   userProperties?: (Pick<TestCaseProperty, 'type' | 'value'> & { name: string })[]
   variables?: (Pick<TestCaseVariable, 'value'> & { name: string })[]
-  checks?: Pick<TestCaseCheck, 'target' | 'path' | 'operator' | 'value' | 'position'>[]
 }
-
-/** The message to send and, if the test case expects one, the message that has to arrive. */
-export type MessageSpec = PublishSpec & { expect?: Expectation }
 
 interface VariableRow {
   name: string
@@ -109,13 +104,7 @@ export function scopeFor(
  * exhausted range.
  */
 export async function withGenerated(tc: TestCaseRecord, scope: TemplateScope, mode: 'consume' | 'peek'): Promise<TemplateScope> {
-  const templates = [
-    tc.topic,
-    tc.payload,
-    tc.correlationId,
-    ...(tc.userProperties ?? []).map((p) => p.value),
-    ...(expectsMessage(tc) ? [tc.expectSource, ...(tc.checks ?? []).map((c) => c.value)] : [])
-  ]
+  const templates = [tc.topic, tc.payload, tc.correlationId, ...(tc.userProperties ?? []).map((p) => p.value)]
   const slots = generatedSlots(templates, scope)
   if (!slots.length) return scope
   const generated = await allocateNumbers(slots.filter((s) => !s.faker), mode)
@@ -128,7 +117,7 @@ export async function withGenerated(tc: TestCaseRecord, scope: TemplateScope, mo
  * Resolves all templates of a test case into a publish spec.
  * Throws TemplateError on unknown variables or invalid JSON.
  */
-export function buildSpec(tc: TestCaseRecord, scope: TemplateScope): MessageSpec {
+export function buildSpec(tc: TestCaseRecord, scope: TemplateScope): PublishSpec {
   const r = new TemplateResolver(scope)
   const topic = r.resolve(tc.topic).trim()
   if (!topic) throw new TemplateError('Topic is empty')
@@ -138,8 +127,6 @@ export function buildSpec(tc: TestCaseRecord, scope: TemplateScope): MessageSpec
   const err = jsonError(payload, contentType)
   if (err) throw new TemplateError(err)
 
-  const correlationId = tc.correlationId ? r.resolve(tc.correlationId) : undefined
-  const expect = buildExpectation(tc, r, correlationId)
   return {
     topic,
     payload,
@@ -148,40 +135,12 @@ export function buildSpec(tc: TestCaseRecord, scope: TemplateScope): MessageSpec
     timeToLiveMs: tc.timeToLiveMs ?? 0,
     dmqEligible: tc.dmqEligible ?? undefined,
     priority: tc.priority ?? undefined,
-    correlationId,
-    replyTo: expect?.mode === 'REPLY' ? expect.source : undefined,
-    expect,
+    correlationId: tc.correlationId ? r.resolve(tc.correlationId) : undefined,
     ackTimeoutMs: tc.ackTimeoutMs ?? DEFAULT_ACK_TIMEOUT_MS,
     userProperties: (tc.userProperties ?? []).map((p) => ({
       name: p.name,
       type: p.type || inferPropertyType(p.value),
       value: r.resolve(p.value)
     }))
-  }
-}
-
-/** Whether the test case waits for a message after sending (TestCases.expectMode). */
-export function expectsMessage(tc: Pick<TestCaseRecord, 'expectMode'>): boolean {
-  return !!tc.expectMode && tc.expectMode !== 'NONE'
-}
-
-/** The resolved expectation (same resolver as the message: {{uuid}} in a check is the uuid that is sent). */
-function buildExpectation(tc: TestCaseRecord, r: TemplateResolver, correlationId: string | undefined): Expectation | undefined {
-  if (!expectsMessage(tc)) return undefined
-  const mode = tc.expectMode as Expectation['mode']
-  let source = r.resolve(tc.expectSource).trim()
-  // request/reply without a reply topic: one of its own per message
-  if (mode === 'REPLY' && !source) source = `aem-suite/reply/${r.resolve('{{newUuid}}')}`
-  if (!source) throw new TemplateError(mode === 'QUEUE' ? 'Enter the queue the expected message arrives on' : 'Enter the topic the expected message arrives on')
-  if (mode === 'REPLY' && /[*>]/.test(source)) throw new TemplateError(`Wildcards are not allowed in a reply topic: ${source}`)
-  const checks = [...(tc.checks ?? [])]
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-    .map((c) => ({ target: c.target!, path: c.path, operator: c.operator!, value: r.resolve(c.value) }))
-  return {
-    mode,
-    source,
-    timeoutMs: tc.expectTimeoutMs ?? DEFAULT_ACK_TIMEOUT_MS,
-    correlationId: tc.expectCorrelation !== false && correlationId ? correlationId : undefined,
-    checks
   }
 }

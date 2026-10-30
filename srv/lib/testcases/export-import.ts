@@ -28,12 +28,6 @@ export interface PropertyDoc {
   type?: string
   value?: string
 }
-export interface CheckDoc {
-  target: string
-  path?: string
-  operator: string
-  value?: string
-}
 export interface VariableDoc {
   name: string
   value?: string
@@ -51,12 +45,7 @@ export interface NodeDoc {
   priority?: number
   correlationId?: string
   ackTimeoutMs?: number
-  expectMode?: string
-  expectSource?: string
-  expectTimeoutMs?: number
-  expectCorrelation?: boolean
   userProperties?: PropertyDoc[]
-  checks?: CheckDoc[]
   variables?: VariableDoc[]
   children?: NodeDoc[]
 }
@@ -79,7 +68,6 @@ export interface ImportResult {
   folders: number
   testCases: number
   userProperties: number
-  checks: number
   variables: number
   /** the top-level nodes of the file (IDs only for a real import) */
   roots: { ID?: string; name: string; kind: string }[]
@@ -131,17 +119,10 @@ export async function exportNodes(ids?: string[] | null): Promise<ExportResult> 
     }
     testCases++
     const props = sorted(r.userProperties)?.map((p) => compact({ name: p.name, type: p.type, value: p.value ?? '' }) as PropertyDoc)
-    const checks = [...(r.checks ?? [])]
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-      .map((c) => compact({ target: c.target, path: c.path, operator: c.operator, value: c.value }) as CheckDoc)
-    // a test case without expected message leaves the expect fields out (files of older versions look the same)
-    const expecting = r.expectMode && r.expectMode !== 'NONE'
-    const testFields = Object.keys(TEST_FIELDS).filter((f) => expecting || !f.startsWith('expect'))
     return compact({
       kind: 'TEST',
-      ...fields(testFields),
+      ...fields(Object.keys(TEST_FIELDS)),
       userProperties: props?.length ? props : undefined,
-      checks: checks.length ? checks : undefined,
       variables: variables?.length ? variables : undefined
     }) as NodeDoc
   }
@@ -187,7 +168,6 @@ export async function importNodes(content: string, opts: { parentId?: string | n
     folders: count('FOLDER'),
     testCases: count('TEST'),
     userProperties: flat.reduce((s, n) => s + (n.d.userProperties?.length ?? 0), 0),
-    checks: flat.reduce((s, n) => s + (n.d.checks?.length ?? 0), 0),
     variables: flat.reduce((s, n) => s + (n.d.variables?.length ?? 0), 0),
     roots: flat.filter((n) => n.parent === null).map((n) => ({ ID: opts.dryRun ? undefined : n.d.ID, name: n.d.name ?? n.d.topic ?? '', kind: n.d.kind as string })),
     target
@@ -265,8 +245,6 @@ function nodeData(n: Record<string, unknown>, kind: NodeKind, where: string, pro
   const read = { text, int: whole, bool }
   for (const [k, type] of Object.entries(TEST_FIELDS)) if (kind === 'TEST' || FOLDER_FIELDS.includes(k as keyof typeof TEST_FIELDS)) read[type](k)
   if (kind === 'TEST') d.userProperties = listOf(n.userProperties, 'userProperties', where, problems, ['name', 'type', 'value'])
-  if (kind === 'TEST')
-    d.checks = listOf(n.checks, 'checks', where, problems, ['target', 'path', 'operator', 'value'], false).map((c, i) => ({ ...c, position: i + 1 }))
   d.variables = listOf(n.variables, 'variables', where, problems, ['name', 'value'])
   return d as unknown as Flat['d']
 }
@@ -300,7 +278,6 @@ async function write(flat: Flat[], parentId: string | null): Promise<void> {
       parent_ID: n.parent === null ? parentId : flat[n.parent].d.ID,
       sortOrder: n.parent === null ? firstOrder + slot * SORT_STEP : (slot + 1) * SORT_STEP,
       userProperties: n.d.userProperties?.map((p) => ({ ...p })) ?? [],
-      checks: n.d.checks?.map((c) => ({ ...c })) ?? [],
       variables: n.d.variables?.map((v) => ({ ...v })) ?? []
     }
   }
@@ -315,7 +292,7 @@ async function write(flat: Flat[], parentId: string | null): Promise<void> {
 
 // ------------------------------------------------------------------------------------------------ helpers
 
-function listOf(value: unknown, field: string, where: string, problems: string[], keys: string[], named = true): { [k: string]: string }[] {
+function listOf(value: unknown, field: string, where: string, problems: string[], keys: string[]): { [k: string]: string }[] {
   if (value === undefined || value === null) return []
   if (!Array.isArray(value)) return void problems.push(`${where}: ${field} must be a list`), []
   const out: { [k: string]: string }[] = []
@@ -329,7 +306,7 @@ function listOf(value: unknown, field: string, where: string, problems: string[]
       else if (typeof v === 'number' || typeof v === 'boolean') entry[k] = String(v) // {"qty": 5} is fine in a hand-written file
       else problems.push(`${where}: ${field}[${i}].${k} must be text`)
     }
-    if (named && !entry.name) problems.push(`${where}: ${field}[${i}] needs a name`)
+    if (!entry.name) problems.push(`${where}: ${field}[${i}] needs a name`)
     out.push(entry)
   })
   return out

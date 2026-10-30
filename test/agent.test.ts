@@ -79,7 +79,7 @@ describe('AI agent service (MCP)', () => {
       const described = await rpc('tools/call', { name: 'TestAgentService-describe', arguments: {} })
       const { entities, actions } = described.body.result.structuredContent
       expect(Object.keys(entities).sort()).toEqual(
-        ['Brokers', 'RunResultChecks', 'RunResults', 'TestNodeChecks', 'TestNodeLastResults', 'TestNodeProperties', 'TestNodeVariables', 'TestNodes', 'TestRuns'].sort()
+        ['Brokers', 'RunResults', 'TestNodeLastResults', 'TestNodeProperties', 'TestNodeVariables', 'TestNodes', 'TestRuns'].sort()
       )
       // no global / broker variables, no saved messages, no delete
       expect(Object.keys(actions).sort()).toEqual(

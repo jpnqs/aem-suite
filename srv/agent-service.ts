@@ -4,7 +4,7 @@ import { copyNodes } from './lib/testcases/copy-nodes'
 import { exportNodes, importNodes } from './lib/testcases/export-import'
 import { STARTER_CORRELATION_ID, STARTER_PAYLOAD } from './lib/core/defaults'
 import { assertValid, nextSortOrder, NodeData, validateEnums, validateNode, validateParent } from './lib/testcases/node-validation'
-import { Brokers, RunResults, TestCaseChecks, TestCaseProperties, TestCases, TestCaseVariables, TestRuns, type TestCaseCheck, type TestRun } from '#cds-models/aem/suite'
+import { Brokers, RunResults, TestCaseProperties, TestCases, TestCaseVariables, TestRuns, type TestRun } from '#cds-models/aem/suite'
 import { createNode, NodeRow, selectNodeDeep } from './lib/testcases/nodes'
 import { TEST_FIELDS as FIELDS } from './lib/testcases/test-fields'
 import type { PropertyType } from './lib/testcases/property-types'
@@ -29,12 +29,6 @@ const recentRuns = new Map<string, number[]>()
 interface PropertyInput {
   name: string
   type?: PropertyType | null
-  value?: string | null
-}
-interface CheckInput {
-  target: TestCaseCheck['target']
-  path?: string | null
-  operator: TestCaseCheck['operator']
   value?: string | null
 }
 interface VariableInput {
@@ -112,7 +106,6 @@ export default class TestAgentService extends cds.ApplicationService {
       const input = req.data as Record<string, unknown> & {
         parentId?: string
         userProperties?: PropertyInput[]
-        checks?: CheckInput[]
         variables?: VariableInput[]
       }
       const d = { ID: cds.utils.uuid(), kind: 'TEST', parent_ID: input.parentId ?? null } as Record<string, unknown>
@@ -122,13 +115,12 @@ export default class TestAgentService extends cds.ApplicationService {
       d.payload ??= STARTER_PAYLOAD
       d.correlationId ??= STARTER_CORRELATION_ID
       d.userProperties = toProperties(input.userProperties)
-      d.checks = toChecks(input.checks)
       d.variables = toVariables(input.variables)
       return createNode(d as unknown as NodeData)
     })
 
     this.on('updateTestCase', async (req) => {
-      const input = req.data as Record<string, unknown> & { id: string; userProperties?: PropertyInput[]; checks?: CheckInput[]; variables?: VariableInput[] }
+      const input = req.data as Record<string, unknown> & { id: string; userProperties?: PropertyInput[]; variables?: VariableInput[] }
       const current = await loadNode(input.id)
       if (!current) return req.reject(404, 'Test case not found')
       if (current.kind !== 'TEST') return req.reject(400, 'This is a folder - use updateFolder')
@@ -136,16 +128,15 @@ export default class TestAgentService extends cds.ApplicationService {
       const changes: Record<string, unknown> = {}
       for (const f of TEST_FIELDS) if (input[f] !== undefined && input[f] !== null) changes[f] = input[f]
       const userProperties = input.userProperties ? toProperties(input.userProperties) : undefined
-      const checks = input.checks ? toChecks(input.checks) : undefined
       const variables = input.variables ? toVariables(input.variables) : undefined
 
       // check the result as a whole, with the same rules as for new test cases
-      const merged = { ...current, ...changes, userProperties: userProperties ?? current.userProperties, checks: checks ?? current.checks, variables: variables ?? current.variables }
+      const merged = { ...current, ...changes, userProperties: userProperties ?? current.userProperties, variables: variables ?? current.variables }
       await assertValid((reject) => {
         validateEnums(merged, reject)
         validateNode(merged, 'UPDATE', reject)
       })
-      return saveChanges(input.id, changes, userProperties, variables, checks)
+      return saveChanges(input.id, changes, userProperties, variables)
     })
 
     this.on('updateFolder', async (req) => {
@@ -282,18 +273,13 @@ async function saveChanges(
   id: string,
   changes: Record<string, unknown>,
   userProperties: PropertyInput[] | undefined,
-  variables: VariableInput[] | undefined,
-  checks?: CheckInput[]
+  variables: VariableInput[] | undefined
 ): Promise<{ ID: string; name: string; kind: string }> {
   if (Object.keys(changes).length) await UPDATE(TestCases, id).with(changes)
   else await UPDATE(TestCases, id).with({ modifiedAt: new Date().toISOString() })
   if (userProperties) {
     await DELETE.from(TestCaseProperties).where({ testCase_ID: id })
     if (userProperties.length) await INSERT.into(TestCaseProperties).entries(userProperties.map((p) => ({ ...p, testCase_ID: id })))
-  }
-  if (checks) {
-    await DELETE.from(TestCaseChecks).where({ testCase_ID: id })
-    if (checks.length) await INSERT.into(TestCaseChecks).entries(checks.map((c) => ({ ...c, testCase_ID: id })))
   }
   if (variables) {
     await DELETE.from(TestCaseVariables).where({ testCase_ID: id })
@@ -307,9 +293,6 @@ const loadNode = (id: string): Promise<NodeRow | undefined> => selectNodeDeep(id
 
 const toProperties = (list?: PropertyInput[] | null): PropertyInput[] =>
   (list ?? []).map((p) => ({ name: p.name, type: p.type ?? undefined, value: p.value ?? '' }))
-
-const toChecks = (list?: CheckInput[] | null) =>
-  (list ?? []).map((c, i) => ({ target: c.target, path: c.path ?? null, operator: c.operator, value: c.value ?? '', position: i + 1 }))
 
 const toVariables = (list?: VariableInput[] | null): VariableInput[] => (list ?? []).map((v) => ({ name: v.name, value: v.value ?? '' }))
 

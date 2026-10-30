@@ -1,7 +1,0 @@
-code;name;descr;position
-JSON_PATH;JSON path;A value of the JSON payload, e.g. order.items[0].id;1
-PAYLOAD;Payload;The whole payload as text;2
-PROPERTY;User property;A user property, path = its name;3
-TOPIC;Topic;The topic the message arrived on;4
-CORRELATION_ID;Correlation ID;The correlation id of the message;5
-CONTENT_TYPE;Content type;The content type of the message;6

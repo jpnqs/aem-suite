@@ -1,7 +1,0 @@
-code;name;descr;position
-EQUALS;equals;Is exactly the value;1
-NOT_EQUALS;does not equal;Is anything but the value;2
-CONTAINS;contains;Contains the value;3
-MATCHES;matches;Matches the regular expression;4
-EXISTS;exists;Is there (any value);5
-NOT_EXISTS;does not exist;Is not there;6
