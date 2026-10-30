@@ -15,7 +15,7 @@
     "@cap-js-community/websocket": "^1.11.2",
     "@cap-js/hana": "^3.1.2",
     "@cap-js/mcp": "^1.5.0",
-    "@faker-js/faker": "^9.9.0",
+    "@faker-js/faker": "^10.6.0",
     "@sap-cloud-sdk/connectivity": "^4.9.1",
     "@sap/cds": "^10.1.1",
     "@sap/xssec": "^4.15.0",
@@ -32,7 +32,7 @@
     "@cap-js/sqlite": "^3.1.2",
     "@eslint/js": "^9.39.5",
     "@playwright/test": "1.63.0",
-    "@sap/cds-dk": "^10.1.0",
+    "@sap/cds-dk": "^10.2.0",
     "@sapui5/types": "1.148.12",
     "@types/jest": "^30.0.0",
     "@types/markdown-it": "^14.2.0",
@@ -63,8 +63,8 @@
     "typecheck": "npm run typer --silent && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p app/subscriber && tsc --noEmit -p app/testcases && tsc --noEmit -p app/cleanup && tsc --noEmit -p e2e",
     "lint": "eslint .",
     "pretest": "npm run typer --silent",
-    "test": "jest",
-    "test:coverage": "npm run typer --silent && jest --coverage",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:coverage": "npm run typer --silent && npm test -- --coverage",
     "verify": "npm run typecheck && npm run lint && npm test",
     "e2e": "playwright test",
     "docs:screenshots": "playwright test -c playwright.screenshots.config.ts",
@@ -146,6 +146,12 @@
     },
     "fiori": {
       "draft_messages": false
+    }
+  },
+  "overrides": {
+    "@hono/node-server": "^2.1.3",
+    "@sap/cds-dk": {
+      "body-parser": "^2.4.0"
     }
   }
 }
