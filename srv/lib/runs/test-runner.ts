@@ -1,8 +1,9 @@
 import cds from '@sap/cds'
-import { Brokers, RunResults, TestCaseStats, TestRuns, type ResultStatus, type RunResult, type TestRun } from '#cds-models/aem/suite'
+import { Brokers, RunResultChecks, RunResults, TestCaseStats, TestRuns, type ResultStatus, type RunResult, type TestRun } from '#cds-models/aem/suite'
 import { BrokerRecord, currentJwt, loadBroker, needsPassword, needsUsername, resolveConnection } from '../broker/resolve'
 import { errMsg, httpError, truncate } from '../core/errors'
-import type { Publisher } from '../solace/session'
+import type { ExpectListener, Publisher, ReceivedMessage } from '../solace/session'
+import { evaluateChecks, isExpectedMessage, type Expectation } from './expectations'
 import { connect } from '../solace/connector'
 import { buildSpec, loadTestCases, loadVariableScopes, scopeFor, TestCaseRecord, withGenerated } from './test-case-spec'
 import { loadTree } from '../testcases/tree'
@@ -423,14 +424,76 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
     resolvedPayload: spec.payload,
     correlationId: spec.correlationId == null ? null : truncate(spec.correlationId, columnLength('RunResults', 'correlationId'))
   }
+  const { expect } = spec
+  let listener: ExpectListener | undefined
   try {
+    // listening starts before sending: a fast answer must not be missed
+    if (expect) {
+      if (!publisher.listen) throw new Error('This connection cannot receive messages')
+      try {
+        listener = await publisher.listen(expect.mode === 'QUEUE' ? 'QUEUE' : 'TOPIC', expect.source, (m) => isExpectedMessage(expect, m))
+      } catch (e) {
+        await progress.finish(r, 'ERROR', { ...sent, expectMode: expect.mode, errorMessage: errorText(`Cannot listen for the expected message: ${errMsg(e)}`) })
+        return false
+      }
+    }
+    const sentAt = Date.now()
     const res = await publisher.publish(spec)
-    await progress.finish(r, 'PASSED', { ...sent, ackLatencyMs: res.latencyMs })
-    return true
+    if (!expect || !listener) {
+      await progress.finish(r, 'PASSED', { ...sent, ackLatencyMs: res.latencyMs })
+      return true
+    }
+    const received = await listener.wait(Math.max(0, expect.timeoutMs - (Date.now() - sentAt)))
+    return await finishExpected(r, ctx, expect, received, { ...sent, ackLatencyMs: res.latencyMs }, sentAt)
   } catch (e) {
-    await progress.finish(r, e instanceof TemplateError ? 'ERROR' : 'FAILED', { ...sent, errorMessage: errorText(errMsg(e)) })
+    await progress.finish(r, e instanceof TemplateError ? 'ERROR' : 'FAILED', { ...sent, expectMode: expect?.mode, errorMessage: errorText(errMsg(e)) })
+    return false
+  } finally {
+    await listener?.close().catch(() => undefined)
+  }
+}
+
+/** The outcome of a message with an expectation: PASSED if the message arrived in time and all checks hold. */
+async function finishExpected(
+  r: PendingResult,
+  ctx: RunContext,
+  expect: Expectation,
+  received: ReceivedMessage | undefined,
+  sent: Record<string, unknown>,
+  sentAt: number
+): Promise<boolean> {
+  const what = expect.mode === 'REPLY' ? 'No reply' : 'No expected message'
+  if (!received) {
+    const filter = expect.correlationId ? ` with correlation id ${expect.correlationId}` : ''
+    await ctx.progress.finish(r, 'FAILED', {
+      ...sent,
+      expectMode: expect.mode,
+      errorMessage: errorText(`${what}${filter} on ${expect.source} within ${expect.timeoutMs} ms`)
+    })
     return false
   }
+  const outcomes = evaluateChecks(expect.checks, received)
+  const failed = outcomes.filter((o) => !o.passed)
+  const checks = outcomes.map((o, i) => ({
+    ID: cds.utils.uuid(),
+    result_ID: r.ID,
+    position: i + 1,
+    description: truncate(o.description, columnLength('RunResultChecks', 'description')),
+    passed: o.passed,
+    actual: o.actual === undefined ? null : truncate(o.actual, columnLength('RunResultChecks', 'actual'))
+  }))
+  if (checks.length) await cds.db.tx(() => INSERT.into(RunResultChecks).entries(checks))
+  await ctx.progress.finish(r, failed.length ? 'FAILED' : 'PASSED', {
+    ...sent,
+    expectMode: expect.mode,
+    receivedTopic: truncate(received.topic, columnLength('RunResults', 'receivedTopic')),
+    receivedPayload: received.payload,
+    receiveLatencyMs: Math.max(0, received.receivedAt.getTime() - sentAt),
+    errorMessage: failed.length
+      ? errorText(`${failed.length} of ${outcomes.length} check(s) failed: ${failed.map((o) => `${o.description} (found: ${o.actual ?? 'nothing'})`).join('; ')}`)
+      : null
+  })
+  return !failed.length
 }
 
 /**

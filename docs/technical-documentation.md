@@ -110,16 +110,17 @@ mta.yaml, xs-security.json    deployment
 |---|---|---|
 | `Brokers` | Broker / message VPN | `credentialMode` DIRECT or DESTINATION; DIRECT keeps `url`, `msgVpn`, an optional `username` (if empty it is entered at run time) – **no password field**; `lastConnection*` holds the last connection test; `agentAllowed` (default true) lets AI agents use a DESTINATION broker. Composition `variables` (broker variables). |
 | `Variables` | Template variables | `broker` empty = global variable, set = broker variable. |
-| `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`. Compositions `userProperties`, `variables`. Association `lastResult` → `TestCaseStats`. |
+| `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`; expected outcome `expectMode` (NONE/TOPIC/QUEUE/REPLY), `expectSource`, `expectTimeoutMs`, `expectCorrelation`. Compositions `userProperties`, `checks`, `variables`. Association `lastResult` → `TestCaseStats`. |
 | `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
+| `TestCaseChecks` | Checks of the expected message | `target` (JSON_PATH, PAYLOAD, PROPERTY, TOPIC, CORRELATION_ID, CONTENT_TYPE), `path`, `operator` (EQUALS, NOT_EQUALS, CONTAINS, MATCHES, EXISTS, NOT_EXISTS), `value` (template), `position`. |
 | `TestCaseVariables` | Variables of a test case **or a folder** | Folder variables apply to all descendants. |
 | `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases (an association, so drafts do not copy it). `TestService` deletes the stats of deleted test cases. |
 | `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED/STOPPED (FAILED = aborted, `failRuns`; STOPPED = stopped by its user, `cancelRun`), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `repetitionOrder` (ROUND / EACH), `delayMs`, `stopOnFailure`. Composition `results`. |
-| `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
+| `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message; with an expected outcome `expectMode`, `receivedTopic`, `receivedPayload`, `receiveLatencyMs` and the composition `checks` (`RunResultChecks`: description, passed, value found). Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
 | `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
 | `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name (`@assert.unique`; the service also refuses the same name in another case), prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
 | `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
-| `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
+| `CredentialModes`, `DeliveryModes`, `PropertyTypes`, `ExpectModes`, `CheckTargets`, `CheckOperators` | Code lists for dropdowns | CSV in `db/data`. |
 
 All enum types carry `@assert.range`, and so do the numeric limits `ackTimeoutMs` (100–120 000), `priority` (0–255) and `connectTimeoutMs` (1 000–120 000): CAP rejects other values on every OData write. Writes that bypass OData (AI agent, import, copy, test case from a message) are checked by `srv/lib/testcases/node-validation.ts`, which reads the same limits from the model (`srv/lib/core/model.ts`).
 
@@ -216,225 +217,7 @@ Rules of the rendering (so write the guide accordingly):
 - Section 1 "Overview" is everything before the first `## ` (title and introduction). A section called "Contents" is skipped, the Help app has its own navigation.
 - **Anchors are the same as on GitHub** (`## 8. Watch messages live (Live Subscriber)` → `8-watch-messages-live-live-subscriber`, repeated headings get `-1`, `-2`), so the `[…](#anchor)` links of the guide's table of contents work in the Help app. `###` headings become the sub items of the navigation.
 - **Raw HTML in the Markdown is not passed through** (it is shown as text); links to other sites open in a new tab; wide tables scroll inside the page.
-- **Pictures.** The guide writes them as `![text](images/guides/x.png)` (relative to `docs/`, so they also show on GitHub). The renderer turns that into `<img src="docs-images/guides/x.png">` inside a link that opens the full size in a new tab; anything that is not `images/...` (other sites, `..`) gets no source at all. `srv/server.ts` serves `docs/images` (deployed: `gen/srv/docs/images`, copied by `scripts/build-docs.js`) with `express.static` under `/docs-images`, public like the guide text; locally after the path rewriting of the apps (`/comaemsuite<app>/docs-images/`), in BTP through the route `^/docs-images/(.*)# AEM Test Suite – Technical Documentation
-
-Audience: developers who run, maintain, extend or deploy the application.
-For end users see [user-guide.md](user-guide.md).
-
----
-
-## 1. Purpose and scope
-
-The AEM Test Suite is a SAP BTP application for functional testing of **SAP Integration Suite, Advanced Event Mesh** (Solace PubSub+) brokers:
-
-- maintain **brokers** (message VPNs) and **test cases** (topic, JSON payload, message header, user properties) in a folder tree,
-- **run** test cases against one or many brokers in parallel and keep the results,
-- **subscribe live** to topics or queues and capture messages.
-
-A test result passes when the broker **acknowledges** the message (guaranteed messaging), or when a direct message was sent without error. Payload assertions, round-trip checks and load tests are out of scope.
-
-## 2. Technology stack
-
-| Layer | Technology |
-|---|---|
-| Backend | SAP CAP **@sap/cds 10** (Node.js 24; CAP 10 needs ≥ 22, **TypeScript**), `cds-tsx` for development, `tsc` via `cds build` for production |
-| Persistence | SAP HANA Cloud (HDI) in production; SQLite in memory for development and tests |
-| Broker access | `solclientjs` 10.x (Solace JS API, SMF over `ws(s)://` or `tcp(s)://`) |
-| Live push | `@cap-js-community/websocket` (plain WebSocket, CAP service `LiveService`) |
-| Destinations | `@sap-cloud-sdk/connectivity` 4.x |
-| UI | SAPUI5 **1.148 (LTS)** from CDN: Fiori elements V4 (List Report / Object Page, tree table) and freestyle UI5 apps; the Live Subscriber and the Test Cases extensions are TypeScript (`ui5-tooling-transpile`) |
-| UI tooling | `cds-plugin-ui5` (serves the apps inside `cds watch`), `@ui5/cli` 4, `ui5-tooling-transpile` |
-| Security | XSUAA, standalone approuter (`@sap/approuter` 23) |
-| Tests | Jest 30 + ts-jest, `@cap-js/cds-test`; Playwright (UI, e2e) |
-
-## 3. Architecture
-
-```
-Browser ─ Fiori launchpad (sandbox) ─ approuter (XSUAA, websockets enabled)
-                                          │
-              ┌───────────────────────────┼────────────────────────────┐
-              │ /odata/v4/admin           │ /odata/v4/test             │ /odata/v4/subscribe     /ws/live
-              ▼                           ▼                            ▼                        ▼
-        AdminService               TestService                   SubscribeService          LiveService (WS)
-              │                           │                            │                        ▲
-              │        srv/lib: test-runner ─ test-case-spec ─ template resolver                 │ runProgress
-              │                 │                                      │ subscription-hub ───────┤ message
-              │                 ▼                                      ▼                         │ subscriptionStatus
-              │        solace/connector ──► solace/session (solclientjs) ──► AEM broker(s)
-              │        broker/resolve ──────► BTP Destination service (DESTINATION brokers)
-              ▼
-        HANA Cloud (HDI container)
-```
-
-**Request flow of a run**
-
-1. UI calls `runTest` / `runTests` with test case or folder IDs, broker IDs and per-broker credentials (password, plus username for brokers without one).
-2. `createRun` validates the input, expands folders to test cases (tree order), and inserts `TestRuns` plus one `PENDING` `RunResults` row per message – test case × broker × repetition (advanced settings, section 7.6) – in the request transaction.
-3. After commit (`req.on('succeeded')`) `executeRunInBackground` starts. Brokers are processed **in parallel**, the test cases of one broker **sequentially** over one session.
-4. Each result row is updated in its own transaction (PASSED, FAILED, ERROR, or SKIPPED when the run was stopped) and a `runProgress` event goes to WebSocket context = run ID.
-5. At the end the run gets status `DONE` (or `STOPPED` when its user stopped it with `cancelRun`), counters, and `TestCaseStats` (last result per test case) is upserted. If storing a result fails, or the run crashes, it ends `FAILED` instead and its open results get `ERROR` (`failRuns`); runs left `RUNNING` by a server restart are ended the same way on the next start.
-
-## 4. Repository layout
-
-```
-app/
-  launchpad/                  sandbox Fiori launchpad (all tiles; webapp/appconfig removes the SAP sample tiles)
-  services.cds                imports all UI annotation files
-  brokers/ variables/ numberranges/ runs/ messages/   Fiori elements apps (annotations.cds + webapp/)
-  testcases/                  Fiori elements app with extensions (webapp/ext/*)
-  subscriber/                 freestyle UI5 app in TypeScript
-  help/ home/                 freestyle UI5 apps: the user guide, the start page
-  _shared/                    UI modules all apps share (Apps, Actions, Help, LiveSocket, Navigation, MyEntriesFilter) -
-                              the UI5 build and dev server add them to each app (scripts/ui5, nothing copied or committed)
-  router/                     standalone approuter (xs-app.json: MCP, OAuth discovery, everything else from the HTML5 repo)
-  <app>/xs-app.json           routes of each app in the HTML5 repo (odata/, ws/ -> destination srv-api)
-db/
-  schema.cds                  domain model (namespace aem.suite)
-  data/                       code lists (deployed)
-srv/
-  admin-service.*, test-service.*, subscribe-service.*, live-service.cds   the UI services
-  help-service.*, home-service.*   Help app and Home app (every logged-in user)
-  agent-service.*             MCP service for AI assistants
-  server.ts                   MCP OAuth discovery; dev only: app-relative odata/ws rewrite, no-cache header for UI files
-  lib/                        business logic (see section 7):
-    core/                     config, defaults, errors, model facts, request keys, live events, unique names
-    broker/                   broker URLs, credentials (direct + BTP destinations), connection check
-    solace/                   solclientjs session, publishing connector, live subscription hub
-    template/                 template engine, faker data, number ranges
-    testcases/                tree, node reads/writes and validation, copy, export/import, fields, property types
-    config/                   rules of number ranges and brokers, export/import of brokers, global variables, number ranges
-    runs/                     test runner, test case -> publish spec, preview, template hints for the payload editor
-    help-content.ts, mcp-oauth.ts, mcp-json.ts   Help app content, MCP OAuth discovery, MCP answers as JSON
-  types/solclientjs.d.ts      typings for solclientjs (the package ships none)
-test/
-  *.test.ts                   Jest: unit, service and consistency tests (section 11)
-  helpers.ts, fakes/          test server, fake broker connections, database reset
-  data/                       demo data – loaded by cds watch / tests only, never deployed
-e2e/                          Playwright tests of the UI apps (section 11)
-docs/                         user guide (also shown by the Help app), this document, reviews (archive/ = old ones)
-local/                        docker-compose for a local Solace broker, terragrunt for its VPN, users and queues
-scripts/build-ui.js           ui5 build of all apps (each writes its HTML5 repo zip into dist/)
-scripts/build-docs.js         copies docs/user-guide.md next to the built server (gen/srv/docs) for the Help app
-scripts/ui5/                  UI5 build task + dev server middleware that give every app its app/_shared modules
-scripts/set-version.js        one version in mta.yaml, every package.json and manifest
-scripts/screenshots/          Playwright spec that takes the images in docs/images (npm run docs:screenshots)
-mta.yaml, xs-security.json    deployment
-.github/workflows/ci.yml      CI: npm run verify and the e2e tests on every push to main and every pull request
-```
-
-## 5. Domain model (`db/schema.cds`)
-
-| Entity | Purpose | Notes |
-|---|---|---|
-| `Brokers` | Broker / message VPN | `credentialMode` DIRECT or DESTINATION; DIRECT keeps `url`, `msgVpn`, an optional `username` (if empty it is entered at run time) – **no password field**; `lastConnection*` holds the last connection test; `agentAllowed` (default true) lets AI agents use a DESTINATION broker. Composition `variables` (broker variables). |
-| `Variables` | Template variables | `broker` empty = global variable, set = broker variable. |
-| `TestCases` | **Tree node**: folder or test case | `kind` FOLDER/TEST, `parent` (association) + `children` (recursive composition), `sortOrder` for manual ordering. Test case fields: `topic`, `payload`, `contentType`, `deliveryMode`, `timeToLiveMs`, `dmqEligible`, `priority`, `correlationId`, `ackTimeoutMs`. Compositions `userProperties`, `variables`. Association `lastResult` → `TestCaseStats`. |
-| `TestCaseProperties` | SMF user properties | `type` STRING / INT / BOOL (empty = inferred on save). |
-| `TestCaseVariables` | Variables of a test case **or a folder** | Folder variables apply to all descendants. |
-| `TestCaseStats` | Outcome of the latest run per test case | Written by the runner; kept separate so runs do not change `modifiedAt` of test cases (an association, so drafts do not copy it). `TestService` deletes the stats of deleted test cases. |
-| `TestRuns` | One execution | `summary` ("A, B → broker1"), `status` RUNNING/DONE/FAILED/STOPPED (FAILED = aborted, `failRuns`; STOPPED = stopped by its user, `cancelRun`), counters `totalCount`, `passedCount`, `failedCount`, `skippedCount`, the advanced settings `repetitions`, `repetitionOrder` (ROUND / EACH), `delayMs`, `stopOnFailure`. Composition `results`. |
-| `RunResults` | One message: test case × broker × repetition | `status` PENDING/PASSED/FAILED/ERROR/SKIPPED, `iteration` (repetition), `sequence` (order within the broker), resolved topic/payload, correlation ID, ACK latency, error message. Name snapshots (`testCaseName`, `brokerName`) keep history readable. |
-| `ReceivedMessages` | Messages saved from the live subscriber | Payload, user properties (JSON), source, delivery mode. |
-| `NumberRanges` | Number ranges for `{{numberRange.<name>}}` | Name (`@assert.unique`; the service also refuses the same name in another case), prefix, suffix, digits, start, step, maximum, `current` (last number issued), `lastUsedAt`. |
-| `SubscriberPresets` | Saved setups of the live subscriber, per user | Name (unique per user), broker, source type, topics (JSON array), queue, username. No password. |
-| `CredentialModes`, `DeliveryModes`, `PropertyTypes` | Code lists for dropdowns | CSV in `db/data`. |
-
-All enum types carry `@assert.range`, and so do the numeric limits `ackTimeoutMs` (100–120 000), `priority` (0–255) and `connectTimeoutMs` (1 000–120 000): CAP rejects other values on every OData write. Writes that bypass OData (AI agent, import, copy, test case from a message) are checked by `srv/lib/testcases/node-validation.ts`, which reads the same limits from the model (`srv/lib/core/model.ts`).
-
-Result semantics:
-
-| Status | Meaning |
-|---|---|
-| PASSED | PERSISTENT: broker ACK received within `ackTimeoutMs`. DIRECT: `send()` succeeded. |
-| FAILED | Broker rejected the message, ACK timeout, send error, session dropped. |
-| ERROR | The message could not be built or sent at all: unknown variable, invalid JSON, missing password, connection/login failure, destination problems. |
-| SKIPPED | Not sent: the run was stopped, or an earlier message to the same broker failed with *stop on first failure*. Counted as done, not as failed. |
-
-`TestCaseStats.status` is PASSED only if every broker of the latest run passed, otherwise FAILED (any FAILED) or ERROR.
-
-## 6. Services and API
-
-All OData V4. Paths are prefixed with the approuter URL in BTP.
-
-### AdminService – `/odata/v4/admin` (role `Admin`)
-
-| Element | Description |
-|---|---|
-| `Brokers` (draft) | Broker maintenance. Handlers: URL completion while editing and on save, validation, **automatic connection test on save for DESTINATION brokers** (max. 5 s). |
-| `Brokers.testConnection(username, password)` | Opens/closes a session, stores the outcome. `password` is required for DIRECT brokers and never stored; `username` only if none is maintained on the broker. |
-| `BrokerVariables` | Broker variables (composition of `Brokers`); the same name rules as test case variables (a name a template can reference, each once). |
-| `GlobalVariables` (draft) | Projection on `Variables` without broker; names unique regardless of case (like number ranges and subscriber setups, `srv/lib/core/unique-name.ts`). |
-| `NumberRanges` (draft) | Virtual `lastNumber` / `nextNumber` (formatted). Bound actions `reset(nextNumber)`, `countUp()` (issues the next number like a run, in the request's transaction) and `countDown()` (gives the last issued number back, compare-and-set on `current`; 400 when nothing was issued). `current` and `lastUsedAt` are never taken from a draft (activation ignores them), so a draft that was open meanwhile cannot set the counter back. |
-| `Destinations` | Read-only value help (`@cds.persistence.skip`) – destinations from the bound destination service and from env `destinations`, filtered to broker URLs. |
-| `CredentialModes` | Code list. |
-| `exportConfig(kind, ids)` | `kind` = `NUMBER_RANGES`, `BROKERS` or `VARIABLES` (global). Returns `{ filename, content, count }`: the JSON file of the given entries, all of the kind without ids. See *Configuration file* below. |
-| `importConfig(kind, content, dryRun)` | Adds the entries of such a file as new ones (existing entries are never changed); returns `{ dryRun, created, renamed: [{ name, newName }] }`. Request bodies up to 2 MB. |
-
-The rules of saving a number range or a broker live in `srv/lib/config/checks.ts`, so the draft handlers and the import apply the same ones.
-
-### TestService – `/odata/v4/test` (role `Tester`)
-
-| Element | Description |
-|---|---|
-| `TestCases` (draft, **hierarchy**) | Folder/test case tree. Computed columns `LimitedDescendantCount`, `DistanceFromRoot`, `DrillState`, `LimitedRank` and `@Aggregation.RecursiveHierarchy #TestTree` / `@Hierarchy.RecursiveHierarchy #TestTree` enable CAP hierarchy queries for the Fiori tree table. `kindText` is a display text for `kind`. |
-| `TestCases.runTest(brokerIds, credentials, options)` | Runs one node (a folder runs its subtree). `options`: the advanced settings (section 7.6). |
-| `TestCases.preview(brokerId)` | Resolves topic, payload, correlation ID and properties without sending. Works on drafts. |
-| `TestCases.templateHints()` | What the templates of the test case can use, for the suggestions of the topic and payload editors (`app/testcases/webapp/ext/TemplateCompleter.ts`; the topic is a one-line `CodeEditor`, see `ext/MessageSection.ts`): one entry per variable name with the winning value, its source and all definitions in lookup order (test case > broker > folder, inner first > global; a broker variable wins for its broker only, so a name several brokers define "depends on the broker"), the number ranges with their next number, and the faker.js expressions with an example (`fakerMethods()`: the methods of the allowed modules, deprecated ones left out, computed once). Built-ins are known to the UI. Works on drafts: their own variables are the ones being edited (`srv/lib/runs/template-hints.ts`). |
-| `TestCases.duplicate()` | Copies a test case or a folder with everything below it (`srv/lib/testcases/copy-nodes.ts`); the copy is named "… (Copy)" and placed right after the original. |
-| `exportNodes(ids)` | Returns `{ filename, content, folders, testCases }`: the JSON file for the given nodes (folders with everything below them; without ids the whole tree). The browser saves `content` as a file. |
-| `importNodes(content, parentId, dryRun)` | Creates the nodes of an export file below `parentId` (empty = top level) as **new** nodes; with `dryRun` it only checks and counts. All or nothing, see "Export and import file" below. The service accepts request bodies up to 5 MB (`@cds.server.body_parser.limit`). |
-| `copyNodes(ids)` | Same for several nodes; a node below another selected node is copied with that node only. Returns `{ ID, name }` per copy. Used by the *Copy* buttons. |
-| `TestCases.moveBefore(NextSibling)` | `ChangeNextSiblingAction` of the tree table (drag & drop ordering). |
-| `runTests(testCaseIds, brokerIds, credentials, options)` | Runs several nodes against several brokers in one run. |
-| `cancelRun(runId)` | Stops a running run: messages not sent yet are SKIPPED. For the user who started it and administrators; only on the instance that executes the run. |
-| `currentUser()` | Logged-in user ID – used to prefill the "Created by" / "Started by" filters. |
-| `Brokers` | Active brokers (read-only projection incl. `credentialMode`, `username`). |
-| `TestRuns`, `RunResults` | Read-only, with `outcome` (PASSED/FAILED/STOPPED/RUNNING; FAILED wins over STOPPED when something failed) and criticality fields (PASSED 3, FAILED 1, RUNNING and STOPPED 2 = warning). |
-| `TestCaseStats` | Read-only, with criticality. |
-| `DeliveryModes`, `PropertyTypes` | Code lists. |
-
-`credentials` is `many { brokerId, username, password }`. `createRun` rejects the call with 400 if a DIRECT broker has no password, or no username (neither maintained on the broker nor passed in `credentials`).
-
-### SubscribeService – `/odata/v4/subscribe` (role `Tester`)
-
-| Element | Description |
-|---|---|
-| `start(brokerId, sourceType, topics, queue, password, username)` | Opens a dedicated session. `sourceType`: `TOPIC` (direct subscriptions, wildcards), `QUEUE_BROWSE` (messages stay), `QUEUE_CONSUME` (client ack, messages removed). Returns `subscriptionId`. |
-| `stop(subscriptionId)` | Closes the subscription (owner only). |
-| `heartbeat(subscriptionId)` | **Heartbeat** of the page that started the subscription: keeps this one subscription alive; `active = false` if it ended on the server. |
-| `activeSubscriptions()` | Own subscriptions (read only). |
-| `SubscriberPresets` | The user's saved subscriber setups. `@restrict` to `createdBy = $user` (a user sees and changes only their own); a `before` handler checks the name (required, unique per user), source type and the topic list. |
-| `ReceivedMessages` | Saved messages (no update). Testers read all and delete only their own, administrators delete any. Action `createTestCase()` creates a test case from a message (pretty-printed JSON payload, property types inferred). |
-| `Brokers` | Active brokers (incl. `credentialMode`, `username`). |
-
-### LiveService – WebSocket `/ws/live` (role `Tester`)
-
-Clients enter a **context** to receive only their events:
-
-```json
-{"event":"wsContext","data":{"context":"<runId or subscriptionId>"}}
-```
-
-| Event | Context | Payload |
-|---|---|---|
-| `runProgress` | run ID | `status` RUNNING/DONE/STOPPED, `total`, `done`, `passed`, `failed`, `skipped`, `resultId` |
-| `message` | subscription ID | topic, payload, contentType, userProperties (JSON), correlationId, deliveryMode, receivedAt, seq |
-| `subscriptionStatus` | subscription ID | `STOPPED`, `DOWN`, `THROTTLED`, `RESUMED` + message |
-
-### HelpService – `/odata/v4/help` (every logged-in user)
-
-Serves the user guide for the **Help app**. `docs/user-guide.md` stays the only source: `srv/lib/help-content.ts` reads it on the server, renders it with `markdown-it` and cuts it into sections, so the browser gets finished HTML and needs no Markdown library.
-
-| Element | Description |
-|---|---|
-| `Sections` (read only, no database) | one row per `## ` heading: `id` (anchor), `number`, `title`, `html`, `text` (plain text for the search), `headings` (JSON list of the `###` / `####` headings with their anchors) |
-
-Rules of the rendering (so write the guide accordingly):
-
-- Section 1 "Overview" is everything before the first `## ` (title and introduction). A section called "Contents" is skipped, the Help app has its own navigation.
-- **Anchors are the same as on GitHub** (`## 8. Watch messages live (Live Subscriber)` → `8-watch-messages-live-live-subscriber`, repeated headings get `-1`, `-2`), so the `[…](#anchor)` links of the guide's table of contents work in the Help app. `###` headings become the sub items of the navigation.
-- **Raw HTML in the Markdown is not passed through** (it is shown as text); links to other sites open in a new tab; wide tables scroll inside the page.
- in `app/help/xs-app.json`. `test/help.test.ts` checks that every picture the guide names exists.
+- **Pictures.** The guide writes them as `![text](images/guides/x.png)` (relative to `docs/`, so they also show on GitHub). The renderer turns that into `<img src="docs-images/guides/x.png">` inside a link that opens the full size in a new tab; anything that is not `images/...` (other sites, `..`) gets no source at all. `srv/server.ts` serves `docs/images` (deployed: `gen/srv/docs/images`, copied by `scripts/build-docs.js`) with `express.static` under `/docs-images`, public like the guide text; locally after the path rewriting of the apps (`/comaemsuite<app>/docs-images/`), in BTP through the route `^/docs-images/(.*)$` in `app/help/xs-app.json`. `test/help.test.ts` checks that every picture the guide names exists.
 - **The pictures of the step-by-step parts** (`docs/images/guides`) are made by `scripts/screenshots/guides.spec.ts` (`npm run docs:screenshots -- guides`): the spec walks the steps of each guide in the running app on the demo data and frames the element to click, so a guide that no longer matches the screens fails the spec. Run it after UI changes and commit the changed pictures.
 - The file is re-rendered when its modification time changes, so edits show up while developing. `cds.aemSuite.help.file` overrides the location (relative to the project root). Deployed, `scripts/build-docs.js` copies the guide to `gen/srv/docs/` (MTA build step, after `cds build`) - a system without the file answers 404 "The user guide is not available".
 - `@requires: 'authenticated-user'`: help is not tied to a role.
@@ -611,6 +394,10 @@ Variables may reference other variables (depth 5, cycle detection). Unknown name
 ### 7.5 `runs/test-case-spec.ts`
 
 Loads test cases with properties and variables, builds the variable scopes (`loadVariableScopes`: global, per broker, per folder + the tree), computes the folder chain of a node (`scopeFor`) and turns a test case into a `PublishSpec` (`buildSpec`): rejects empty topics and wildcards, applies content-type detection and property-type inference as fallbacks.
+
+### 7.5a `runs/expectations.ts` – expected outcome
+
+A test case with `expectMode` other than NONE waits for a message after sending. `buildSpec` resolves `expectSource` and the check values with the **same** template resolver as the message, so `{{uuid}}` in a check is the uuid that was sent; REPLY without a source gets `aem-suite/reply/<uuid>` and sets it as reply-to of the message. The runner calls `Publisher.listen` **before** publishing (TOPIC/REPLY: a topic subscription on the run's session, filtered with `topicMatches`; QUEUE: a CLIENT-ack consumer that acknowledges only the accepted message), then waits the rest of `expectTimeoutMs`. With `expectCorrelation` only a message with the sent correlation ID is accepted. `evaluateChecks` compares; the result is PASSED only if the message arrived and every check held, the checks are stored in `RunResultChecks`. `checkProblem` is the save-time validation (path readable, regex valid unless templated).
 
 ### 7.6 `runs/test-runner.ts`
 

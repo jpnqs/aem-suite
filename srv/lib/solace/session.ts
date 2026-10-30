@@ -47,15 +47,26 @@ export interface PublishSpec {
   correlationId?: string | null
   userProperties?: UserProperty[]
   ackTimeoutMs?: number | null
+  /** request/reply: the topic the answer is expected on */
+  replyTo?: string | null
 }
 
 export interface PublishResult {
   latencyMs: number
 }
 
+/** Waits for an expected message (lib/runs/expectations.ts); messages that arrive before wait() are kept. */
+export interface ExpectListener {
+  /** the first accepted message, undefined if none arrived within timeoutMs (counted from this call) */
+  wait(timeoutMs: number): Promise<ReceivedMessage | undefined>
+  close(): Promise<void>
+}
+
 /** Minimal publishing contract, so the test runner can be tested with a stub. */
 export interface Publisher {
   publish(spec: PublishSpec): Promise<PublishResult>
+  /** Starts listening on a topic subscription or a queue - before the message is published. */
+  listen?(kind: 'TOPIC' | 'QUEUE', source: string, accept: (msg: ReceivedMessage) => boolean): Promise<ExpectListener>
   close(): Promise<void>
 }
 
@@ -227,6 +238,59 @@ export class SolaceSession implements Publisher {
     })
   }
 
+  /** Removes a topic subscription (no confirmation awaited: the messages are filtered by the listener anyway). */
+  unsubscribe(topic: string): void {
+    if (this.closed) return
+    const s = sol()
+    try {
+      this.session.unsubscribe(s.SolclientFactory.createTopicDestination(topic), false, randomUUID(), 10000)
+    } catch {
+      /* the session may be going down */
+    }
+  }
+
+  /**
+   * Listens for an expected message: on a topic subscription (subscribed now, removed on close) or on a queue
+   * (consumed: the accepted message is acknowledged, the others go back to the queue when the listener closes).
+   */
+  async listen(kind: 'TOPIC' | 'QUEUE', source: string, accept: (msg: ReceivedMessage) => boolean): Promise<ExpectListener> {
+    const inbox = new ExpectInbox()
+    if (kind === 'TOPIC') {
+      const off = this.onMessage((m) => {
+        const msg = readMessage(m)
+        if (topicMatches(source, msg.topic) && accept(msg)) inbox.deliver(msg)
+      })
+      try {
+        await this.subscribe(source)
+      } catch (e) {
+        off()
+        throw e
+      }
+      inbox.onClose = async () => {
+        off()
+        this.unsubscribe(source)
+      }
+      return inbox
+    }
+    const s = sol()
+    const consumer = await this.createQueueConsumer(source)
+    consumer.on(s.MessageConsumerEventName.MESSAGE, (m: solace.Message) => {
+      const msg = readMessage(m)
+      if (!inbox.done && accept(msg)) {
+        m.acknowledge()
+        inbox.deliver(msg)
+      }
+    })
+    inbox.onClose = async () => {
+      try {
+        consumer.disconnect()
+      } catch {
+        /* ignore */
+      }
+    }
+    return inbox
+  }
+
   /** Registers a listener for direct messages (topic subscriptions). Returns an unregister function. */
   onMessage(listener: (msg: solace.Message) => void): () => void {
     this.messageListeners.add(listener)
@@ -332,6 +396,66 @@ export class SolaceSession implements Publisher {
   }
 }
 
+/** The first accepted message of an ExpectListener. */
+class ExpectInbox implements ExpectListener {
+  private message?: ReceivedMessage
+  private waiting?: (msg: ReceivedMessage | undefined) => void
+  onClose?: () => Promise<void>
+  private closed = false
+
+  get done(): boolean {
+    return !!this.message || this.closed
+  }
+
+  deliver(msg: ReceivedMessage): void {
+    if (this.done) return
+    this.message = msg
+    this.waiting?.(msg)
+  }
+
+  wait(timeoutMs: number): Promise<ReceivedMessage | undefined> {
+    if (this.message || this.closed) return Promise.resolve(this.message)
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.waiting = undefined
+        resolve(undefined)
+      }, timeoutMs)
+      this.waiting = (msg) => {
+        clearTimeout(timer)
+        this.waiting = undefined
+        resolve(msg)
+      }
+    })
+  }
+
+  async close(): Promise<void> {
+    if (this.closed) return
+    this.closed = true
+    this.waiting?.(this.message)
+    await this.onClose?.()
+  }
+}
+
+/**
+ * Whether a topic matches a Solace topic subscription: levels split by "/", "*" alone is any one level,
+ * "abc*" a level starting with abc, ">" as the last level one or more levels.
+ */
+export function topicMatches(subscription: string, topic: string): boolean {
+  const sub = subscription.split('/')
+  const levels = topic.split('/')
+  for (let i = 0; i < sub.length; i++) {
+    const s = sub[i]
+    if (s === '>' && i === sub.length - 1) return levels.length > i
+    const level = levels[i]
+    if (level === undefined) return false
+    if (s === '*') continue
+    if (s.endsWith('*')) {
+      if (!level.startsWith(s.slice(0, -1))) return false
+    } else if (s !== level) return false
+  }
+  return levels.length === sub.length
+}
+
 /**
  * Connects a queue consumer / browser and resolves once it is up. Guarded by a timeout: if the broker never
  * answers, the caller (a live subscription being started) must not hang and keep its slot for good.
@@ -381,6 +505,8 @@ export function buildMessage(spec: PublishSpec): solace.Message {
   )
   if (spec.contentType) msg.setHttpContentType(spec.contentType)
   if (spec.correlationId) msg.setCorrelationId(spec.correlationId)
+  // setReplyTo exists on every message, the typings of solclientjs only declare it elsewhere
+  if (spec.replyTo) (msg as unknown as { setReplyTo(d: solace.Destination): void }).setReplyTo(s.SolclientFactory.createTopicDestination(spec.replyTo))
   if (spec.timeToLiveMs && spec.timeToLiveMs > 0) msg.setTimeToLive(spec.timeToLiveMs)
   if (spec.dmqEligible != null) msg.setDMQEligible(!!spec.dmqEligible)
   if (spec.priority != null) msg.setPriority(spec.priority)

@@ -2,7 +2,7 @@ import cds from '@sap/cds'
 import path from 'node:path'
 import type { AemSuiteConfig } from '../srv/lib/core/config'
 import { setConnector } from '../srv/lib/solace/connector'
-import type { PublishSpec } from '../srv/lib/solace/session'
+import { topicMatches, type ExpectListener, type PublishSpec, type ReceivedMessage } from '../srv/lib/solace/session'
 import { waitForRun } from '../srv/lib/runs/test-runner'
 
 /** The mocked users (package.json, profiles development and test). */
@@ -124,24 +124,61 @@ const safeJson = (s: string) => {
  * Replaces the broker connection for the enclosing describe: records every connection and publish, fails to
  * connect to a broker named "unreachable" and rejects topics that contain "reject".
  */
+type Listening = { kind: 'TOPIC' | 'QUEUE'; source: string }
+
+/** The message itself on a matching subscription / queue "q/<topic>", or a reply to it on its reply-to topic. */
+function echo(spec: PublishSpec, l: Listening): ReceivedMessage | undefined {
+  const as = (topic: string): ReceivedMessage => ({
+    topic,
+    payload: spec.payload,
+    contentType: spec.contentType ?? null,
+    userProperties: Object.fromEntries((spec.userProperties ?? []).map((p) => [p.name, p.value])),
+    correlationId: spec.correlationId ?? null,
+    deliveryMode: 'DIRECT',
+    receivedAt: new Date()
+  })
+  if (spec.replyTo) return l.source === spec.replyTo ? as(spec.replyTo) : undefined
+  if (l.kind === 'QUEUE') return l.source === `q/${spec.topic}` ? as(spec.topic) : undefined
+  return topicMatches(l.source, spec.topic) ? as(spec.topic) : undefined
+}
+
 export function fakeBroker(latencyMs = 1) {
   const broker = {
     published: [] as { broker: string; spec: PublishSpec }[],
     /** broker name -> user name of the last connection */
     connectedAs: {} as Record<string, string>,
     /** broker name -> password of the last connection */
-    connectedWith: {} as Record<string, string>
+    connectedWith: {} as Record<string, string>,
+    /**
+     * What arrives after a message is published, per listener (expected outcome of a test case); undefined = nothing.
+     * Default: the message itself on a matching topic subscription or on queue "q/<topic>", a reply echoing the message.
+     */
+    respond: undefined as undefined | ((spec: PublishSpec, listening: Listening) => ReceivedMessage | undefined)
   }
   beforeAll(() =>
     setConnector(async (conn) => {
       broker.connectedAs[conn.brokerName] = conn.userName
       broker.connectedWith[conn.brokerName] = conn.password
       if (conn.brokerName === 'unreachable') throw new Error('Connect failed: Unauthorized')
+      const listeners = new Set<Listening & { accept: (m: ReceivedMessage) => boolean; got?: ReceivedMessage }>()
       return {
         publish: async (spec) => {
           broker.published.push({ broker: conn.brokerName, spec })
           if (spec.topic.includes('reject')) throw new Error('Rejected by broker: no subscribers')
+          for (const l of listeners) {
+            const msg = (broker.respond ?? echo)(spec, l)
+            if (msg && !l.got && l.accept(msg)) l.got = msg
+          }
           return { latencyMs }
+        },
+        listen: async (kind, source, accept): Promise<ExpectListener> => {
+          if (source.includes('missing')) throw new Error(`Cannot bind to queue "${source}": Unknown Queue`)
+          const l = { kind, source, accept } as Listening & { accept: (m: ReceivedMessage) => boolean; got?: ReceivedMessage }
+          listeners.add(l)
+          return {
+            wait: async () => l.got,
+            close: async () => void listeners.delete(l)
+          }
         },
         close: async () => undefined
       }
@@ -153,10 +190,12 @@ export function fakeBroker(latencyMs = 1) {
 
 /** Children before parents, so no foreign key complains. */
 const TABLES = [
+  'RunResultChecks',
   'RunResults',
   'TestRuns',
   'TestCaseStats',
   'TestCaseProperties',
+  'TestCaseChecks',
   'TestCaseVariables',
   'TestCases',
   'Variables',

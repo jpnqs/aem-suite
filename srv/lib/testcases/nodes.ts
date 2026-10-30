@@ -7,11 +7,12 @@ import { assertValid, nextSortOrder, NodeData, validateEnums, validateNode, vali
 
 export type NodeRow = NodeData & Record<string, unknown>
 
-/** Test cases / folders with their user properties and variables (all columns). */
+/** Test cases / folders with their user properties, checks and variables (all columns). */
 export async function selectNodesDeep(where?: Record<string, unknown>, from: unknown = TestCases): Promise<NodeRow[]> {
   const query = SELECT.from(from as string, (t: any) => {
     t`.*`
     t.userProperties((p: any) => p`.*`)
+    t.checks((c: any) => c`.*`)
     t.variables((v: any) => v`.*`)
   })
   return (await (where ? query.where(where) : query)) as NodeRow[]

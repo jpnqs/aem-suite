@@ -6,7 +6,7 @@ import { selectNodesDeep } from './nodes'
 import { loadTree, renumberSiblings, TreeNode } from './tree'
 
 const MANAGED = ['createdAt', 'createdBy', 'modifiedAt', 'modifiedBy']
-/** keys of the child rows (user properties, variables) that must be new for the copy */
+/** keys of the child rows (user properties, checks, variables) that must be new for the copy */
 const CHILD_KEYS = ['ID', 'testCase_ID']
 
 export interface CopyResult {
@@ -16,7 +16,7 @@ export interface CopyResult {
 
 /**
  * Copies test cases and folders. A folder is copied with everything below it (subfolders, test cases,
- * user properties, variables). Nodes that lie below another selected node are copied with that node only.
+ * user properties, checks, variables). Nodes that lie below another selected node are copied with that node only.
  * Every copy is named "<name> (Copy)" and placed right after its original.
  */
 export async function copyNodes(ids: string[]): Promise<CopyResult[]> {
@@ -48,13 +48,14 @@ async function copySubtree(rootId: string, children: Map<string | null, TreeNode
     if (!row) return undefined // deleted meanwhile
     const isRoot = id === rootId
     return {
-      ...omit(row, [...MANAGED, 'userProperties', 'variables']),
+      ...omit(row, [...MANAGED, 'userProperties', 'checks', 'variables']),
       ID: newIds.get(id),
       parent_ID: isRoot ? row.parent_ID : newIds.get(row.parent_ID as string),
       name: isRoot ? copyName : row.name,
       // right behind the original; the siblings are renumbered below
       ...(isRoot ? { sortOrder: (row.sortOrder ?? 0) + 1 } : {}),
       userProperties: (row.userProperties ?? []).map((p) => omit(p, CHILD_KEYS)),
+      checks: (row.checks ?? []).map((c) => omit(c, CHILD_KEYS)),
       variables: (row.variables ?? []).map((v) => omit(v, CHILD_KEYS))
     }
   }

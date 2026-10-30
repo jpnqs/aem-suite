@@ -17,6 +17,7 @@ Every chapter starts with the clicks, step by step (the element to click is fram
   - [Export and import](#export-and-import)
 - [5. Create and edit a test case](#5-create-and-edit-a-test-case)
   - [The fields](#the-fields)
+  - [Expected outcome: check what arrives](#expected-outcome-check-what-arrives)
 - [6. Run tests](#6-run-tests)
   - [Advanced settings](#advanced-settings)
   - [What do the results mean?](#what-do-the-results-mean)
@@ -258,8 +259,23 @@ Open it, click **Edit**, change, click **Save** at the bottom. **Discard Draft**
 | **Time to Live (ms)**, **Priority**, **DMQ Eligible** | empty | empty = no expiry / broker default |
 | **User Properties** | – | name, type and value of SMF user properties; values may use variables; an empty type is detected (`42` Integer, `true` Boolean, else String) |
 | **Variables** | – | values for this test case only – they win over all others |
+| **Expected Outcome** | Acknowledgement only | what has to arrive after sending – see below |
 
 Save before running – a draft cannot be run.
+
+### Expected outcome: check what arrives
+
+By default a test passes when the broker accepts the message. In the section **Expected Outcome** a test case can also require that a message **arrives** – and check what it holds.
+
+| Field | Meaning |
+|---|---|
+| **Expected Message** | **Acknowledgement only** (default) · **Message on a topic**: a message arrives on a topic subscription (wildcards allowed, e.g. `acme/orders/>`) · **Message on a queue**: a message arrives on a queue – it is *consumed* · **Reply**: request/reply – the message is sent with a reply-to topic and the answer must arrive there |
+| **Topic / Queue** | the subscription, the queue name or the reply-to topic. For *Reply* it may stay empty: every message gets a topic of its own (`aem-suite/reply/` plus a new uuid). Variables allowed. |
+| **Wait for Message (ms)** | how long to wait after sending (default 5000) |
+| **Same Correlation ID** | on (default): only a message with the correlation ID of the sent one counts – other traffic on the topic is ignored. Switch it off if your consumer does not pass the correlation ID on. |
+| **Checks** | all must hold for the message that arrived. **Looks At**: *JSON path* (e.g. `order.items[0].id`), *Payload*, *User property* (path = its name), *Topic*, *Correlation ID*, *Content type*. **Operator**: equals, does not equal, contains, matches (regular expression), exists, does not exist. **Expected Value** may use variables – they have the values of the **sent** message, so `{{uuid}}` is the uuid that was sent. |
+
+Listening starts **before** the message is sent, so a fast answer is not missed. The **Preview** shows the expectation with its values.
 
 ---
 
@@ -297,14 +313,14 @@ The dialog tells you what you are about to start ("30 or more messages … the p
 
 | Result | Meaning |
 |---|---|
-| **PASSED** | persistent: the broker acknowledged the message. Direct: it was sent. |
-| **FAILED** | the broker rejected the message, or no acknowledgement came in time |
+| **PASSED** | persistent: the broker acknowledged the message. Direct: it was sent. With an *expected outcome*: also the expected message arrived in time and all checks held. |
+| **FAILED** | the broker rejected the message, or no acknowledgement came in time – or the expected message did not arrive, or a check failed (the error says which, and what was found) |
 | **ERROR** | not sent at all – unknown variable, invalid JSON, wrong password, broker not reachable … |
 | **SKIPPED** | not sent: the run was stopped, or *Stop at the first failure* |
 
 A whole run ends **PASSED**, **FAILED**, **STOPPED** (stopped by you, nothing failed before) or is still **RUNNING**.
 
-PASSED means the broker **accepted** the message – not that a consumer processed it. To see that, use the Live Subscriber.
+Without an expected outcome, PASSED means the broker **accepted** the message – not that a consumer processed it. To test that, give the test case an [expected outcome](#expected-outcome-check-what-arrives).
 
 ---
 
@@ -315,7 +331,7 @@ PASSED means the broker **accepted** the message – not that a consumer process
 ![The Test Runs list](images/guides/results-2-list.png)
 
 - Click a **test case** or **broker** name to open it, the **run** to see all its results with the totals.
-- Click a row for the details: the **resolved payload** that was really sent (formatted, read-only), topic, correlation ID and the error text.
+- Click a row for the details: the **resolved payload** that was really sent (formatted, read-only), topic, correlation ID and the error text. With an expected outcome also the section **Expected Outcome**: where the message arrived, after how long (*Receive Latency*), its payload, and every check with the value found.
 
    ![The results of a run](images/guides/results-1-run.png)
 

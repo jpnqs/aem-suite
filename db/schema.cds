@@ -115,6 +115,62 @@ type ReceivedDeliveryMode : String(20) enum {
   PERSISTENT;
 }
 
+/**
+ * What a test case expects after sending (besides the broker's acknowledgement):
+ * NONE - nothing, TOPIC - a message on a topic subscription, QUEUE - a message on a queue,
+ * REPLY - an answer to the message (request/reply: the message carries a reply-to topic).
+ */
+@assert.range
+type ExpectMode : String(10) enum {
+  NONE;
+  TOPIC;
+  QUEUE;
+  REPLY;
+}
+
+/** what a check of the received message looks at */
+@assert.range
+type CheckTarget : String(20) enum {
+  /** the payload as text */
+  PAYLOAD;
+  /** a value of the JSON payload, path like order.items[0].id */
+  JSON_PATH;
+  /** a user property, path = its name */
+  PROPERTY;
+  TOPIC;
+  CORRELATION_ID;
+  CONTENT_TYPE;
+}
+
+@assert.range
+type CheckOperator : String(15) enum {
+  EQUALS;
+  NOT_EQUALS;
+  CONTAINS;
+  /** regular expression */
+  MATCHES;
+  ![EXISTS];
+  NOT_EXISTS;
+}
+
+@singular: 'ExpectModeCode'
+entity ExpectModes : CodeList {
+  key code     : ExpectMode;
+      position : Integer;
+}
+
+@singular: 'CheckTargetCode'
+entity CheckTargets : CodeList {
+  key code     : CheckTarget;
+      position : Integer;
+}
+
+@singular: 'CheckOperatorCode'
+entity CheckOperators : CodeList {
+  key code     : CheckOperator;
+      position : Integer;
+}
+
 /** Client username on a broker (Brokers and the saved setups of the live subscriber). */
 type Username : String(200);
 
@@ -190,8 +246,22 @@ entity TestCases : cuid, managed {
   /** correlation id template, e.g. {{uuid}} */
   correlationId  : String(200);
   ackTimeoutMs   : Integer default 5000 @assert.range: [100, 120000];
+  /** expected outcome: a message that has to arrive after sending (NONE / empty = the broker's acknowledgement is enough) */
+  expectMode     : ExpectMode default 'NONE';
+  /** TOPIC: topic subscription (wildcards allowed), QUEUE: queue name, REPLY: reply-to topic (empty = generated); templates */
+  expectSource   : String(500);
+  /** how long to wait for the expected message */
+  expectTimeoutMs : Integer default 5000 @assert.range: [100, 120000];
+  /** only a message with the correlation id of the sent one counts (if the test case sends one) */
+  expectCorrelation : Boolean default true;
+  /** the text of expectMode (code list), so the page shows "Reply" instead of REPLY */
+  expectModeInfo : Association to one ExpectModes
+                     on expectModeInfo.code = $self.expectMode;
   userProperties : Composition of many TestCaseProperties
                      on userProperties.testCase = $self;
+  /** checks of the expected message (all must hold) */
+  checks         : Composition of many TestCaseChecks
+                     on checks.testCase = $self;
   variables      : Composition of many TestCaseVariables
                      on variables.testCase = $self;
   /**
@@ -234,6 +304,24 @@ entity TestCaseProperties : cuid {
   type     : PropertyType;
   /** value template */
   value    : String(1000);
+}
+
+/** A check of the message a test case expects (TestCases.expectMode). */
+entity TestCaseChecks : cuid {
+  testCase  : Association to TestCases;
+  /** order of the checks */
+  position  : Integer default 0;
+  target    : CheckTarget @mandatory;
+  /** JSON_PATH: path in the payload (order.items[0].id), PROPERTY: name of the user property */
+  path      : String(500);
+  operator  : CheckOperator @mandatory;
+  /** expected value (template, resolved together with the sent message: {{uuid}} is the same value) */
+  value     : String(2000);
+  /** the texts of target and operator (code lists) */
+  targetInfo   : Association to one CheckTargets
+                   on targetInfo.code = $self.target;
+  operatorInfo : Association to one CheckOperators
+                   on operatorInfo.code = $self.operator;
 }
 
 /** Variables local to a test case - highest precedence. */
@@ -284,6 +372,16 @@ entity RunResults : cuid {
   resolvedPayload : LargeString;
   correlationId   : String(200);
   ackLatencyMs    : Integer;
+  /** the expected message (test cases with expectMode): where it came from, after how long, what it held */
+  expectMode      : ExpectMode;
+  receivedTopic   : String(500);
+  receivedPayload : LargeString;
+  /** time from sending until the expected message arrived */
+  receiveLatencyMs : Integer;
+  checks          : Composition of many RunResultChecks
+                      on checks.result = $self;
+  expectModeInfo  : Association to one ExpectModes
+                      on expectModeInfo.code = $self.expectMode;
   errorMessage    : String(2000);
   executedAt      : Timestamp;
   /** the texts of status and deliveryMode (the code lists), so lists show "Passed" instead of PASSED */
@@ -291,6 +389,17 @@ entity RunResults : cuid {
                       on statusInfo.code = $self.status;
   deliveryModeInfo : Association to one DeliveryModes
                       on deliveryModeInfo.code = $self.deliveryMode;
+}
+
+/** The outcome of one check of a test case on the received message (snapshot: readable if the test case changes). */
+entity RunResultChecks : cuid {
+  result      : Association to RunResults;
+  position    : Integer;
+  /** e.g. "JSON path order.id equals 4711" */
+  description : String(1000);
+  passed      : Boolean;
+  /** the value found in the message (cut), empty = not there */
+  actual      : String(2000);
 }
 
 /** Messages captured by the live subscriber that a user decided to keep. */
@@ -435,6 +544,10 @@ annotate TestCases with {
   priority      @title: '{i18n>Priority0255}'  @Common.QuickInfo: '{i18n>InfoEmptyBrokerDefault}';
   correlationId @title: '{i18n>CorrelationID}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur2}';
   ackTimeoutMs  @title: '{i18n>ACKTimeoutMs}';
+  expectMode    @title: '{i18n>ExpectedMessage}'  @Common.QuickInfo: '{i18n>InfoExpectMode}';
+  expectSource  @title: '{i18n>ExpectSource}'  @Common.QuickInfo: '{i18n>InfoExpectSource}';
+  expectTimeoutMs @title: '{i18n>ExpectTimeoutMs}';
+  expectCorrelation @title: '{i18n>ExpectCorrelation}'  @Common.QuickInfo: '{i18n>InfoExpectCorrelation}';
   createdBy     @title: '{i18n>CreatedBy}';
   modifiedAt    @title: '{i18n>ChangedAt}';
   modifiedBy    @title: '{i18n>ChangedBy}';
@@ -451,6 +564,21 @@ annotate TestCaseProperties with {
   name  @title: '{i18n>Name}';
   value @title: '{i18n>Value}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur3}';
   type  @title: '{i18n>Type}'  @Common.QuickInfo: '{i18n>InfoEmptyDetectedOnSave42IntegerTrueBool}';
+};
+
+annotate TestCaseChecks with {
+  position @title: '{i18n>Position}';
+  target   @title: '{i18n>CheckTarget}';
+  path     @title: '{i18n>CheckPath}'  @Common.QuickInfo: '{i18n>InfoCheckPath}';
+  operator @title: '{i18n>CheckOperator}';
+  value    @title: '{i18n>ExpectedValue}'  @Common.QuickInfo: '{i18n>InfoCheckValue}';
+};
+
+annotate RunResultChecks with {
+  position    @title: '{i18n>Position}';
+  description @title: '{i18n>Check}';
+  passed      @title: '{i18n>Passed}';
+  actual      @title: '{i18n>FoundValue}';
 };
 
 annotate TestCaseVariables with {
@@ -492,6 +620,10 @@ annotate RunResults with {
   resolvedPayload @title: '{i18n>Payload}';
   correlationId   @title: '{i18n>CorrelationID}';
   ackLatencyMs    @title: '{i18n>ACKLatencyMs}';
+  expectMode      @title: '{i18n>ExpectedMessage}';
+  receivedTopic   @title: '{i18n>ReceivedTopic}';
+  receivedPayload @title: '{i18n>ReceivedPayload}';
+  receiveLatencyMs @title: '{i18n>ReceiveLatencyMs}'  @Common.QuickInfo: '{i18n>InfoReceiveLatency}';
   errorMessage    @title: '{i18n>Error}';
   executedAt      @title: '{i18n>ExecutedAt}';
 };
