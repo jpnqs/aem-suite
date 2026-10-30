@@ -17,6 +17,8 @@ Every chapter starts with the clicks, step by step (the element to click is fram
   - [Export and import](#export-and-import)
 - [5. Create and edit a test case](#5-create-and-edit-a-test-case)
   - [The fields](#the-fields)
+  - [Versions](#versions)
+  - [Tags and editing many test cases at once](#tags-and-editing-many-test-cases-at-once)
 - [6. Run tests](#6-run-tests)
   - [Advanced settings](#advanced-settings)
   - [What do the results mean?](#what-do-the-results-mean)
@@ -260,8 +262,18 @@ Open it, click **Edit**, change, click **Save** at the bottom. **Discard Draft**
 | **Time to Live (ms)**, **Priority**, **DMQ Eligible** | empty | empty = no expiry / broker default |
 | **User Properties** | – | name, type and value of SMF user properties; values may use variables; an empty type is detected (`42` Integer, `true` Boolean, else String) |
 | **Variables** | – | values for this test case only – they win over all others |
+| **Tags** | – | words to find and run test cases by, e.g. `smoke, regression` (test cases and folders). Stored in lower case; one word each (letters, digits, `.` `_` `-`) |
 
 Save before running – a draft cannot be run.
+
+### Versions
+
+Every save keeps a **version** (section *Versions* at the bottom of the page): who saved it when, and which fields changed. Select one and click **Restore** to put the test case back to that state – the restore is a version of its own, so you can go back again. The last 50 versions are kept. A test case that someone is editing cannot be restored until the draft is saved or discarded.
+
+### Tags and editing many test cases at once
+
+- To run all test cases with a tag: filter the list by **Tags** (e.g. *contains smoke*), select all, **Run…**.
+- **Edit Selected…** changes all selected test cases in one go: add or remove tags, set the delivery mode or the ACK timeout, or replace a part of the topics (e.g. `/v1/` → `/v2/`). A selected folder stands for every test case below it (tags are set on the folder itself). Empty fields stay as they are. If one result would break a rule, nothing is changed; test cases that someone is editing are left alone and named.
 
 ---
 

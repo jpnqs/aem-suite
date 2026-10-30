@@ -6,6 +6,7 @@
 export const TEST_FIELDS = {
   name: 'text',
   description: 'text',
+  tags: 'text',
   topic: 'text',
   payload: 'text',
   contentType: 'text',
@@ -20,7 +21,7 @@ export const TEST_FIELDS = {
 export type TestField = keyof typeof TEST_FIELDS
 
 /** What a folder has of these fields. */
-export const FOLDER_FIELDS: readonly TestField[] = ['name', 'description']
+export const FOLDER_FIELDS: readonly TestField[] = ['name', 'description', 'tags']
 
 /** Elements of aem.suite.TestCases that are no user input: keys, tree, managed fields, compositions, statistics. */
-export const TECHNICAL_ELEMENTS = ['ID', 'kind', 'parent', 'children', 'sortOrder', 'userProperties', 'variables', 'lastResult', 'creator', 'createdAt', 'createdBy', 'modifiedAt', 'modifiedBy']
+export const TECHNICAL_ELEMENTS = ['ID', 'kind', 'parent', 'children', 'sortOrder', 'userProperties', 'variables', 'lastResult', 'versions', 'creator', 'createdAt', 'createdBy', 'modifiedAt', 'modifiedBy']

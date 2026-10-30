@@ -13,6 +13,7 @@ import { runOutcome, startRun, toCredentials } from './lib/runs/test-runner'
 import { brokerRedactor } from './lib/broker/redact'
 import { appLinks } from './lib/core/public-url'
 import { loadTree } from './lib/testcases/tree'
+import { recordVersion } from './lib/testcases/versions'
 
 const LOG = cds.log('aem-agent')
 const MAX_WAIT_SECONDS = 30
@@ -85,9 +86,10 @@ export default class TestAgentService extends cds.ApplicationService {
 
     // ---------------------------------------------------------------- plan: create and change
     this.on('createFolder', async (req) => {
-      const { name, description, parentId, variables } = req.data as {
+      const { name, description, tags, parentId, variables } = req.data as {
         name: string
         description?: string
+        tags?: string
         parentId?: string
         variables?: VariableInput[]
       }
@@ -96,10 +98,11 @@ export default class TestAgentService extends cds.ApplicationService {
         kind: 'FOLDER',
         name,
         description: description ?? null,
+        tags: tags ?? null,
         parent_ID: parentId ?? null,
         variables: toVariables(variables)
       }
-      return createNode(d as NodeData)
+      return withVersion(await createNode(d as NodeData))
     })
 
     this.on('createTestCase', async (req) => {
@@ -116,7 +119,7 @@ export default class TestAgentService extends cds.ApplicationService {
       d.correlationId ??= STARTER_CORRELATION_ID
       d.userProperties = toProperties(input.userProperties)
       d.variables = toVariables(input.variables)
-      return createNode(d as unknown as NodeData)
+      return withVersion(await createNode(d as unknown as NodeData))
     })
 
     this.on('updateTestCase', async (req) => {
@@ -136,11 +139,12 @@ export default class TestAgentService extends cds.ApplicationService {
         validateEnums(merged, reject)
         validateNode(merged, 'UPDATE', reject)
       })
+      if (changes.tags !== undefined) changes.tags = merged.tags
       return saveChanges(input.id, changes, userProperties, variables)
     })
 
     this.on('updateFolder', async (req) => {
-      const input = req.data as { id: string; name?: string; description?: string; variables?: VariableInput[] }
+      const input = req.data as { id: string; name?: string; description?: string; tags?: string; variables?: VariableInput[] }
       const current = await loadNode(input.id)
       if (!current) return req.reject(404, 'Folder not found')
       if (current.kind !== 'FOLDER') return req.reject(400, 'This is a test case - use updateTestCase')
@@ -148,9 +152,11 @@ export default class TestAgentService extends cds.ApplicationService {
       const changes: Record<string, unknown> = {}
       if (input.name != null) changes.name = input.name
       if (input.description != null) changes.description = input.description
+      if (input.tags != null) changes.tags = input.tags
       const variables = input.variables ? toVariables(input.variables) : undefined
       const merged = { ...current, ...changes, variables: variables ?? current.variables }
       await assertValid((reject) => validateNode(merged, 'UPDATE', reject))
+      if (changes.tags !== undefined) changes.tags = merged.tags
       return saveChanges(input.id, changes, undefined, variables)
     })
 
@@ -287,8 +293,15 @@ async function saveChanges(
     await DELETE.from(TestCaseVariables).where({ testCase_ID: id })
     if (variables.length) await INSERT.into(TestCaseVariables).entries(variables.map((v) => ({ ...v, testCase_ID: id })))
   }
+  await recordVersion(id)
   const row = await SELECT.one.from(TestCases, id).columns('ID', 'name', 'kind')
   return { ID: id, name: row?.name ?? '', kind: row?.kind ?? '' }
+}
+
+/** A test case or folder an agent created gets its first version, like one saved in the app. */
+async function withVersion<T extends { ID: string }>(node: T): Promise<T> {
+  await recordVersion(node.ID)
+  return node
 }
 
 const loadNode = (id: string): Promise<NodeRow | undefined> => selectNodeDeep(id)

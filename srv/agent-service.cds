@@ -28,6 +28,8 @@ service TestAgentService {
       kind,
       name,
       description,
+      /** lower case, comma separated, e.g. "regression, smoke" */
+      tags,
       topic,
       payload,
       contentType,
@@ -182,6 +184,8 @@ service TestAgentService {
                       name : String,
                       /** Documentation (Markdown) */
                       description : String,
+                      /** comma separated, e.g. "smoke, regression" */
+                      tags : String,
                       parentId : UUID,
                       variables : many VariableInput) returns NodeRef;
 
@@ -205,6 +209,8 @@ service TestAgentService {
                         ackTimeoutMs : Integer,
                         /** Documentation (Markdown) */
                         description : String,
+                        /** comma separated, e.g. "smoke, regression" */
+                        tags : String,
                         parentId : UUID,
                         userProperties : many PropertyInput,
                         variables : many VariableInput) returns NodeRef;
@@ -222,6 +228,7 @@ service TestAgentService {
                         correlationId : String,
                         ackTimeoutMs : Integer,
                         description : String,
+                        tags : String,
                         userProperties : many PropertyInput,
                         variables : many VariableInput) returns NodeRef;
 
@@ -229,6 +236,7 @@ service TestAgentService {
   action updateFolder(id : UUID not null,
                       name : String,
                       description : String,
+                      tags : String,
                       variables : many VariableInput) returns NodeRef;
 
   /** Moves a test case or folder into another folder (parentId empty = top level). */

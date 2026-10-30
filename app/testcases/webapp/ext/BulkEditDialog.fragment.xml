@@ -1,0 +1,41 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:f="sap.ui.layout.form">
+  <!-- "Edit Selected": changes many test cases at once (TestService.bulkUpdate). Empty fields stay unchanged. -->
+  <Dialog
+    title="{i18n>bulk.title}"
+    contentWidth="36rem"
+    resizable="true"
+    draggable="true">
+    <content>
+      <VBox class="sapUiSmallMargin">
+        <MessageStrip text="{bulk>/info}" type="Information" showIcon="true" class="sapUiSmallMarginBottom" />
+        <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanM="4" labelSpanL="4">
+          <Label text="{i18n>bulk.addTags}" />
+          <Input value="{bulk>/addTags}" placeholder="{i18n>bulk.tagsPlaceholder}" />
+          <Label text="{i18n>bulk.removeTags}" />
+          <Input value="{bulk>/removeTags}" placeholder="{i18n>bulk.tagsPlaceholder}" />
+          <Label text="{i18n>bulk.deliveryMode}" />
+          <Select selectedKey="{bulk>/deliveryMode}" forceSelection="false">
+            <core:Item key="" text="{i18n>bulk.unchanged}" />
+            <core:Item key="PERSISTENT" text="{i18n>bulk.persistent}" />
+            <core:Item key="DIRECT" text="{i18n>bulk.direct}" />
+          </Select>
+          <Label text="{i18n>bulk.ackTimeout}" />
+          <Input value="{bulk>/ackTimeoutMs}" type="Number" placeholder="{i18n>bulk.unchanged}" />
+          <Label text="{i18n>bulk.topicFind}" />
+          <Input value="{bulk>/topicFind}" placeholder="{i18n>bulk.topicFindPlaceholder}" />
+          <Label text="{i18n>bulk.topicReplace}" />
+          <Input value="{bulk>/topicReplace}" enabled="{= !!${bulk>/topicFind} }" />
+        </f:SimpleForm>
+      </VBox>
+    </content>
+    <beginButton>
+      <Button text="{i18n>bulk.apply}" type="Emphasized" press=".onApply" busy="{bulk>/busy}" />
+    </beginButton>
+    <endButton>
+      <Button text="{i18n>bulk.cancel}" press=".onClose" />
+    </endButton>
+  </Dialog>
+</core:FragmentDefinition>

@@ -1,5 +1,5 @@
 import cds from '@sap/cds'
-import { TestCases as TestCaseRows, TestCaseStats } from '#cds-models/aem/suite'
+import { TestCases as TestCaseRows, TestCaseStats, TestCaseVersions } from '#cds-models/aem/suite'
 import { buildPreview } from './lib/runs/preview'
 import { templateHints } from './lib/runs/template-hints'
 import { BrokerCredential, cancelRun, RunOptions, startRun, toCredentials } from './lib/runs/test-runner'
@@ -8,6 +8,8 @@ import { copyNodes } from './lib/testcases/copy-nodes'
 import { documentationFromHtml, renderDocumentation } from './lib/testcases/documentation'
 import { exportNodes, importNodes } from './lib/testcases/export-import'
 import { compareRuns } from './lib/runs/compare'
+import { bulkUpdate, BulkChanges } from './lib/testcases/bulk'
+import { recordVersion, restoreVersion } from './lib/testcases/versions'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/testcases/node-validation'
 import { selectNodeDeep } from './lib/testcases/nodes'
 import { columnLength } from './lib/core/model'
@@ -70,10 +72,24 @@ export default class TestService extends cds.ApplicationService {
         if (row && typeof row === 'object' && row.description !== undefined) row.descriptionHtml = renderDocumentation(row.description)
     })
 
+    // every save keeps a version (the activation of a draft is the CREATE / UPDATE of the active entity)
+    this.after(['CREATE', 'UPDATE'], TestCases, async (result, req) => {
+      const id = (result as { ID?: string } | undefined)?.ID ?? (req.data as { ID?: string }).ID ?? keyOf(req).ID
+      if (id) await recordVersion(id)
+    })
+
+    this.on('restore', 'TestCaseVersions', async (req) => restoreVersion(idOf(req)))
+
+    this.on('bulkUpdate', async (req) => {
+      const { ids, changes } = req.data as { ids: string[]; changes?: BulkChanges | null }
+      return bulkUpdate(ids, changes ?? {})
+    })
+
     // the latest outcome of a test case is an association (not part of the draft): remove the stats of deleted nodes
     // (a folder deletes everything below it)
     this.after('DELETE', TestCases, async () => {
       await DELETE.from(TestCaseStats).where({ testCase_ID: { 'not in': SELECT('ID').from(TestCaseRows) } })
+      await DELETE.from(TestCaseVersions).where({ testCase_ID: { 'not in': SELECT('ID').from(TestCaseRows) } })
     })
 
     // drag & drop: place the node before NextSibling (null = at the end)

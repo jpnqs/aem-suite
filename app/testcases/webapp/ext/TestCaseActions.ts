@@ -91,6 +91,52 @@ export default {
       .catch(showError);
   },
 
+  /**
+   * List report toolbar action "Edit Selected": changes tags, delivery mode, ACK timeout or topics of the selected
+   * test cases at once (a folder stands for every test case below it) - TestService.bulkUpdate.
+   */
+  editSelected(this: ListReportExtensionAPI, _context: Context, selectedContexts?: Context[]): Promise<void> | undefined {
+    const t = textsOf(this);
+    const ids = idsOf(activeContexts(selectedContexts, t));
+    if (!ids.length) {
+      return undefined;
+    }
+    const state = new JSONModel({ info: t("bulk.info", [ids.length]), addTags: "", removeTags: "", deliveryMode: "", ackTimeoutMs: "", topicFind: "", topicReplace: "", busy: false });
+    let dialog: Dialog;
+    const handler = {
+      onApply: (): void => {
+        const d = state.getData() as Record<string, string>;
+        const changes = {
+          addTags: d.addTags.trim() || null,
+          removeTags: d.removeTags.trim() || null,
+          deliveryMode: d.deliveryMode || null,
+          ackTimeoutMs: d.ackTimeoutMs === "" ? null : Math.round(Number(d.ackTimeoutMs)),
+          topicFind: d.topicFind || null,
+          topicReplace: d.topicFind ? d.topicReplace : null
+        };
+        state.setProperty("/busy", true);
+        Actions.invokeAction<{ updated: number; skipped?: string[] }>(this.getModel() as ODataModel, "/bulkUpdate(...)", { ids, changes })
+          .then((result) => {
+            dialog.close();
+            const skipped = result.skipped || [];
+            MessageToast.show(t("bulk.done", [result.updated]) + (skipped.length ? " " + t("bulk.skipped", [skipped.join(", ")]) : ""));
+            return this.refresh();
+          })
+          .catch(showError)
+          .finally(() => state.setProperty("/busy", false));
+      },
+      onClose: (): void => {
+        dialog.close();
+      }
+    };
+    return (this.loadFragment({ id: "bulkEdit" + Date.now(), name: "com.aem.suite.testcases.ext.BulkEditDialog", controller: handler }) as Promise<Dialog>).then((d) => {
+      dialog = d;
+      dialog.setModel(state, "bulk");
+      dialog.attachAfterClose(() => dialog.destroy());
+      dialog.open();
+    }, showError);
+  },
+
   /** Object page header action: copies this test case or folder. */
   copyFromObjectPage(this: ExtensionAPI, context: Context): Promise<void> {
     return copyNodes(this, [context.getProperty("ID") as string])

@@ -189,6 +189,11 @@
                       "text": "{{action.run}}",
                       "requiresSelection": true
                     },
+                    "editSelected": {
+                      "press": "com.aem.suite.testcases.ext.TestCaseActions.editSelected",
+                      "text": "{{action.editSelected}}",
+                      "requiresSelection": true
+                    },
                     "copySelected": {
                       "press": "com.aem.suite.testcases.ext.TestCaseActions.copySelected",
                       "text": "{{action.copy}}",

@@ -203,6 +203,43 @@ service TestService {
   @readonly
   entity Users as projection on db.Users;
 
+  /** Saved states of test cases and folders (section "Versions"); restore() puts one back. */
+  @readonly
+  entity TestCaseVersions as projection on db.TestCaseVersions excluding { snapshot }
+    actions {
+      /** Puts the test case back to this version (a new version records that). Not while it is being edited. */
+      @Common.SideEffects: {TargetEntities: ['in/testCase']}
+      action restore() returns RestoredVersion;
+    };
+
+  type RestoredVersion {
+    ID      : UUID;
+    version : Integer;
+  }
+
+  /**
+   * Changes many test cases at once ("Edit Selected"): tags on the selected nodes, the other changes on the test
+   * cases (a folder stands for every test case below it). All or nothing; nodes being edited are left alone.
+   */
+  action bulkUpdate(ids : many UUID not null, changes : BulkChanges) returns BulkResult;
+
+  type BulkChanges {
+    deliveryMode : String;
+    ackTimeoutMs : Integer;
+    /** replaced in the topics as typed */
+    topicFind    : String;
+    topicReplace : String;
+    /** comma separated */
+    addTags      : String;
+    removeTags   : String;
+  }
+
+  type BulkResult {
+    updated : Integer;
+    /** names of the nodes that are being edited */
+    skipped : many String;
+  }
+
   /** The users that created test cases - value help of the "Created By" filter. */
   @readonly
   @cds.redirection.target: false

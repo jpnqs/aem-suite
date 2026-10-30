@@ -7,6 +7,7 @@ import type { TestCaseRecord } from '../runs/test-case-spec'
 import { loadTree } from './tree'
 import { columnLength, elementOf, enumValues, rangeOf } from '../core/model'
 import { config } from '../core/config'
+import { invalidTags, normalizeTags, TAG_RULE } from './tags'
 
 /**
  * Rules for creating / changing test cases and folders - shared by the UI service (TestService),
@@ -105,6 +106,11 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
   const nameLength = columnLength('TestCases', 'name')
   if (!d.name && d.topic) d.name = d.topic.slice(0, nameLength)
   if (!d.contentType && d.payload !== undefined) d.contentType = detectContentType(d.payload)
+  if (d.tags !== undefined) {
+    const invalid = invalidTags(d.tags)
+    if (invalid.length) reject(400, `Invalid tag(s) ${invalid.join(', ')}: ${TAG_RULE}`, 'in/tags')
+    d.tags = normalizeTags(d.tags)
+  }
   d.userProperties?.forEach((p) => {
     if (!p.type) p.type = inferPropertyType(p.value)
   })

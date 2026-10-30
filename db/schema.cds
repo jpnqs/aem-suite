@@ -180,6 +180,8 @@ entity TestCases : cuid, managed {
   name           : String(200);
   /** documentation (Markdown) */
   description    : LargeString;
+  /** e.g. "regression, smoke" - lower case, sorted, comma separated (lib/testcases/tags.ts); test cases and folders */
+  tags           : String(500);
   /** topic template, e.g. acme/orders/{{region}}/created/v1/{{uuid}} - required for test cases */
   topic          : String(500);
   /** JSON payload template */
@@ -208,6 +210,23 @@ entity TestCases : cuid, managed {
   /** the name of createdBy, if that user has logged in since names are kept */
   creator        : Association to one Users
                      on creator.ID = $self.createdBy;
+  /** saved versions, newest first (not a composition: a draft does not copy them) */
+  versions       : Association to many TestCaseVersions
+                     on versions.testCase = $self;
+}
+
+/** A saved state of a test case or folder (lib/testcases/versions.ts): written on every save, the last 50 are kept. */
+entity TestCaseVersions : cuid {
+  testCase : Association to TestCases;
+  /** 1, 2, 3 ... per test case */
+  version  : Integer;
+  savedAt  : Timestamp;
+  savedBy  : Username;
+  name     : String(200);
+  /** the fields that differ from the version before ("created" for the first) */
+  changes  : String(1000);
+  /** the fields, user properties and variables as JSON */
+  snapshot : LargeString;
 }
 
 /**
@@ -482,6 +501,7 @@ annotate TestCases with {
   dmqEligible   @title: '{i18n>DMQEligible}'  @Common.QuickInfo: '{i18n>InfoEmptyBrokerDefault}';
   priority      @title: '{i18n>Priority0255}'  @Common.QuickInfo: '{i18n>InfoEmptyBrokerDefault}';
   correlationId @title: '{i18n>CorrelationID}'  @Common.QuickInfo: '{i18n>InfoSupportsTemplateVariablesInDoubleCur2}';
+  tags          @title: '{i18n>Tags}'  @Common.QuickInfo: '{i18n>InfoTags}';
   ackTimeoutMs  @title: '{i18n>ACKTimeoutMs}';
   createdBy     @title: '{i18n>CreatedBy}';
   modifiedAt    @title: '{i18n>ChangedAt}';
@@ -609,4 +629,12 @@ annotate AuditLog with {
   name     @title: '{i18n>Name}';
   details  @title: '{i18n>Details}';
   service  @title: '{i18n>Service}';
+};
+
+annotate TestCaseVersions with {
+  version @title: '{i18n>Version}';
+  savedAt @title: '{i18n>SavedAt}';
+  savedBy @title: '{i18n>SavedBy}';
+  name    @title: '{i18n>Name}';
+  changes @title: '{i18n>Changes}';
 };

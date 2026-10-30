@@ -13,6 +13,7 @@ annotate service.TestCases with @(
     createdBy,
     name,
     topic,
+    tags,
     deliveryMode
   ],
   // folders first, then manual (drag & drop) order
@@ -44,6 +45,7 @@ annotate service.TestCases with @(
     {Value: name},
     // "Type" is a custom icon column (ext/TypeColumn.fragment.xml, see manifest)
     {Value: topic},
+    {Value: tags},
     {
       Value      : lastResult.status,
       Criticality: lastResult.criticality,
@@ -93,6 +95,7 @@ annotate service.TestCases with @(
     {Value: priority},
     {Value: dmqEligible}
   ]},
+  UI.FieldGroup #Tags: {Data: [{Value: tags}]},
   // folder contents: the subfolders and test cases directly below a folder, in tree order
   UI.LineItem #Children: [
     {
@@ -138,6 +141,12 @@ annotate service.TestCases with @(
     },
     {
       $Type : 'UI.ReferenceFacet',
+      ID    : 'Tags',
+      Target: '@UI.FieldGroup#Tags',
+      Label : '{i18n>Tags}'
+    },
+    {
+      $Type : 'UI.ReferenceFacet',
       ID    : 'Variables',
       Target: 'variables/@UI.LineItem',
       Label : '{i18n>Variables}'
@@ -160,6 +169,13 @@ annotate service.TestCases with @(
         Target: '@UI.FieldGroup#Advanced',
         Label : '{i18n>OptionalSettings}'
       }]
+    },
+    // every save keeps a version (srv/lib/testcases/versions.ts)
+    {
+      $Type : 'UI.ReferenceFacet',
+      ID    : 'Versions',
+      Target: 'versions/@UI.PresentationVariant',
+      Label : '{i18n>Versions}'
     }
   ]
 ) {
@@ -273,3 +289,25 @@ annotate service.Brokers with {
   ID   @UI.Hidden;
   name @title: '{i18n>Broker}';
 };
+
+annotate service.TestCaseVersions with @(
+  UI.PresentationVariant: {
+    SortOrder     : [{
+      Property  : version,
+      Descending: true
+    }],
+    Visualizations: ['@UI.LineItem']
+  },
+  UI.LineItem           : [
+    {
+      $Type : 'UI.DataFieldForAction',
+      Action: 'TestService.restore',
+      Label : '{i18n>RestoreVersion}'
+    },
+    {Value: version},
+    {Value: savedAt},
+    {Value: savedBy},
+    {Value: name},
+    {Value: changes}
+  ]
+);
