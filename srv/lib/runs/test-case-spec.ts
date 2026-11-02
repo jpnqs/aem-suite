@@ -8,7 +8,7 @@ import { generateFake } from '../template/fake-data'
 import { config } from '../core/config'
 import { DEFAULT_ACK_TIMEOUT_MS, detectContentType } from '../core/defaults'
 import { NodeRow, selectNodesDeep } from '../testcases/nodes'
-import { inferPropertyType } from '../testcases/property-types'
+import { inferPropertyType, parseBool, parseInt64 } from '../testcases/property-types'
 import { loadTree, Tree } from '../testcases/tree'
 
 /**
@@ -126,6 +126,19 @@ export function buildSpec(tc: TestCaseRecord, scope: TemplateScope): PublishSpec
   const contentType = tc.contentType || detectContentType(tc.payload)
   const err = jsonError(payload, contentType)
   if (err) throw new TemplateError(err)
+  // here, not at the broker: Preview shows the same problem a run would end with
+  const maxBytes = config().runs.maxPayloadBytes
+  const bytes = Buffer.byteLength(payload, 'utf8')
+  if (bytes > maxBytes) throw new TemplateError(`The payload has ${bytes} bytes - at most ${maxBytes} are sent`)
+  const userProperties = (tc.userProperties ?? []).map((p) => ({
+    name: p.name,
+    type: p.type || inferPropertyType(p.value),
+    value: r.resolve(p.value)
+  }))
+  for (const p of userProperties) {
+    if (p.type === 'INT' && parseInt64(p.value) === undefined) throw new TemplateError(`User property "${p.name}" is not an integer in the safe range: ${p.value}`)
+    if (p.type === 'BOOL' && parseBool(p.value) === undefined) throw new TemplateError(`User property "${p.name}" is not true or false: ${p.value}`)
+  }
 
   return {
     topic,
@@ -137,10 +150,6 @@ export function buildSpec(tc: TestCaseRecord, scope: TemplateScope): PublishSpec
     priority: tc.priority ?? undefined,
     correlationId: tc.correlationId ? r.resolve(tc.correlationId) : undefined,
     ackTimeoutMs: tc.ackTimeoutMs ?? DEFAULT_ACK_TIMEOUT_MS,
-    userProperties: (tc.userProperties ?? []).map((p) => ({
-      name: p.name,
-      type: p.type || inferPropertyType(p.value),
-      value: r.resolve(p.value)
-    }))
+    userProperties
   }
 }

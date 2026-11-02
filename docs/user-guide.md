@@ -298,6 +298,8 @@ You can close the dialog at any time – the run goes on. **Stop run** ends it e
 
 ### Advanced settings
 
+The settings of your last run are remembered. When one of them is not the default, the panel opens by itself, so you see what the run will send; below it the dialog shows how many messages that makes (and the most a run may have). The limits come from the server.
+
 | Setting | Meaning |
 |---|---|
 | **Repetitions** | how often **every** test case is sent to **every** broker (1 – 1000). Variables, `{{uuid}}`, number ranges and faker values are new for every message. |
@@ -316,7 +318,7 @@ The dialog tells you what you are about to start ("30 or more messages … the p
 | **ERROR** | not sent at all – unknown variable, invalid JSON, wrong password, broker not reachable … |
 | **SKIPPED** | not sent: the run was stopped, or *Stop at the first failure* |
 
-A whole run ends **PASSED**, **FAILED**, **STOPPED** (stopped by you, nothing failed before) or is still **RUNNING**.
+A whole run ends **PASSED**, **FAILED** (a message failed, or the run was aborted - also when the server was restarted while it ran), **STOPPED** (stopped by you, nothing failed before) or is still **RUNNING**.
 
 PASSED means the broker **accepted** the message – not that a consumer processed it. To see that, use the Live Subscriber.
 
@@ -334,7 +336,7 @@ PASSED means the broker **accepted** the message – not that a consumer process
    ![The results of a run](images/guides/results-1-run.png)
 
 - The **Last Result** of each test case is also shown in the test case list and on its page – with **Last Runs** (the outcomes of its last 20 runs, oldest first: `P` passed, `F` failed, `E` error).
-- **Compare…** on a run's page compares it with an earlier run (the one before it is preselected): per test case and broker it shows what **broke**, what was **fixed**, what is **new** or **no longer run**, and the ACK latency before and now.
+- **Compare…** on a run's page compares it with an earlier run (preselected: the earlier run of the same test cases and brokers, else your own, else the one before it): per test case and broker it shows what **broke**, what was **fixed**, what is **new**, **no longer run** or **not run** (stopped, or not sent yet), and the ACK latency before and now.
 - On a broker's page (**Brokers**, admins) **Runs per Day** shows how many messages it got per day, how many passed, and the average and highest ACK latency.
 
 ---

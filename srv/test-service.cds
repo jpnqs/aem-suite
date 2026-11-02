@@ -122,7 +122,9 @@ service TestService {
       active,
       /** runs need options.confirmProduction */
       production,
-      lastConnectionStatus
+      lastConnectionStatus,
+      /** when the connection was last tested or used by a run (tooltip of the status in the Run dialog) */
+      lastConnectionAt
     }
     where active = true;
 
@@ -180,6 +182,17 @@ service TestService {
         else 0
       end as criticality : Integer
     };
+
+  /** The limits of the Run dialog (cds.aemSuite.runs): the dialog shows and checks them as the server does. */
+  function runLimits() returns RunLimits;
+
+  type RunLimits {
+    maxRepetitions  : Integer;
+    maxDelayMs      : Integer;
+    /** messages (test cases x brokers x repetitions) of one run */
+    maxResults      : Integer;
+    maxPayloadBytes : Integer;
+  }
 
   /**
    * Compares two runs per test case and broker (repetitions folded into the worst outcome): BROKEN, FIXED, NEW,

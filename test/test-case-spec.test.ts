@@ -61,7 +61,10 @@ describe('scopeFor / buildSpec', () => {
     [{ topic: '{{nope}}' }, /Unknown variable\(s\): nope/],
     [{ topic: '{{empty}}' }, /Topic is empty/],
     [{ topic: 'orders/>' }, /Wildcards are not allowed/],
-    [{ payload: '{"n": {{app}}}' }, /JSON/]
+    [{ payload: '{"n": {{app}}}' }, /JSON/],
+    // what a run would end with is what Preview shows: the broker library never gets a wrong property
+    [{ userProperties: [{ name: 'n', type: 'INT' as const, value: 'abc' }] }, /User property "n" is not an integer/],
+    [{ userProperties: [{ name: 'f', type: 'BOOL' as const, value: 'maybe' }] }, /User property "f" is not true or false/]
   ])('refuses %j', (extra, message) => {
     const scope = { ...scopeFor(tc(), broker, vars), global: { ...vars.global, empty: '' } }
     expect(() => buildSpec(tc(extra), scope)).toThrow(TemplateError)

@@ -18,7 +18,7 @@ describe('operations', () => {
     for (const n of [1, 2, 3]) ids.push((await createActive(POST, 'test', 'TestCases', { name: `op ${n}`, topic: `op/${n}`, payload: '{}' })).ID)
   })
 
-  it('a stopping server ends its runs STOPPED, the messages not sent yet SKIPPED with the reason', async () => {
+  it('a stopping server ends its runs FAILED (aborted, not stopped by a user), the messages not sent yet SKIPPED with the reason', async () => {
     const res = await start({ delayMs: 2000 })
     expect(res.status).toBe(200)
     const runId = res.data.runId
@@ -26,7 +26,7 @@ describe('operations', () => {
     await stopAllRuns(5000)
     await waitForRun(runId)
     const { data: run } = await GET(`/odata/v4/test/TestRuns(${runId})`, tester)
-    expect(run).toMatchObject({ status: 'STOPPED', passedCount: 1, skippedCount: 2 })
+    expect(run).toMatchObject({ status: 'FAILED', outcome: 'FAILED', passedCount: 1, skippedCount: 2 })
     const { data } = await GET(`/odata/v4/test/RunResults?$filter=run_ID eq ${runId} and status eq 'SKIPPED'`, tester)
     expect(data.value[0].errorMessage).toBe('Skipped: the server was stopped while the run was in progress')
   })

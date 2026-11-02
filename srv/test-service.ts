@@ -10,6 +10,7 @@ import { exportNodes, importNodes } from './lib/testcases/export-import'
 import { compareRuns } from './lib/runs/compare'
 import { bulkUpdate, BulkChanges } from './lib/testcases/bulk'
 import { knownTags } from './lib/testcases/tags'
+import { config } from './lib/core/config'
 import { recordVersion, restoreVersion } from './lib/testcases/versions'
 import { nextSortOrder, NodeData, Reject, validateNode, validateParent } from './lib/testcases/node-validation'
 import { selectNodeDeep } from './lib/testcases/nodes'
@@ -82,6 +83,11 @@ export default class TestService extends cds.ApplicationService {
     this.on('restore', 'TestCaseVersions', async (req) => restoreVersion(idOf(req)))
 
     this.on('knownTags', () => knownTags())
+
+    this.on('runLimits', () => {
+      const { maxRepetitions, maxDelayMs, maxResults, maxPayloadBytes } = config().runs
+      return { maxRepetitions, maxDelayMs, maxResults, maxPayloadBytes }
+    })
 
     this.on('bulkUpdate', async (req) => {
       const { ids, changes } = req.data as { ids: string[]; changes?: BulkChanges | null }

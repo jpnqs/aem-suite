@@ -49,6 +49,27 @@ interface BrokerRow {
   msgVpn?: string | null;
 }
 
+/** One line of the problems list: equal problems of a broker together. */
+interface Problem {
+  title: string;
+  description: string;
+  statusText: string;
+}
+
+interface ResultRow {
+  testCaseName: string;
+  brokerName: string;
+  status: string;
+  errorMessage?: string | null;
+}
+
+/** The limits of the server (TestService.runLimits) - until they are read, the defaults. */
+interface RunLimits {
+  maxRepetitions: number;
+  maxDelayMs: number;
+  maxResults: number;
+}
+
 interface RunRow {
   status: string;
   totalCount: number;
@@ -90,7 +111,11 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
     delayMs: Prefs.get("runDelayMs", 0),
     order: Prefs.get("runOrder", "ROUND"),
     stopOnFailure: Prefs.get("runStopOnFailure", false),
+    limits: { maxRepetitions: 1000, maxDelayMs: 60000, maxResults: 5000 } as RunLimits,
+    /** the advanced settings panel is open: a setting of the last run is not the default */
+    settingsOpen: false,
     estimate: "",
+    estimateState: "None",
     stopping: false,
     skipped: 0,
     total: 0,
@@ -105,6 +130,21 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
     stopped: false,
     connectionLost: false
   });
+  state.setProperty(
+    "/settingsOpen",
+    state.getProperty("/repetitions") !== 1 || state.getProperty("/delayMs") !== 0 || state.getProperty("/order") !== "ROUND" || !!state.getProperty("/stopOnFailure")
+  );
+  const limitsBinding = model.bindContext("/runLimits()");
+  limitsBinding
+    .requestObject()
+    .then((limits: RunLimits) => {
+      state.setProperty("/limits", limits);
+      updateEstimate();
+    })
+    .catch(() => {
+      /* the defaults stay; the server checks anyway */
+    })
+    .finally(() => limitsBinding.destroy());
   const socket = new LiveSocket(
     (event, data) => {
       if (event !== "runProgress" || data.runId !== state.getProperty("/runId")) {
@@ -180,15 +220,32 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
       .bindList("/RunResults", undefined, [], filters, { $select: "testCaseName,brokerName,status,errorMessage" })
       .requestContexts(0, MAX_PROBLEMS)
       .then((contexts) => {
-        state.setProperty(
-          "/problems",
-          contexts.map((c) => c.getObject())
-        );
+        state.setProperty("/problems", groupProblems(contexts.map((c) => c.getObject() as ResultRow)));
         state.setProperty("/moreProblems", Math.max(0, (state.getProperty("/failed") as number) - contexts.length));
       })
       .catch(() => {
         /* details remain available in the results */
       });
+  }
+
+  /** The same problem of the same broker is one line: "Connect failed: ... - dev - 3 messages: A, B, C". */
+  function groupProblems(rows: ResultRow[]): Problem[] {
+    const groups = new Map<string, { row: ResultRow; names: string[] }>();
+    for (const r of rows) {
+      const key = [r.brokerName, r.status, r.errorMessage].join("\u0000");
+      const group = groups.get(key) ?? { row: r, names: [] };
+      group.names.push(r.testCaseName);
+      groups.set(key, group);
+    }
+    return [...groups.values()].map(({ row, names }) => {
+      const unique = [...new Set(names)];
+      const shown = unique.length > 3 ? t("run.problemMore", [unique.slice(0, 3).join(", "), unique.length - 3]) : unique.join(", ");
+      return {
+        title: row.errorMessage || t("run.status." + row.status),
+        description: names.length === 1 ? `${row.brokerName} · ${shown}` : t("run.problemMany", [row.brokerName, names.length, shown]),
+        statusText: t("run.status." + row.status)
+      };
+    });
   }
 
   function selectedBrokers(): Context[] {
@@ -220,23 +277,31 @@ function openRunDialog(api: ExtensionAPI, testCaseIds: string[], label: string):
     state.setProperty("/credentials", rows);
   }
 
-  /** "5 test cases x 2 brokers x 10 = at least 100 messages; the pauses alone take about 2 min" */
+  /** "5 test cases x 2 brokers x 10 = at least 100 messages (at most 5000 per run); the pauses alone take about 2 min" */
   function updateEstimate(): void {
     const brokerCount = selectedBrokers().length;
     const reps = Math.max(1, Number(state.getProperty("/repetitions")) || 1);
     const delay = Math.max(0, Number(state.getProperty("/delayMs")) || 0);
+    const { maxResults } = state.getProperty("/limits") as RunLimits;
     const perBroker = testCaseIds.length * reps;
+    const total = perBroker * brokerCount;
     let text = "";
     if (brokerCount && (reps > 1 || delay > 0)) {
-      text = t("run.estimate", [perBroker * brokerCount, testCaseIds.length, t(brokerCount === 1 ? "run.brokerOne" : "run.brokerMany", [brokerCount]), reps]);
+      text = t("run.estimate", [total, testCaseIds.length, t(brokerCount === 1 ? "run.brokerOne" : "run.brokerMany", [brokerCount]), reps]);
+      text += t(total > maxResults ? "run.estimateTooMany" : "run.estimateLimit", [maxResults]);
       if (delay > 0 && perBroker > 1) {
         text += t("run.estimatePauses", [formatDuration((perBroker - 1) * delay, t)]);
       }
     }
     state.setProperty("/estimate", text);
+    state.setProperty("/estimateState", total > maxResults ? "Error" : "None");
   }
 
   const handler = {
+    /** the tooltip of a broker's connection status: when it was tested */
+    testedAt(at?: string | null): string {
+      return at ? t("run.lastTested", [new Date(at).toLocaleString()]) : "";
+    },
     onHelp(): void {
       Help.openForRun();
     },

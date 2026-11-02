@@ -2,7 +2,7 @@ import { RunResults, TestRuns } from '#cds-models/aem/suite'
 import { httpError } from '../core/errors'
 
 /** How a test case on a broker changed from one run to the other. */
-export type Change = 'FIXED' | 'BROKEN' | 'STILL_FAILING' | 'STILL_PASSING' | 'NEW' | 'GONE'
+export type Change = 'FIXED' | 'BROKEN' | 'STILL_FAILING' | 'STILL_PASSING' | 'NEW' | 'GONE' | 'NOT_RUN'
 
 export interface Comparison {
   testCase: string
@@ -54,7 +54,21 @@ export async function compareRuns(baseRunId: string, otherRunId: string): Promis
     const b = base.get(key)
     const o = other.get(key)
     const passed = (s?: string) => s === 'PASSED'
-    const change: Change = !b ? 'NEW' : !o ? 'GONE' : passed(b.status) ? (passed(o.status) ? 'STILL_PASSING' : 'BROKEN') : passed(o.status) ? 'FIXED' : 'STILL_FAILING'
+    // skipped (the run was stopped, stop on first failure) or not sent yet (still running): no result to compare
+    const notRun = (s?: string) => s === 'SKIPPED' || s === 'PENDING'
+    const change: Change = !b
+      ? 'NEW'
+      : !o
+        ? 'GONE'
+        : notRun(b.status) || notRun(o.status)
+          ? 'NOT_RUN'
+          : passed(b.status)
+            ? passed(o.status)
+              ? 'STILL_PASSING'
+              : 'BROKEN'
+            : passed(o.status)
+              ? 'FIXED'
+              : 'STILL_FAILING'
     out.push({
       testCase: (o ?? b)!.name,
       broker: (o ?? b)!.broker,
@@ -65,6 +79,6 @@ export async function compareRuns(baseRunId: string, otherRunId: string): Promis
       otherAckLatencyMs: avg(o?.latencies)
     })
   }
-  const order: Change[] = ['BROKEN', 'FIXED', 'NEW', 'GONE', 'STILL_FAILING', 'STILL_PASSING']
+  const order: Change[] = ['BROKEN', 'FIXED', 'NEW', 'GONE', 'NOT_RUN', 'STILL_FAILING', 'STILL_PASSING']
   return out.sort((x, y) => order.indexOf(x.change) - order.indexOf(y.change) || x.testCase.localeCompare(y.testCase) || x.broker.localeCompare(y.broker))
 }

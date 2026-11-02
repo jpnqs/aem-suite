@@ -81,7 +81,7 @@ describe('SolaceSession', () => {
     jest.advanceTimersByTime(3000)
     await closing
     expect(fake.disposed).toBe(1)
-    await expect(s.publish(spec)).rejects.toThrow('Session is closed')
+    await expect(s.publish(spec)).rejects.toThrow('The connection to the broker is closed')
   })
 
   it('resolves DIRECT publish without waiting for an ACK', async () => {

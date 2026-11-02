@@ -23,6 +23,12 @@
           </Select>
         </HBox>
         <MessageStrip
+          text="{compare>/hint}"
+          visible="{= !!${compare>/hint} }"
+          type="Warning"
+          showIcon="true"
+          class="sapUiSmallMarginTopBottom" />
+        <MessageStrip
           text="{compare>/summary}"
           visible="{= !!${compare>/summary} }"
           type="{= ${compare>/broken} > 0 ? 'Error' : 'Information' }"
@@ -47,8 +53,8 @@
               <ObjectStatus text="{compare>changeText}" state="{compare>state}" />
               <Text text="{compare>testCase}" />
               <Text text="{compare>broker}" />
-              <Text text="{compare>baseStatus}" />
-              <Text text="{compare>otherStatus}" />
+              <Text text="{compare>baseStatusText}" />
+              <Text text="{compare>otherStatusText}" />
               <Text text="{compare>latency}" />
             </ColumnListItem>
           </items>

@@ -68,6 +68,29 @@ function normalizeOptions(o?: RunOptions | null): RunSettings {
 
 /** Runs that were stopped (by their user, or because the server stops) -> why: the messages not sent yet are skipped. */
 const cancelledRuns = new Map<string, string>()
+/** why the messages of a run were skipped when the server stopped (such a run ends FAILED, not STOPPED: nobody stopped it) */
+const SERVER_STOPPED = 'Skipped: the server was stopped while the run was in progress'
+
+/** What to do when a run is stopped: end the wait for a broker connection or an acknowledgement. */
+const abortHandlers = new Map<string, Set<() => void>>()
+
+/** Registers `fn` to be called when the run is stopped; returns the function that takes it back. */
+function onAbort(runId: string, fn: () => void): () => void {
+  const set = abortHandlers.get(runId) ?? new Set<() => void>()
+  set.add(fn)
+  abortHandlers.set(runId, set)
+  return () => {
+    set.delete(fn)
+    if (!set.size) abortHandlers.delete(runId)
+  }
+}
+
+function abortRun(runId: string): void {
+  for (const fn of [...(abortHandlers.get(runId) ?? [])]) fn()
+}
+
+/** The run was stopped while a broker connection was being made. */
+class RunStopped extends Error {}
 
 /**
  * Stops a running run (started by the same user, or by an administrator): what was not sent yet is skipped.
@@ -79,16 +102,20 @@ export async function cancelRun(runId: string, user: { id: string; is(role: stri
   if (run.createdBy !== user.id && !user.is('Admin')) throw httpError(403, 'Only the user who started the run (or an administrator) can stop it')
   if (run.status !== 'RUNNING' || !activeRuns.has(runId)) throw httpError(409, 'The run is not running (any more)')
   cancelledRuns.set(runId, 'Skipped: the run was stopped')
+  abortRun(runId)
 }
 
 /**
  * The server is stopping (deployment, restart): every run stops sending, its messages not sent yet are SKIPPED and
- * it ends STOPPED instead of being left RUNNING. Waits up to timeoutMs for the runs to store that.
+ * it ends FAILED (aborted - nobody stopped it) instead of being left RUNNING. Waits up to timeoutMs for the runs to store that.
  */
 export async function stopAllRuns(timeoutMs: number): Promise<void> {
   const running = [...activeRuns.entries()]
   if (!running.length) return
-  for (const [runId] of running) cancelledRuns.set(runId, 'Skipped: the server was stopped while the run was in progress')
+  for (const [runId] of running) {
+    cancelledRuns.set(runId, SERVER_STOPPED)
+    abortRun(runId)
+  }
   LOG.info(`Stopping ${running.length} run(s): the server stops`)
   await Promise.race([Promise.allSettled(running.map(([, p]) => p)), new Promise((resolve) => setTimeout(resolve, timeoutMs).unref())])
 }
@@ -304,10 +331,11 @@ class RunProgress {
     await this.progressed(r.ID)
   }
 
-  /** Marks the run DONE (or STOPPED, when its user stopped it) once every result is stored. */
+  /** Marks the run DONE (STOPPED when its user stopped it, FAILED when the server stopped) once every result is stored. */
   async complete(): Promise<void> {
     const { passed, failed, skipped } = this.counts
-    const status = cancelledRuns.has(this.runId) ? 'STOPPED' : 'DONE'
+    const reason = cancelledRuns.get(this.runId)
+    const status = reason === undefined ? 'DONE' : reason === SERVER_STOPPED ? 'FAILED' : 'STOPPED'
     await cds.db.tx(() =>
       UPDATE(TestRuns, this.runId).with({
         status,
@@ -321,7 +349,7 @@ class RunProgress {
     await safely('broker statistics', () => addBrokerDailyStats(this.runId))
     this.stop()
     await this.emit(undefined, status)
-    LOG.info(`Run ${this.runId} ${status === 'STOPPED' ? 'stopped' : 'finished'}: ${passed}/${this.total} passed`)
+    LOG.info(`Run ${this.runId} ${status === 'DONE' ? 'finished' : status === 'STOPPED' ? 'stopped' : 'aborted'}: ${passed}/${this.total} passed`)
   }
 
   /** No more live progress (the run ends, or it crashed and failRuns takes over). */
@@ -413,14 +441,38 @@ async function runBroker(brokerId: string, results: PendingResult[], ctx: RunCon
     const entered = ctx.credentials.get(brokerId)
     const conn = await resolveConnection(broker, ctx.jwt, entered?.password, entered?.username)
     password = conn.password
-    publisher = await connect(conn)
+    const connecting = connect(conn)
+    let release = (): void => undefined
+    const stopped = new Promise<never>((_, reject) => {
+      release = onAbort(ctx.runId, () => reject(new RunStopped()))
+    })
+    try {
+      publisher = await Promise.race([connecting, stopped])
+    } catch (e) {
+      // stopped while connecting: a connection that is made after all is closed again
+      void connecting.then((p) => p.close(), () => undefined)
+      throw e
+    } finally {
+      release()
+    }
+    await safely('connection status', () => noteConnection(brokerId, true, `Connected for a run (${broker.name})`))
   } catch (e) {
+    if (e instanceof RunStopped) {
+      for (const r of results) await progress.skip(r, cancelledRuns.get(ctx.runId) ?? 'Skipped: the run was stopped')
+      return
+    }
     // a password entered for the run never ends up in a result, whatever the broker library put into its error
-    const text = masked(masked(errMsg(e), ctx.credentials.get(brokerId)?.password), password)
-    for (const r of results) await progress.finish(r, 'ERROR', { errorMessage: errorText(text) })
+    const text = errorText(masked(masked(errMsg(e), ctx.credentials.get(brokerId)?.password), password))
+    await safely('connection status', () => noteConnection(brokerId, false, text))
+    // the error is stored once, with the first result: the others point to it (not 5000 copies of one problem)
+    for (const [i, r] of results.entries()) {
+      await progress.finish(r, 'ERROR', { errorMessage: i === 0 ? text : 'Not sent - the connection to this broker failed (see the first result of this broker)' })
+    }
     return
   }
 
+  // a stop ends the wait for an acknowledgement too: closing the connection rejects what is pending
+  const releaseAbort = onAbort(ctx.runId, () => void publisher.close().catch(() => undefined))
   try {
     let stopReason: string | undefined
     for (let i = 0; i < results.length; i++) {
@@ -439,8 +491,20 @@ async function runBroker(brokerId: string, results: PendingResult[], ctx: RunCon
       if (!passed && ctx.stopOnFailure) stopReason = 'Skipped: an earlier message to this broker failed (stop on first failure)'
     }
   } finally {
+    releaseAbort()
     await publisher.close().catch(() => undefined)
   }
+}
+
+/** The last connection test of the broker is the last connection a run made: the broker list shows it. */
+async function noteConnection(brokerId: string, ok: boolean, message: string): Promise<void> {
+  await cds.db.tx(() =>
+    UPDATE(Brokers, brokerId).with({
+      lastConnectionStatus: ok ? 'OK' : 'ERROR',
+      lastConnectionAt: new Date().toISOString(),
+      lastConnectionMessage: truncate(message, columnLength('Brokers', 'lastConnectionMessage'))
+    })
+  )
 }
 
 /** Resolves and publishes one message; stores the outcome. Resolves true when the broker accepted it. */
@@ -454,9 +518,6 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
   let spec
   try {
     spec = buildSpec(tc, await withGenerated(tc, scopeFor(tc, broker, ctx.vars), 'consume'))
-    const maxBytes = config().runs.maxPayloadBytes
-    const bytes = Buffer.byteLength(spec.payload ?? '', 'utf8')
-    if (bytes > maxBytes) throw new TemplateError(`The payload has ${bytes} bytes - at most ${maxBytes} are sent (cds.aemSuite.runs.maxPayloadBytes)`)
   } catch (e) {
     await progress.finish(r, 'ERROR', { errorMessage: errorText(errMsg(e)), deliveryMode: tc.deliveryMode })
     return false
@@ -473,7 +534,12 @@ async function sendOne(r: PendingResult, broker: BrokerRecord, publisher: Publis
     await progress.finish(r, 'PASSED', { ...sent, ackLatencyMs: res.latencyMs })
     return true
   } catch (e) {
-    await progress.finish(r, e instanceof TemplateError ? 'ERROR' : 'FAILED', { ...sent, errorMessage: errorText(errMsg(e)) })
+    // stopped while waiting for the acknowledgement: the connection was closed under it
+    const stoppedWaiting = cancelledRuns.has(ctx.runId) && !(e instanceof TemplateError)
+    await progress.finish(r, e instanceof TemplateError ? 'ERROR' : 'FAILED', {
+      ...sent,
+      errorMessage: stoppedWaiting ? 'Stopped while waiting for the acknowledgement - the message may have been delivered' : errorText(errMsg(e))
+    })
     return false
   }
 }
@@ -518,6 +584,16 @@ export async function failRuns(where: Record<string, unknown>, reason: string): 
   }
 }
 
+/** "B1: No ack (x50); B2: Connect failed" - an equal problem of a broker once, with how often it happened. */
+function problemsOf(bad: Outcome[]): string {
+  const counts = new Map<string, number>()
+  for (const o of bad) {
+    const key = `${o.broker}: ${o.error ?? o.status}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts].map(([text, n]) => (n > 1 ? `${text} (×${n})` : text)).join('; ')
+}
+
 /** Stores the latest outcome per test case (PASSED only if all brokers passed) and adds it to its history. */
 async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outcome[]>) {
   const runAt = new Date().toISOString()
@@ -534,8 +610,8 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
       status,
       runAt,
       run_ID: runId,
-      brokers: truncate(outcomes.map((o) => o.broker).join(', '), columnLength('TestCaseStats', 'brokers')),
-      message: bad.length ? truncate(bad.map((o) => `${o.broker}: ${o.error ?? o.status}`).join('; '), columnLength('TestCaseStats', 'message')) : null,
+      brokers: truncate([...new Set(outcomes.map((o) => o.broker))].join(', '), columnLength('TestCaseStats', 'brokers')),
+      message: bad.length ? truncate(problemsOf(bad), columnLength('TestCaseStats', 'message')) : null,
       history: nextHistory(historyOf.get(testCaseId), status)
     }
   })

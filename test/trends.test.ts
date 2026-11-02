@@ -61,4 +61,13 @@ describe('trends of runs', () => {
     expect(back.data.value.map((r: { change: string }) => r.change)).toEqual(['FIXED', 'GONE'])
     expect((await GET(`/odata/v4/test/compareRuns(baseRunId=${base},otherRunId=00000000-0000-4000-8000-000000000000)`, tester)).status).toBe(404)
   })
+
+  it('does not call what was not run "broken": skipped and pending results have no outcome to compare', async () => {
+    await setTopic('trend/ok')
+    const stopped = await run([tc.ID])
+    await UPDATE('aem.suite.RunResults').with({ status: 'SKIPPED' }).where({ run_ID: stopped })
+    const passed = await run([tc.ID])
+    const { data } = await GET(`/odata/v4/test/compareRuns(baseRunId=${passed},otherRunId=${stopped})`, tester)
+    expect(data.value).toEqual([expect.objectContaining({ testCase: 'trend', baseStatus: 'PASSED', otherStatus: 'SKIPPED', change: 'NOT_RUN' })])
+  })
 })

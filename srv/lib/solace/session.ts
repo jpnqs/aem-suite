@@ -161,7 +161,7 @@ export class SolaceSession implements Publisher {
 
   /** Publishes a message. PERSISTENT resolves on broker ACK, DIRECT right after send(). */
   publish(spec: PublishSpec): Promise<PublishResult> {
-    if (this.closed) return Promise.reject(new Error('Session is closed'))
+    if (this.closed) return Promise.reject(new Error('The connection to the broker is closed (it was lost, or the run was stopped)'))
     let msg: solace.Message
     try {
       msg = buildMessage(spec)

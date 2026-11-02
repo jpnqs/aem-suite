@@ -5,7 +5,7 @@ sap.ui.define(
 
     /** how many earlier runs the compare dialog offers */
     var COMPARE_CHOICES = 30;
-    var STATES = { BROKEN: "Error", FIXED: "Success", NEW: "Information", GONE: "Warning", STILL_FAILING: "Error", STILL_PASSING: "None" };
+    var STATES = { BROKEN: "Error", FIXED: "Success", NEW: "Information", GONE: "Warning", NOT_RUN: "None", STILL_FAILING: "Error", STILL_PASSING: "None" };
 
     return {
       /**
@@ -43,7 +43,14 @@ sap.ui.define(
         var texts = this.getModel("i18n").getResourceBundle();
         var runId = context.getProperty("ID");
         var createdAt = context.getProperty("createdAt");
-        var state = new JSONModel({ baseRunId: null, runs: [], rows: [], summary: "", broken: 0, busy: false });
+        var summaryOfThis = context.getProperty("summary");
+        var createdByThis = context.getProperty("createdBy");
+        // a run in progress has results that are not sent yet: they are "not run" here, and the summary is not final
+        var inProgress = context.getProperty("status") === "RUNNING";
+        var state = new JSONModel({ baseRunId: null, runs: [], rows: [], summary: "", hint: inProgress ? texts.getText("compare.inProgress") : "", broken: 0, busy: false });
+        var statusText = function (status) {
+          return status ? texts.getText("compare.status." + status) : "–";
+        };
         var dialog;
 
         var handler = {
@@ -58,6 +65,8 @@ sap.ui.define(
                 var rows = (result.value || []).map(function (r) {
                   return Object.assign({}, r, {
                     changeText: texts.getText("compare.change." + r.change),
+                    baseStatusText: statusText(r.baseStatus),
+                    otherStatusText: statusText(r.otherStatus),
                     state: STATES[r.change] || "None",
                     latency:
                       r.baseAckLatencyMs == null && r.otherAckLatencyMs == null
@@ -72,7 +81,7 @@ sap.ui.define(
                 };
                 state.setProperty("/rows", rows);
                 state.setProperty("/broken", count("BROKEN"));
-                state.setProperty("/summary", texts.getText("compare.summary", [count("BROKEN"), count("FIXED"), count("NEW"), count("GONE")]));
+                state.setProperty("/summary", texts.getText("compare.summary", [count("BROKEN"), count("FIXED"), count("NEW"), count("GONE"), count("NOT_RUN")]));
               })
               .catch(Actions.showError)
               .finally(function () {
@@ -86,15 +95,21 @@ sap.ui.define(
 
         // the earlier runs to choose from, newest first
         var runs = model.bindList("/TestRuns", null, [new Sorter("createdAt", true)], [new Filter("createdAt", "LT", createdAt)], {
-          $select: "ID,summary,createdAt"
+          $select: "ID,summary,createdAt,createdBy"
         });
         var runsLoaded = runs.requestContexts(0, COMPARE_CHOICES).then(function (contexts) {
           var list = contexts.map(function (c) {
             var run = c.getObject();
-            return { ID: run.ID, label: new Date(run.createdAt).toLocaleString() + " – " + (run.summary || "") };
+            // the earlier run of the same test cases and brokers (the summary names them), else of the same person,
+            // else the one before: a run of someone else about something else only shows "new" and "no longer run"
+            var score = (run.summary === summaryOfThis ? 2 : 0) + (run.createdBy === createdByThis ? 1 : 0);
+            return { ID: run.ID, score: score, label: new Date(run.createdAt).toLocaleString() + " – " + (run.summary || "") };
           });
+          var best = list.reduce(function (found, run) {
+            return !found || run.score > found.score ? run : found;
+          }, null);
           state.setProperty("/runs", list);
-          state.setProperty("/baseRunId", list.length ? list[0].ID : null);
+          state.setProperty("/baseRunId", best ? best.ID : null);
           if (!list.length) {
             state.setProperty("/summary", texts.getText("compare.noEarlierRun"));
           }

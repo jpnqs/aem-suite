@@ -18,6 +18,8 @@
         <List
           id="brokerList"
           mode="MultiSelect"
+          growing="true"
+          growingThreshold="200"
           includeItemInSelection="true"
           noDataText="{i18n>run.noActiveBrokersMaintainBrokersFirst}"
           updateFinished=".onBrokersLoaded"
@@ -42,7 +44,8 @@
                 visible="{= ${production} === true }"
                 class="sapUiSmallMarginEnd" />
               <ObjectStatus
-                text="{lastConnectionStatus}"
+                text="{= ${lastConnectionStatus} === 'OK' ? ${i18n>run.connectionOk} : ${lastConnectionStatus} === 'ERROR' ? ${i18n>run.connectionFailed} : '' }"
+                tooltip="{path: 'lastConnectionAt', formatter: '.testedAt'}"
                 state="{= ${lastConnectionStatus} === 'OK' ? 'Success' : ${lastConnectionStatus} === 'ERROR' ? 'Error' : 'None' }" />
             </HBox>
           </CustomListItem>
@@ -55,6 +58,7 @@
                 <Label text="{= ${run>username} ? ${run>name} + ' (' + ${run>username} + ')' : ${run>name} }" width="12rem" wrapping="true" />
                 <Input
                   visible="{run>needsUsername}"
+                  tooltip="{run>name} - {i18n>run.username}"
                   value="{run>enteredUsername}"
                   valueLiveUpdate="true"
                   valueState="{= ${run>missing} &amp;&amp; !${run>enteredUsername} ? 'Error' : 'None' }"
@@ -64,6 +68,7 @@
                   submit=".onPrimary" />
                 <Input
                   type="Password"
+                  tooltip="{run>name} - {i18n>run.password}"
                   value="{run>password}"
                   valueLiveUpdate="true"
                   valueState="{= ${run>missing} &amp;&amp; !${run>password} ? 'Error' : 'None' }"
@@ -74,24 +79,25 @@
             </CustomListItem>
           </List>
         </VBox>
+        <!-- the settings of the last run are remembered: when any is not the default the panel opens, and says so -->
         <Panel
           headerText="{i18n>run.advancedSettings}"
           expandable="true"
-          expanded="false"
+          expanded="{run>/settingsOpen}"
           class="sapUiNoContentPadding sapUiSmallMarginTop">
           <content>
             <VBox class="sapUiSmallMargin">
-              <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-                <Label text="{i18n>run.repetitions}" width="14rem" tooltip="{i18n>run.howOftenEveryTestCaseIs}" />
-                <StepInput value="{run>/repetitions}" min="1" max="1000" width="9rem" change=".onOptionsChange" />
+              <HBox alignItems="Center" class="sapUiTinyMarginBottom" wrap="Wrap">
+                <Label text="{i18n>run.repetitions}" labelFor="runRepetitions" width="14rem" tooltip="{i18n>run.howOftenEveryTestCaseIs}" />
+                <StepInput id="runRepetitions" value="{run>/repetitions}" min="1" max="{run>/limits/maxRepetitions}" width="9rem" change=".onOptionsChange" />
               </HBox>
-              <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-                <Label text="{i18n>run.pauseBetweenMessages}" width="14rem" tooltip="{i18n>run.waitBetweenTwoMessagesToThe}" />
-                <StepInput value="{run>/delayMs}" min="0" max="60000" step="100" largerStep="1000" displayValuePrecision="0" description="{i18n>run.ms}" fieldWidth="60%" width="11rem" change=".onOptionsChange" />
+              <HBox alignItems="Center" class="sapUiTinyMarginBottom" wrap="Wrap">
+                <Label text="{i18n>run.pauseBetweenMessages}" labelFor="runDelay" width="14rem" tooltip="{i18n>run.waitBetweenTwoMessagesToThe}" />
+                <StepInput id="runDelay" value="{run>/delayMs}" min="0" max="{run>/limits/maxDelayMs}" step="100" largerStep="1000" displayValuePrecision="0" description="{i18n>run.ms}" fieldWidth="60%" width="11rem" change=".onOptionsChange" />
               </HBox>
-              <HBox alignItems="Center" class="sapUiTinyMarginBottom" visible="{= ${run>/repetitions} > 1 }">
-                <Label text="{i18n>run.order}" width="14rem" tooltip="{i18n>run.wholeSelectionABCA}" />
-                <SegmentedButton selectedKey="{run>/order}" width="20rem">
+              <HBox alignItems="Center" class="sapUiTinyMarginBottom" visible="{= ${run>/repetitions} > 1 }" wrap="Wrap">
+                <Label text="{i18n>run.order}" labelFor="runOrder" width="14rem" tooltip="{i18n>run.wholeSelectionABCA}" />
+                <SegmentedButton id="runOrder" selectedKey="{run>/order}" width="20rem" change=".onOptionsChange">
                   <items>
                     <SegmentedButtonItem key="ROUND" text="{i18n>run.wholeSelection}" />
                     <SegmentedButtonItem key="EACH" text="{i18n>run.eachTestCase}" />
@@ -101,11 +107,17 @@
               <CheckBox
                 text="{i18n>run.stopAtTheFirstFailure}"
                 selected="{run>/stopOnFailure}"
+                select=".onOptionsChange"
                 tooltip="{i18n>run.afterAMessageFailedTheRest}" />
-              <Text text="{run>/estimate}" class="sapUiTinyMarginTop" />
             </VBox>
           </content>
         </Panel>
+        <!-- outside the panel: what the run will send is seen before Run, also with the panel closed -->
+        <ObjectStatus
+          text="{run>/estimate}"
+          state="{run>/estimateState}"
+          visible="{= !!${run>/estimate} }"
+          class="sapUiTinyMarginTop" />
       </VBox>
       <VBox class="sapUiSmallMargin" visible="{= !!${run>/runId} }">
         <MessageStrip
@@ -144,9 +156,9 @@
           headerText="{i18n>run.problems}"
           class="sapUiSmallMarginTop">
           <StandardListItem
-            title="{run>testCaseName} @ {run>brokerName}"
-            description="{run>errorMessage}"
-            info="{run>status}"
+            title="{run>title}"
+            description="{run>description}"
+            info="{run>statusText}"
             infoState="Error"
             wrapping="true" />
         </List>

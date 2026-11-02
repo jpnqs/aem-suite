@@ -9,32 +9,6 @@ annotate service.TestRuns with @(
     Title         : {Value: summary},
     Description   : {Value: createdAt}
   },
-  UI.PresentationVariant: {
-    SortOrder     : [{
-      Property  : createdAt,
-      Descending: true
-    }],
-    Visualizations: ['@UI.LineItem']
-  },
-  UI.SelectionFields   : [
-    createdBy,
-    status,
-    createdAt
-  ],
-  UI.LineItem          : [
-    {Value: createdAt},
-    {Value: summary},
-    {
-      Value      : outcome,
-      Criticality: statusCriticality
-    },
-    {Value: createdBy},
-    {Value: totalCount},
-    {Value: passedCount},
-    {Value: failedCount},
-    {Value: skippedCount},
-    {Value: finishedAt}
-  ],
   UI.HeaderFacets      : [{
     $Type : 'UI.ReferenceFacet',
     Target: '@UI.FieldGroup#Summary',
