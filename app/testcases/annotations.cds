@@ -13,7 +13,7 @@ annotate service.TestCases with @(
     createdBy,
     name,
     topic,
-    tags,
+    // "Tags" is a custom filter field of pills (ext/TagsFilter.fragment.xml, see manifest)
     deliveryMode
   ],
   // folders first, then manual (drag & drop) order

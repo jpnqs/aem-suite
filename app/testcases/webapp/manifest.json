@@ -137,6 +137,19 @@
                 }
               },
               "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.SelectionFields": {
+                  "filterFields": {
+                    "tags": {
+                      "label": "{{filter.tags}}",
+                      "property": "tags",
+                      "template": "com.aem.suite.testcases.ext.TagsFilter",
+                      "position": {
+                        "placement": "After",
+                        "anchor": "topic"
+                      }
+                    }
+                  }
+                },
                 "@com.sap.vocabularies.UI.v1.LineItem": {
                   "columns": {
                     "typeIcon": {

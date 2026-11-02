@@ -1,0 +1,18 @@
+<core:FragmentDefinition
+  xmlns:core="sap.ui.core"
+  xmlns="sap.m"
+  xmlns:ext="com.aem.suite.testcases.ext">
+  <!--
+    Tags filter of the list: pills with suggestions and value help (ext/TagsInput.ts). Each tag is a condition
+    "tags contains <tag>" (tags are stored as one text, "eu, smoke"); several tags: test cases with any of them.
+    In a VBox: the filter field takes the typed text of a direct input as a condition - only the pills count here.
+  -->
+  <VBox
+    core:require="{TagsFilterType: 'com/aem/suite/testcases/ext/TagsFilterType'}"
+    width="100%">
+    <ext:TagsInput
+      tagList="{path: 'filterValues>', type: 'TagsFilterType'}"
+      invalidText="{i18n>tags.invalid}"
+      width="100%" />
+  </VBox>
+</core:FragmentDefinition>

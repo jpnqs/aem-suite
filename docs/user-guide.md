@@ -272,7 +272,7 @@ Every save keeps a **version** (section *Versions* at the bottom of the page): w
 
 ### Tags and editing many test cases at once
 
-- To run all test cases with a tag: filter the list by **Tags** (e.g. *contains smoke*), select all, **Run…**.
+- To run all test cases with a tag: pick it in the **Tags** filter of the list (suggested while typing, or from its value help; several tags: test cases with any of them), **Go**, select all, **Run…**.
 - **Edit Selected…** changes all selected test cases in one go: add or remove tags, set the delivery mode or the ACK timeout, or replace a part of the topics (e.g. `/v1/` → `/v2/`). A selected folder stands for every test case below it (tags are set on the folder itself). Empty fields stay as they are. If one result would break a rule, nothing is changed; test cases that someone is editing are left alone and named.
 
 ---

@@ -21,6 +21,8 @@ import type ResourceBundle from "sap/base/i18n/ResourceBundle";
  * theme's indication colors, css/style.css). Read only (editable=false) it just shows the pills - table and display.
  * The rules are the server's (srv/lib/testcases/tags.ts).
  *
+ * In the filter bar it is bound by `tagList` (string[], one condition per tag - ext/TagsFilter.fragment.xml).
+ *
  * Value help: the tags in use (TestService.knownTags) are suggested while typing, and the value help icon opens a
  * list of them to tick.
  */
@@ -85,6 +87,8 @@ export default class TagsInput extends MultiInput {
     properties: {
       /** the tags as text, two-way bound */
       tags: { type: "string", defaultValue: "" },
+      /** the same as a list, two-way bound (filter bar) */
+      tagList: { type: "string[]", defaultValue: [] },
       /** the message when a typed word is no tag */
       invalidText: { type: "string", defaultValue: "" }
     }
@@ -94,6 +98,7 @@ export default class TagsInput extends MultiInput {
   static renderer = "sap.m.MultiInputRenderer";
 
   declare getTags: () => string;
+  declare getTagList: () => string[];
   declare getInvalidText: () => string;
 
   private dialog?: SelectDialog;
@@ -147,6 +152,12 @@ export default class TagsInput extends MultiInput {
   setTags(value: string | null): this {
     this.setProperty("tags", value ?? "", true);
     this.showTags(tagsOf(value));
+    return this;
+  }
+
+  setTagList(value: string[] | null): this {
+    this.setProperty("tagList", value ?? [], true);
+    this.showTags(tagsOf((value ?? []).join(",")));
     return this;
   }
 
@@ -246,6 +257,7 @@ export default class TagsInput extends MultiInput {
     const text = joinTags(tags);
     this.showTags(tagsOf(text));
     this.setProperty("tags", text);
+    this.setProperty("tagList", tagsOf(text));
   }
 
   private showTags(tags: string[]): void {

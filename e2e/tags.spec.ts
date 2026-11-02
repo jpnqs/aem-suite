@@ -111,4 +111,32 @@ test.describe('tags', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible()
   })
+
+  test('the list filters by tags, picked as pills', async ({ page }) => {
+    const tag = `filter-${uniqueName('x').slice(2).toLowerCase()}`
+    const tagged = uniqueName('E2E_TAGS_IN')
+    const other = uniqueName('E2E_TAGS_OUT')
+    await createTestCase(page.request, tagged, `${tag}, smoke`)
+    await createTestCase(page.request, other, 'smoke')
+
+    await openApp(page, apps.testCases)
+    await expectAppOpen(page, apps.testCases)
+    await page.getByRole('option', { name: 'All Test Cases' }).click()
+    // the list loaded (it takes the focus when it is done)
+    await expect(page.getByRole('row').filter({ hasText: other })).toBeVisible()
+    const field = page.locator('[id*="FilterField::tags"]')
+    const filter = field.getByRole('textbox')
+    await filter.click()
+    // a whole tag and a comma (suggestions: see the test above)
+    await filter.pressSequentially(`${tag},`)
+    await expect(field.locator('.aemTag')).toHaveText([tag])
+    await expect(filter).toHaveValue('')
+    // the request: "contains" per tag
+    const list = page.waitForRequest((r) => decodeURIComponent(r.postData() ?? '').includes(`contains(tags,'${tag}')`))
+    await page.getByRole('button', { name: 'Go', exact: true }).click()
+    await list
+    await expect(page.getByRole('row').filter({ hasText: tagged })).toBeVisible()
+    await expect(page.getByRole('row').filter({ hasText: other })).toHaveCount(0)
+    await page.screenshot({ path: test.info().outputPath('tags-filter.png') })
+  })
 })
