@@ -187,7 +187,7 @@ describe('export / import of test cases and folders', () => {
       const before = await countNodes()
       const res = await importNodes(content, extra)
       expect(res.status).toBe(400)
-      expect(res.data.error.message).toMatch(/^Nothing was imported: /)
+      expect(res.data.error.message).toMatch(/^Nothing was imported:[ \n]/)
       expect(await countNodes()).toBe(before)
       return res.data.error.message as string
     }
@@ -253,7 +253,7 @@ describe('export / import of test cases and folders', () => {
       const many = Array.from({ length: 30 }, (_, i) => ({ kind: 'TEST', name: `t${i}`, payload: '{' }))
       const message = await rejected(doc(many))
       expect(message).toMatch(/topic: Topic is required/)
-      expect(message).toMatch(/\(and \d+ more\)$/)
+      expect(message).toMatch(/\n… and \d+ more$/)
     })
   })
 })

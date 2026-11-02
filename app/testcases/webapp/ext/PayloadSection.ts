@@ -84,10 +84,17 @@ interface StatusTexts {
   empty: string;
   /** with {0} = the parser's message */
   invalid: string;
+  /** a payload that is not JSON, with {0} = the content type */
+  other: string;
 }
 
 /** What the status line says about a payload - decided once, for the bindings and while typing. */
-function status(text: string | null | undefined, texts?: StatusTexts): { text: string; state: ValueState; icon: string } {
+function status(text: string | null | undefined, texts?: StatusTexts, contentType?: string | null): { text: string; state: ValueState; icon: string } {
+  // only JSON is checked as JSON: a text or XML payload is sent as it is (the server checks the same way)
+  const checked = !contentType || /json/i.test(contentType);
+  if (!checked) {
+    return { text: !texts ? "" : texts.other.replace("{0}", contentType || ""), state: ValueState.None, icon: "sap-icon://document-text" };
+  }
   const err = JsonTemplate.validate(text);
   return {
     text: !texts ? "" : err ? texts.invalid.replace("{0}", err) : text && text.trim() ? texts.valid : texts.empty,
@@ -106,16 +113,16 @@ function current(bound?: string | null, typed?: string | null): string | null | 
 
 export default {
   // formatters of the status line: parts [payload, aem>/typedPayload] (+ the three texts for statusText)
-  statusText(bound?: string | null, typed?: string | null, valid = "", empty = "", invalid = ""): string {
-    return status(current(bound, typed), { valid, empty, invalid }).text;
+  statusText(bound?: string | null, typed?: string | null, contentType?: string | null, valid = "", empty = "", invalid = "", other = ""): string {
+    return status(current(bound, typed), { valid, empty, invalid, other }, contentType).text;
   },
 
-  statusState(bound?: string | null, typed?: string | null): ValueState {
-    return status(current(bound, typed)).state;
+  statusState(bound?: string | null, typed?: string | null, contentType?: string | null): ValueState {
+    return status(current(bound, typed), undefined, contentType).state;
   },
 
-  statusIcon(bound?: string | null, typed?: string | null): string {
-    return status(current(bound, typed)).icon;
+  statusIcon(bound?: string | null, typed?: string | null, contentType?: string | null): string {
+    return status(current(bound, typed), undefined, contentType).icon;
   },
 
   onLiveChange(event: Event<{ value: string }>): void {
@@ -137,6 +144,11 @@ export default {
     const button = event.getSource() as Control;
     const ctx = button.getBindingContext() as Context | undefined;
     const aem = button.getModel("aem") as JSONModel;
+    const contentType = ctx?.getProperty("contentType") as string | null | undefined;
+    if (contentType && !/json/i.test(contentType)) {
+      MessageToast.show(textsOf(button)("payload.cannotFormat", [contentType + " is not JSON"]));
+      return;
+    }
     try {
       const formatted = JsonTemplate.format(current(ctx?.getProperty("payload") as string | undefined, aem.getProperty("/typedPayload") as string | null) || "");
       if (ctx) {

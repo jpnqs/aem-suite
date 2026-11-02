@@ -49,7 +49,7 @@ export default {
   /** Saves the given nodes (no ids: everything) as a JSON file. */
   exportNodes(api: ExtensionAPI, ids: string[]): Promise<void> {
     const t = textsOf(api);
-    return Actions.invokeAction<Counts & { filename: string; content: string }>(api.getModel() as ODataModel, "/exportNodes(...)", { ids }).then((result) => {
+    return Actions.busy(Actions.invokeAction<Counts & { filename: string; content: string }>(api.getModel() as ODataModel, "/exportNodes(...)", { ids })).then((result) => {
       Files.download(result.filename, result.content);
       MessageToast.show(t("file.exported", [describeCounts(result, t), result.filename]));
     });
@@ -67,7 +67,7 @@ export default {
       return;
     }
     const importCall = (dryRun: boolean) =>
-      Actions.invokeAction<Counts & { target?: string | null }>(model, "/importNodes(...)", { content: file.text, parentId, dryRun });
+      Actions.busy(Actions.invokeAction<Counts & { target?: string | null }>(model, "/importNodes(...)", { content: file.text, parentId, dryRun }));
     const check = await importCall(true);
     if (!(await confirmImport(file.name, check, t))) {
       return;

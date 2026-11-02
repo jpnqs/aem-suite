@@ -33,10 +33,22 @@ async function snapshotOf(id: string): Promise<Snapshot | undefined> {
   }
 }
 
-/** What differs between two snapshots: the field names, "user properties", "variables". */
+/** how the Versions table names a changed field (the others are named as they are) */
+const FIELD_LABELS: Record<string, string> = {
+  deliveryMode: 'delivery mode',
+  contentType: 'content type',
+  correlationId: 'correlation ID',
+  ackTimeoutMs: 'ACK timeout',
+  timeToLiveMs: 'time to live',
+  dmqEligible: 'DMQ eligible'
+}
+
+/** What differs between two snapshots: the names of the fields, "user properties", "variables". */
 function changesBetween(before: Snapshot | undefined, after: Snapshot): string[] {
   if (!before) return ['created']
-  const fields = Object.keys(after.fields).filter((f) => JSON.stringify(before.fields[f] ?? null) !== JSON.stringify(after.fields[f] ?? null))
+  const fields = Object.keys(after.fields)
+    .filter((f) => JSON.stringify(before.fields[f] ?? null) !== JSON.stringify(after.fields[f] ?? null))
+    .map((f) => FIELD_LABELS[f] ?? f)
   if (JSON.stringify(before.userProperties) !== JSON.stringify(after.userProperties)) fields.push('user properties')
   if (JSON.stringify(before.variables) !== JSON.stringify(after.variables)) fields.push('variables')
   return fields
@@ -77,9 +89,9 @@ export async function restoreVersion(versionId: string): Promise<{ ID: string; v
   if (!v) throw httpError(404, 'Version not found')
   const id = v.testCase_ID
   const node = await SELECT.one.from(TestCases).columns('ID', 'kind').where({ ID: id })
-  if (!node) throw httpError(404, 'The test case of this version no longer exists')
+  if (!node) throw httpError(404, 'The test case or folder of this version no longer exists')
   const draft = await SELECT.one.from(DRAFTS).columns('ID').where({ ID: id })
-  if (draft) throw httpError(409, 'The test case is being edited - save or discard the draft first')
+  if (draft) throw httpError(409, 'It is being edited - save or discard the draft first')
   const snapshot = JSON.parse(v.snapshot) as Snapshot
   // a folder keeps being a folder: only the fields the version has
   await UPDATE(TestCases, id).with({ ...snapshot.fields, modifiedAt: new Date().toISOString() })

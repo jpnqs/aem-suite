@@ -591,7 +591,7 @@ When you save a rule, tick **Apply automatically every day**: the server then cl
 | *Unknown variable(s): …* | Define the variable (test case, folder, broker or global) or fix the spelling – **Preview** shows it. |
 | *Payload is not valid JSON* | Fix the JSON, or clear *Content Type* for plain text. |
 | *Number range "…" is exhausted* | **Reset** the range or raise *Last Allowed Number* (Admin). |
-| **Run…** is disabled | Save your draft, or select at least one row. |
+| **Run…** does nothing but show a message | Only unsaved drafts are selected: save them first, or select saved test cases. |
 | I don't see the test cases or runs of colleagues | Test cases: switch to **All Test Cases**. Runs: remove the filter *Started By*. |
 | *WebSocket offline* in the Live Subscriber | The connection to the server dropped; it reconnects – reload the page if it stays. |
 | A run stays *RUNNING* | A broker that does not answer is given up after its connect timeout; look again later or stop it (**Stop run** in the dialog, **Stop Run** on the run's page in Test Runs). |

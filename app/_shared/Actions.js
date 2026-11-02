@@ -1,4 +1,4 @@
-sap.ui.define(["sap/m/MessageBox"], function (MessageBox) {
+sap.ui.define(["sap/m/MessageBox", "sap/ui/core/BusyIndicator"], function (MessageBox, BusyIndicator) {
   "use strict";
 
   /** The text of an error from OData, a promise rejection or anything else. */
@@ -8,6 +8,17 @@ sap.ui.define(["sap/m/MessageBox"], function (MessageBox) {
 
   return {
     errorText: errorText,
+
+    /**
+     * Blocks the page with the busy indicator while the work runs (an action that takes a moment - copy, import,
+     * export - is not started twice by a second click), and resolves / rejects with the work.
+     */
+    busy: function (work) {
+      BusyIndicator.show(0);
+      return Promise.resolve(work).finally(function () {
+        BusyIndicator.hide();
+      });
+    },
 
     /** Shows an error to the user (and logs it, for the details). */
     showError: function (e) {

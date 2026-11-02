@@ -28,7 +28,7 @@ type Copy = { ID: string; name: string };
  * Resolves with the copies; the copy is placed right after its original.
  */
 function copyNodes(api: ExtensionAPI, ids: string[]): Promise<Copy[]> {
-  return Actions.invokeAction<{ value?: Copy[] }>(api.getModel() as ODataModel, "/copyNodes(...)", { ids }).then((result) => result.value || []);
+  return Actions.busy(Actions.invokeAction<{ value?: Copy[] }>(api.getModel() as ODataModel, "/copyNodes(...)", { ids })).then((result) => result.value || []);
 }
 
 function copiedMessage(copies: Copy[], t: Texts): string {

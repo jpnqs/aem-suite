@@ -66,15 +66,17 @@ describe('versions, tags and bulk edit', () => {
     expect(res.status).toBe(200)
     expect(res.data).toEqual(expect.objectContaining({ updated: 3, skipped: [] }))
     expect(await node(a.ID)).toMatchObject({ topic: 'shop/v2/a', deliveryMode: 'DIRECT', tags: 'regression' })
+    // a name that was the topic follows it, one that was typed does not
+    expect((await node(a.ID)).name).toBe('a')
     // b was not selected itself: no tags, but the changes of its folder's test cases
     expect(await node(b.ID)).toMatchObject({ topic: 'shop/v2/b', deliveryMode: 'DIRECT', tags: null })
     expect((await node(folder.ID)).tags).toBe('regression')
-    expect((await node(b.ID)).versions[0].changes).toBe('topic, deliveryMode')
+    expect((await node(b.ID)).versions[0].changes).toBe('topic, delivery mode')
 
     // all or nothing: a broken result changes nothing
     const bad = await POST('/odata/v4/test/bulkUpdate', { ids: [a.ID], changes: { ackTimeoutMs: 1 } }, tester)
     expect(bad.status).toBe(400)
-    expect(bad.data.error.message).toMatch(/^a: ACK timeout must be between 100 and 120000 ms/)
+    expect(bad.data.error.message).toMatch(/^ACK timeout must be between 100 and 120000 ms \(a\)$/)
 
     // a test case being edited is left alone
     await draft.edit(POST, 'test', 'TestCases', b.ID)

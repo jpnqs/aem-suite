@@ -156,9 +156,12 @@ export async function importNodes(content: string, opts: { parentId?: string | n
   const parentId = opts.parentId ?? null
   problems.push(...(await validate(flat, parentId)))
   if (problems.length) {
-    const shown = problems.slice(0, MAX_PROBLEMS_SHOWN).join('; ')
-    const more = problems.length > MAX_PROBLEMS_SHOWN ? ` (and ${problems.length - MAX_PROBLEMS_SHOWN} more)` : ''
-    throw httpError(400, `Nothing was imported: ${shown}${more}`)
+    // one per line (the message box keeps the line breaks)
+    const shown = problems.slice(0, MAX_PROBLEMS_SHOWN).map((p) => `
+• ${p}`).join('')
+    const more = problems.length > MAX_PROBLEMS_SHOWN ? `
+… and ${problems.length - MAX_PROBLEMS_SHOWN} more` : ''
+    throw httpError(400, `Nothing was imported:${shown}${more}`)
   }
 
   const target = parentId ? ((await SELECT.one.from(TestCases).columns('name').where({ ID: parentId }))?.name ?? null) : null

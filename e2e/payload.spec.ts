@@ -95,3 +95,12 @@ test('Enter makes a new line in the payload editor (the page shortcut must not t
   await page.keyboard.press('Enter')
   expect(await lines(topic)).toBe(1)
 })
+
+test('a payload that is not JSON is not checked as JSON', async ({ page }) => {
+  const res = await page.request.post('/odata/v4/test/TestCases', { data: { topic: 'e2e/plain', payload: 'plain text, not JSON', contentType: 'text/plain' } })
+  expect(res.ok()).toBe(true)
+  const { ID } = await res.json()
+  await page.goto(`/launchpad.html#${apps.testCases.intent}&/TestCases(ID=${ID},IsActiveEntity=false)`)
+  await expect(page.getByText('Content type text/plain - sent as it is, not checked')).toBeVisible()
+  await expect(page.getByText(/^Invalid JSON: /)).toHaveCount(0)
+})

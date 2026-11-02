@@ -51,6 +51,12 @@ export default class TestService extends cds.ApplicationService {
     this.before(['CREATE', 'UPDATE'], TestCases, async (req) => {
       const d = req.data as NodeData
       const reject: Reject = (status, message, target) => req.error(status, message, target)
+      // saving a draft writes all its columns: the folder and position can have changed meanwhile (cut and paste,
+      // drag and drop and "move" write the saved row, not the draft) - they stay as they are now
+      if (req.event === 'UPDATE' && (req as unknown as { _?: { event?: string } })._?.event === 'draftActivate') {
+        const saved = await SELECT.one.from(TestCaseRows).columns('parent_ID', 'sortOrder').where({ ID: d.ID ?? keyOf(req).ID })
+        if (saved) Object.assign(d, { parent_ID: saved.parent_ID, sortOrder: saved.sortOrder })
+      }
       const parentOk = await validateParent(d, d.ID ?? keyOf(req).ID, reject)
       if (parentOk && req.event === 'CREATE' && !d.sortOrder) d.sortOrder = await nextSortOrder(d.parent_ID)
       validateNode(d, req.event, reject)

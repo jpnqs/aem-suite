@@ -101,6 +101,8 @@ export function validateNode(d: NodeData, event: string, reject: Reject): void {
     if ((event === 'CREATE' || d.name !== undefined) && !d.name?.trim()) reject(400, 'Folder name is required', 'in/name')
   } else if (d.kind === 'TEST' || event === 'CREATE') {
     if (!d.topic?.trim()) reject(400, 'Topic is required', 'in/topic')
+    // a publish topic has no wildcards (a run would refuse it); what a template inserts is only known at the run
+    else if (/[*>]/.test(d.topic.replace(/\{\{[^}]*\}\}/g, ''))) reject(400, `A topic to publish to has no wildcards (* and >): ${d.topic}`, 'in/topic')
   }
   // fill what was left empty
   const nameLength = columnLength('TestCases', 'name')

@@ -7,9 +7,9 @@
     width="100%">
     <OverflowToolbar style="Clear">
       <ObjectStatus
-        text="{parts: ['payload', 'aem>/typedPayload', 'i18n>payload.valid', 'i18n>payload.empty', 'i18n>payload.invalid'], formatter: 'handler.statusText'}"
-        state="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusState'}"
-        icon="{parts: ['payload', 'aem>/typedPayload'], formatter: 'handler.statusIcon'}" />
+        text="{parts: ['payload', 'aem>/typedPayload', 'contentType', 'i18n>payload.valid', 'i18n>payload.empty', 'i18n>payload.invalid', 'i18n>payload.other'], formatter: 'handler.statusText'}"
+        state="{parts: ['payload', 'aem>/typedPayload', 'contentType'], formatter: 'handler.statusState'}"
+        icon="{parts: ['payload', 'aem>/typedPayload', 'contentType'], formatter: 'handler.statusIcon'}" />
       <ToolbarSpacer />
       <Button
         icon="sap-icon://sys-help"

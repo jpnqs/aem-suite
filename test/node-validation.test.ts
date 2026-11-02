@@ -36,6 +36,12 @@ describe('node validation', () => {
     expect(d.userProperties!.map((p) => p.type)).toEqual(['INT', 'BOOL', 'STRING'])
   })
 
+  it('refuses wildcards in the topic of a test case - what a template inserts is only known at the run', async () => {
+    expect(await problemsOf({ kind: 'TEST', topic: 'orders/>' })).toEqual(['topic: A topic to publish to has no wildcards (* and >): orders/>'])
+    expect(await problemsOf({ kind: 'TEST', topic: 'a/*/b' })).toHaveLength(1)
+    expect(await problemsOf({ kind: 'TEST', topic: 'orders/{{region}}/created' })).toEqual([])
+  })
+
   it('requires a topic for test cases and a name for folders', async () => {
     expect(await problemsOf({ kind: 'TEST', topic: '  ' })).toEqual(['topic: Topic is required'])
     expect(await problemsOf({ kind: 'FOLDER' })).toEqual(['name: Folder name is required'])

@@ -5,7 +5,7 @@
   <VBox
     core:require="{handler: 'com/aem/suite/testcases/ext/MessageSection'}"
     width="100%">
-    <Label text="{i18n>preview.topic}" required="{ui>/isEditable}" design="Bold" visible="{= !${aem>/isFolder} }" />
+    <Label text="{i18n>preview.topic}" labelFor="topicEditor" required="{ui>/isEditable}" design="Bold" visible="{= !${aem>/isFolder} }" />
     <ce:CodeEditor
       id="topicEditor"
       type="text"
@@ -23,10 +23,12 @@
 
     <Label
       text="{= ${aem>/isFolder} ? ${i18n>message.folderName} : ${i18n>message.name} }"
+      labelFor="nameInput"
       required="{= ${ui>/isEditable} &amp;&amp; ${aem>/isFolder} }"
       design="{= ${aem>/isFolder} ? 'Bold' : 'Standard' }"
       class="sapUiSmallMarginTop" />
     <Input
+      id="nameInput"
       value="{name}"
       visible="{ui>/isEditable}"
       width="100%"

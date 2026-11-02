@@ -54,7 +54,7 @@
           <Title text="{i18n>run.credentialsUsedForThisRunOnly}" level="H6" />
           <List items="{path: 'run>/credentials', templateShareable: false}" showSeparators="None">
             <CustomListItem>
-              <HBox alignItems="Center" class="sapUiTinyMarginTopBottom">
+              <HBox alignItems="Center" wrap="Wrap" class="sapUiTinyMarginTopBottom">
                 <Label text="{= ${run>username} ? ${run>name} + ' (' + ${run>username} + ')' : ${run>name} }" width="12rem" wrapping="true" />
                 <Input
                   visible="{run>needsUsername}"

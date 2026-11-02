@@ -11,7 +11,7 @@
     draggable="true">
     <content>
       <VBox class="sapUiSmallMargin">
-        <HBox alignItems="Center">
+        <HBox alignItems="Center" wrap="Wrap">
           <Label text="{i18n>preview.resolveForBroker}" labelFor="previewBroker" class="sapUiSmallMarginEnd" />
           <Select
             id="previewBroker"

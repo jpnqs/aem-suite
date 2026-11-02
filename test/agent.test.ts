@@ -316,7 +316,7 @@ describe('AI agent service (MCP)', () => {
         })
       })
       expect(bad.ok).toBe(false)
-      expect(bad.error).toMatch(/Nothing was imported: Broken \/ Bad: payload: Payload is not valid JSON/)
+      expect(bad.error).toMatch(/Nothing was imported:\n• Broken \/ Bad: payload: Payload is not valid JSON/)
       expect(await query("SELECT ID from TestNodes where name = 'Broken'")).toHaveLength(0)
       expect((await call('importNodes', { content: 'nope' })).error).toMatch(/not valid JSON/)
     })

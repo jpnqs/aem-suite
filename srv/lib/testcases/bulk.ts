@@ -1,10 +1,14 @@
 import { TestCases } from '#cds-models/aem/suite'
 import { httpError } from '../core/errors'
-import { assertValid, NodeData, validateEnums, validateNode } from './node-validation'
+import { columnLength } from '../core/model'
+import { collectProblems, NodeData, validateEnums, validateNode } from './node-validation'
 import { selectNodesDeep } from './nodes'
 import { joinTags, tagsOf } from './tags'
 import { loadTree } from './tree'
 import { DRAFTS, recordVersion } from './versions'
+
+/** problems named in the error of a refused bulk change */
+const MAX_PROBLEMS = 5
 
 /** What "Edit Selected" changes - everything optional, empty = unchanged. */
 export interface BulkChanges {
@@ -58,7 +62,12 @@ export async function bulkUpdate(ids: string[], changes: BulkChanges): Promise<B
     if (testIds.includes(row.ID) && row.kind === 'TEST') {
       if (c.deliveryMode) data.deliveryMode = c.deliveryMode as NodeData['deliveryMode']
       if (c.ackTimeoutMs != null) data.ackTimeoutMs = c.ackTimeoutMs
-      if (c.topicFind && row.topic?.includes(c.topicFind)) data.topic = row.topic.split(c.topicFind).join(c.topicReplace ?? '')
+      if (c.topicFind && row.topic?.includes(c.topicFind)) {
+        data.topic = row.topic.split(c.topicFind).join(c.topicReplace ?? '')
+        // a name that was the topic (the default of a new test case) follows it
+        const nameLength = columnLength('TestCases', 'name')
+        if (row.name === row.topic.slice(0, nameLength)) data.name = data.topic.slice(0, nameLength)
+      }
     }
     if (tagIds.includes(row.ID)) {
       const tags = joinTags([...tagsOf(row.tags).filter((t) => !remove.includes(t)), ...add])
@@ -70,15 +79,23 @@ export async function bulkUpdate(ids: string[], changes: BulkChanges): Promise<B
 
   // the rules of a save, on the result as a whole
   const byId = new Map(rows.map((r) => [r.ID, r]))
-  await assertValid((reject) => {
-    for (const u of updates) {
-      const merged = { ...byId.get(u.id)!, ...u.data } as NodeData
-      const where = merged.name ?? merged.topic ?? u.id
-      const prefixed = (status: number, message: string) => reject(status, `${where}: ${message}`)
-      validateEnums(merged, prefixed)
-      validateNode(merged, 'UPDATE', prefixed)
+  // one problem is one line, with the test cases it is about (a wrong value on 200 test cases is not 200 lines)
+  const found = new Map<string, string[]>()
+  for (const u of updates) {
+    const merged = { ...byId.get(u.id)!, ...u.data } as NodeData
+    const where = merged.name ?? merged.topic ?? u.id
+    for (const problem of await collectProblems((reject) => {
+      const plain = (status: number, message: string) => reject(status, message)
+      validateEnums(merged, plain)
+      validateNode(merged, 'UPDATE', plain)
+    })) {
+      found.set(problem, [...(found.get(problem) ?? []), where])
     }
-  })
+  }
+  if (found.size) {
+    const shown = [...found].slice(0, MAX_PROBLEMS).map(([problem, names]) => `${problem} (${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''})`)
+    throw httpError(400, shown.join('; ') + (found.size > MAX_PROBLEMS ? ` (and ${found.size - MAX_PROBLEMS} more problems)` : ''))
+  }
   for (const u of updates) {
     await UPDATE(TestCases, u.id).with({ ...u.data, modifiedAt: new Date().toISOString() })
     await recordVersion(u.id)
