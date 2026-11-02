@@ -62,13 +62,4 @@ describe('operations', () => {
     expect(res.status).toBe(200)
     expect(res.data).toEqual({ status: 'UP' })
   })
-
-  it('shows administrators the state of the server on Home, testers not', async () => {
-    const { data: forAdmin } = await GET('/odata/v4/home/overview()', admin)
-    expect(forAdmin.system).toMatchObject({ version: expect.stringMatching(/^\d+\.\d+\.\d+/), runsInProgress: 0, liveSubscriptions: 0 })
-    expect(forAdmin.system.runsStarted).toBeGreaterThanOrEqual(2)
-    expect(forAdmin.system.messagesPassed).toBeGreaterThanOrEqual(1)
-    const { data: forTester } = await GET('/odata/v4/home/overview()', tester)
-    expect(forTester.system).toBeNull()
-  })
 })

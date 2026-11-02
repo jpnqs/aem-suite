@@ -498,7 +498,7 @@ Each HTML5 app is deployed on its own, so every app needs the modules it uses un
 - AI access (MCP): role `Tester`, secrets stay out of the AI channel, see "TestAgentService" in section 6.
 - Local development uses mocked users (`package.json` → `cds.requires.[development].auth`): `admin/admin` (Admin+Tester), `tester/tester` (Tester). The WebSocket is anonymous locally (plugin behaviour with mocked auth); events are isolated by context IDs.
 
-- **Monitoring.** `/health` (CAP, no login) is the liveness check of Cloud Foundry (`mta.yaml`). `/health/db` (no login, no data) answers 200 `{"status":"UP"}` when the database answers, else 503 - for an external monitor; it is not the CF health check, so a database outage does not restart the app. Administrators see the **System** section on Home (`HomeService.overview().system`, `lib/core/metrics.ts`): version, uptime, runs in progress, live subscriptions of all users, runs started and messages passed / failed since the start, memory.
+- **Monitoring.** `/health` (CAP, no login) is the liveness check of Cloud Foundry (`mta.yaml`). `/health/db` (no login, no data) answers 200 `{"status":"UP"}` when the database answers, else 503 - for an external monitor; it is not the CF health check, so a database outage does not restart the app.
 
 ## 10. Configuration
 

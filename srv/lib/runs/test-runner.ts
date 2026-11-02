@@ -11,7 +11,6 @@ import { config } from '../core/config'
 import { emitLive } from '../core/live'
 import { columnLength } from '../core/model'
 import { addBrokerDailyStats, nextHistory, safely } from './trends'
-import { count } from '../core/metrics'
 
 const LOG = cds.log('aem-runner')
 
@@ -272,7 +271,6 @@ export async function startRun(
 ): Promise<RunRef> {
   const run = await createRun(testCaseIds, brokerIds, credentials, options, Math.min(maxMessages, config().runs.maxResults))
   const jwt = currentJwt()
-  count('runsStarted')
   req.on('succeeded', () => void executeRunInBackground(run.runId, jwt, credentials))
   return run
 }
@@ -318,7 +316,6 @@ class RunProgress {
     this.counts.done++
     if (status === 'PASSED') this.counts.passed++
     else this.counts.failed++
-    count(status === 'PASSED' ? 'messagesPassed' : 'messagesFailed')
     await cds.db.tx(() => UPDATE(RunResults, r.ID).with({ status, executedAt: new Date().toISOString(), ...data }))
     await this.progressed(r.ID)
   }
