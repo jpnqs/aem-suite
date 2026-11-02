@@ -39,7 +39,47 @@ service AdminService {
 
   /** Who changed or did what (Audit Log app) - written by srv/lib/core/audit.ts, never changed. */
   @readonly
-  entity AuditLog as projection on db.AuditLog;
+  entity AuditLog as
+    projection on db.AuditLog {
+      *,
+      // the codes of the log as words (the app shows "Created (CREATE)"); unknown ones stay as they are
+      case action
+        when 'CREATE'         then 'Created'
+        when 'UPDATE'         then 'Changed'
+        when 'DELETE'         then 'Deleted'
+        when 'runTests'       then 'Started a run'
+        when 'runTest'        then 'Started a run'
+        when 'cancelRun'      then 'Stopped a run'
+        when 'execute'        then 'Cleaned up data'
+        when 'testConnection' then 'Tested a connection'
+        when 'importNodes'    then 'Imported test cases'
+        when 'importConfig'   then 'Imported a configuration'
+        when 'copyNodes'      then 'Copied test cases'
+        when 'duplicate'      then 'Copied a test case'
+        when 'bulkUpdate'     then 'Edited several test cases'
+        when 'restore'        then 'Restored a version'
+        when 'createTestCase' then 'Made a test case from a message'
+        when 'reset'          then 'Reset a number range'
+        when 'countUp'        then 'Issued a number'
+        when 'countDown'      then 'Gave a number back'
+        when 'start'          then 'Started a subscription'
+        when 'stop'           then 'Stopped a subscription'
+        else action
+      end as actionText : String(60),
+      case target
+        when 'TestCases'         then 'Test case'
+        when 'Brokers'           then 'Broker'
+        when 'GlobalVariables'   then 'Global variable'
+        when 'NumberRanges'      then 'Number range'
+        when 'ReceivedMessages'  then 'Saved message'
+        when 'CleanupRules'      then 'Cleanup rule'
+        when 'CleanupLogs'       then 'Cleanup'
+        when 'SubscriberPresets' then 'Subscription setup'
+        when 'TestCaseVersions'  then 'Version'
+        when 'TestRuns'          then 'Run'
+        else target
+      end as targetText : String(60)
+    };
 
   /** Messages and acknowledgement latency per broker and day (section "Last Days" of a broker). */
   @readonly

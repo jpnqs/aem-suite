@@ -6,7 +6,7 @@ annotate service.AuditLog with @(
   UI.HeaderInfo         : {
     TypeName      : '{i18n>AuditEntry}',
     TypeNamePlural: '{i18n>AuditLog}',
-    Title         : {Value: action},
+    Title         : {Value: actionText},
     Description   : {Value: at}
   },
   UI.SelectionFields    : [
@@ -48,5 +48,10 @@ annotate service.AuditLog with @(
     Label : '{i18n>AuditEntry}'
   }]
 ) {
-  details @UI.MultiLineText;
+  details    @UI.MultiLineText;
+  // "Created (CREATE)", "Test case (TestCases)": readable, and the code is still there to filter by
+  action     @Common.Text: actionText  @Common.TextArrangement: #TextFirst;
+  target     @Common.Text: targetText  @Common.TextArrangement: #TextFirst;
+  actionText @UI.Hidden;
+  targetText @UI.Hidden;
 };

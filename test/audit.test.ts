@@ -26,6 +26,8 @@ describe('audit log, production brokers, secrets, retention', () => {
       expect(created).toMatchObject({ user: 'admin', service: 'AdminService', targetId: broker.ID, name: 'dev' })
       expect(created.details).toContain('url')
       expect(created.details).not.toContain('dev.example')
+      // the codes as words, for the Audit Log app (it shows "Created (CREATE)")
+      expect(created).toMatchObject({ actionText: 'Created', targetText: 'Broker' })
       // a draft that is never saved leaves no entry
       await POST('/odata/v4/admin/Brokers', { name: 'never saved' }, admin)
       expect(await auditOf(`name eq 'never saved'`)).toEqual([])

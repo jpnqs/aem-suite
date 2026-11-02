@@ -14,7 +14,7 @@
       "target": "$1",
       "service": "html5-apps-repo-rt",
       "authenticationType": "xsuaa",
-      "cacheControl": "no-cache, no-store, must-revalidate"
+      "cacheControl": "no-cache"
     }
   ]
 }

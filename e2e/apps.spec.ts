@@ -16,6 +16,8 @@ test.describe('apps (admin)', () => {
   test('Test Cases offers a folder or a test case to create (labels from the i18n bundle)', async ({ page }) => {
     await openApp(page, apps.testCases)
     await expectAppOpen(page, apps.testCases)
+    // the list is loaded (the toolbar is rebuilt when it is: a click before that opens nothing)
+    await expect(page.getByText('Orders', { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: 'Create' }).first().click()
     await expect(page.getByRole('menuitem', { name: 'Folder' })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Test Case' })).toBeVisible()

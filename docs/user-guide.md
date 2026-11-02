@@ -56,6 +56,7 @@ Every chapter starts with the clicks, step by step (the element to click is fram
 | **Global Variables** | values for all test cases | Admin |
 | **Number Ranges** | document numbers (like SAP) for your messages | Admin |
 | **Data Cleanup** | delete old runs, messages and setups | Admin |
+| **Audit Log** | who changed or did what (read only) | Admin |
 | **Help** | this guide, with a search | everyone |
 
 On **Home** the tiles are grouped into **Testing** and **Administration**. **Needs attention** lists what is wrong (failed results, a broker whose connection test failed); **OK** hides a notice until the situation changes, **Show again** brings it back.

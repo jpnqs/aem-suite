@@ -57,6 +57,12 @@ modules:
       keep-existing-routes: true
       disk-quota: 256M
       memory: 256M
+    properties:
+      # minutes without a request until the login of the browser ends
+      SESSION_TIMEOUT: 60
+      httpHeaders:
+        - X-Content-Type-Options: nosniff
+        - Referrer-Policy: strict-origin-when-cross-origin
     requires:
       - name: srv-api
         group: destinations
