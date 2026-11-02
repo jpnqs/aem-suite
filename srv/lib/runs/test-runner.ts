@@ -10,7 +10,7 @@ import { TemplateError } from '../template/resolve'
 import { config } from '../core/config'
 import { emitLive } from '../core/live'
 import { columnLength } from '../core/model'
-import { addBrokerDailyStats, healthOf, nextHistory, safely } from './trends'
+import { addBrokerDailyStats, nextHistory, safely } from './trends'
 import { count } from '../core/metrics'
 
 const LOG = cds.log('aem-runner')
@@ -536,7 +536,7 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
       run_ID: runId,
       brokers: truncate(outcomes.map((o) => o.broker).join(', '), columnLength('TestCaseStats', 'brokers')),
       message: bad.length ? truncate(bad.map((o) => `${o.broker}: ${o.error ?? o.status}`).join('; '), columnLength('TestCaseStats', 'message')) : null,
-      ...trendOf(nextHistory(historyOf.get(testCaseId), status))
+      history: nextHistory(historyOf.get(testCaseId), status)
     }
   })
   try {
@@ -546,4 +546,3 @@ async function updateTestCaseStats(runId: string, perTestCase: Map<string, Outco
   }
 }
 
-const trendOf = (history: string) => ({ history, ...healthOf(history) })

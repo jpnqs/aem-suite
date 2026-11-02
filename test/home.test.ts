@@ -58,7 +58,6 @@ describe('home (start page)', () => {
       runningRuns: 1,
       resultsPassed: 6,
       resultsFailed: 1,
-      passRate: 86,
       brokers: 3,
       brokersOk: 1,
       brokersFailing: 1,

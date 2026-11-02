@@ -1,7 +1,7 @@
 import cds from '@sap/cds'
 import fs from 'node:fs'
 import path from 'node:path'
-import { Brokers, ReceivedMessages, TestCases, TestCaseStats, TestRuns } from '#cds-models/aem/suite'
+import { Brokers, ReceivedMessages, TestCases, TestRuns } from '#cds-models/aem/suite'
 import { metrics } from './lib/core/metrics'
 import { listSubscriptions, subscriptionCount } from './lib/solace/subscription-hub'
 import { activeRunIds, runOutcome } from './lib/runs/test-runner'
@@ -11,7 +11,7 @@ const RECENT_DAYS = 7
 const LAST_RUNS = 5
 
 /** count(1) of an entity (the typed query API has no overload for a union of entities, hence the cast) */
-const count = async (entity: typeof TestCases | typeof TestRuns | typeof ReceivedMessages | typeof TestCaseStats, where?: Record<string, unknown>): Promise<number> => {
+const count = async (entity: typeof TestCases | typeof TestRuns | typeof ReceivedMessages, where?: Record<string, unknown>): Promise<number> => {
   const query = SELECT.one.from(entity as typeof TestCases).columns('count(1) as n')
   const row = (await (where ? query.where(where) : query)) as { n: number } | undefined
   return Number(row?.n ?? 0)
@@ -44,7 +44,6 @@ export default class HomeService extends cds.ApplicationService {
 
       const resultsPassed = recent.reduce((s, r) => s + (r.passedCount ?? 0), 0)
       const resultsFailed = recent.reduce((s, r) => s + (r.failedCount ?? 0), 0)
-      const finished = resultsPassed + resultsFailed
       return {
         user,
         firstName,
@@ -57,7 +56,6 @@ export default class HomeService extends cds.ApplicationService {
         runningRuns: await count(TestRuns, { status: 'RUNNING' }),
         resultsPassed,
         resultsFailed,
-        passRate: finished ? Math.round((resultsPassed / finished) * 100) : null,
         lastRuns: lastRuns.map((r) => ({
           ID: r.ID,
           summary: r.summary,
@@ -75,7 +73,6 @@ export default class HomeService extends cds.ApplicationService {
         failingBrokers: brokers.filter((b) => b.lastConnectionStatus === 'ERROR').map((b) => b.name),
         savedMessages,
         liveSubscriptions: listSubscriptions(user).length,
-        flakyTestCases: await count(TestCaseStats, { flaky: true }),
         system: admin ? systemStatus() : null
       }
     })

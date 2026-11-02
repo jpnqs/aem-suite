@@ -1,4 +1,4 @@
-import { healthOf, nextHistory } from '../srv/lib/runs/trends'
+import { nextHistory } from '../srv/lib/runs/trends'
 import { createActive, fakeBroker, resetDatabase, runAndWait, startServer, users } from './helpers'
 
 const { GET, POST } = startServer()
@@ -9,17 +9,6 @@ describe('trends (lib/runs/trends.ts)', () => {
     expect(nextHistory(null, 'PASSED')).toBe('P')
     expect(nextHistory('PF', 'ERROR')).toBe('PFE')
     expect(nextHistory('P'.repeat(20), 'FAILED')).toBe('P'.repeat(19) + 'F')
-  })
-
-  it('flaky: passed and failed in the last 10 runs, changing at least twice', () => {
-    expect(healthOf('')).toEqual({ passRate: null, flaky: false })
-    expect(healthOf('PPPP')).toEqual({ passRate: 100, flaky: false })
-    // one regression is no flakiness
-    expect(healthOf('PPPPFFF')).toEqual({ passRate: 57, flaky: false })
-    expect(healthOf('PFP')).toEqual({ passRate: 67, flaky: true })
-    expect(healthOf('PEPPF')).toMatchObject({ flaky: true })
-    // the changes are older than the last 10 runs
-    expect(healthOf('PFPF' + 'P'.repeat(10))).toMatchObject({ flaky: false })
   })
 })
 
@@ -40,20 +29,20 @@ describe('trends of runs', () => {
     tc = await createActive(POST, 'test', 'TestCases', { name: 'trend', topic: 'trend/ok', payload: '{}' })
   })
 
-  it('keeps the history, pass rate and flakiness of a test case', async () => {
+  it('keeps the history of a test case', async () => {
     await run([tc.ID])
     await setTopic('trend/reject')
     await run([tc.ID])
     await setTopic('trend/ok')
     await run([tc.ID])
     const { data } = await GET(`/odata/v4/test/TestCases(ID=${tc.ID},IsActiveEntity=true)?$expand=lastResult`, tester)
-    expect(data.lastResult).toMatchObject({ status: 'PASSED', history: 'PFP', passRate: 67, flaky: true, flakyCriticality: 2 })
+    expect(data.lastResult).toMatchObject({ status: 'PASSED', history: 'PFP' })
   })
 
   it('adds up messages and latencies per broker and day', async () => {
     const { data } = await GET(`/odata/v4/admin/Brokers(ID=${brokerId},IsActiveEntity=true)/dailyStats`, admin)
     expect(data.value).toEqual([
-      expect.objectContaining({ day: new Date().toISOString().slice(0, 10), brokerName: 'dev', messages: 3, passed: 2, ackCount: 2, passRate: 67, criticality: 2 })
+      expect.objectContaining({ day: new Date().toISOString().slice(0, 10), brokerName: 'dev', messages: 3, passed: 2, ackCount: 2 })
     ])
   })
 

@@ -3,14 +3,12 @@ import { BrokerDailyStats, RunResults } from '#cds-models/aem/suite'
 
 /**
  * Trends kept while runs finish (cheap to read, the same on SQLite and HANA):
- * - per test case the outcomes of its last runs (TestCaseStats.history), its pass rate and whether it is flaky,
+ * - per test case the outcomes of its last runs (TestCaseStats.history),
  * - per broker and day the number of messages and their latencies (BrokerDailyStats).
  */
 
 /** how many outcomes TestCaseStats.history keeps */
 export const HISTORY_LENGTH = 20
-/** the outcomes "flaky" looks at */
-const FLAKY_WINDOW = 10
 
 /** P = passed, F = failed, E = error - newest last */
 export type HistoryLetter = 'P' | 'F' | 'E'
@@ -20,20 +18,6 @@ export const letterOf = (status: string): HistoryLetter => (status === 'PASSED' 
 /** The history with the newest outcome appended, cut to HISTORY_LENGTH. */
 export function nextHistory(previous: string | null | undefined, status: string): string {
   return ((previous ?? '') + letterOf(status)).slice(-HISTORY_LENGTH)
-}
-
-/**
- * Pass rate (percent of the kept outcomes) and flaky: within the last FLAKY_WINDOW outcomes it passed and failed,
- * and changed between the two at least twice - one regression (or one fix) alone is not flaky.
- */
-export function healthOf(history: string | null | undefined): { passRate: number | null; flaky: boolean } {
-  const h = history ?? ''
-  if (!h.length) return { passRate: null, flaky: false }
-  const passRate = Math.round((100 * [...h].filter((c) => c === 'P').length) / h.length)
-  const recent = h.slice(-FLAKY_WINDOW)
-  let changes = 0
-  for (let i = 1; i < recent.length; i++) if ((recent[i] === 'P') !== (recent[i - 1] === 'P')) changes++
-  return { passRate, flaky: recent.includes('P') && /[FE]/.test(recent) && changes >= 2 }
 }
 
 interface LatencyRow {

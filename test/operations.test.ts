@@ -68,7 +68,6 @@ describe('operations', () => {
     expect(forAdmin.system).toMatchObject({ version: expect.stringMatching(/^\d+\.\d+\.\d+/), runsInProgress: 0, liveSubscriptions: 0 })
     expect(forAdmin.system.runsStarted).toBeGreaterThanOrEqual(2)
     expect(forAdmin.system.messagesPassed).toBeGreaterThanOrEqual(1)
-    expect(typeof forAdmin.flakyTestCases).toBe('number')
     const { data: forTester } = await GET('/odata/v4/home/overview()', tester)
     expect(forTester.system).toBeNull()
   })

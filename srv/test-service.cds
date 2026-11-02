@@ -175,9 +175,7 @@ service TestService {
         when 'FAILED' then 1
         when 'ERROR'  then 1
         else 0
-      end as criticality : Integer,
-      // flaky is a warning
-      case when flaky = true then 2 else 0 end as flakyCriticality : Integer
+      end as criticality : Integer
     };
 
   /**

@@ -228,16 +228,6 @@ sap.ui.define(
         if (!o.brokers) {
           info("noBroker", t(o.admin ? "attention.noBroker.admin" : "attention.noBroker.tester"), t("action.brokers"), brokersLink);
         }
-        if (o.flakyTestCases) {
-          items.push({
-            id: "flaky:" + o.flakyTestCases,
-            text: t(o.flakyTestCases === 1 ? "attention.flaky.one" : "attention.flaky.many", [o.flakyTestCases]),
-            state: "Warning",
-            icon: "sap-icon://alert",
-            action: t("action.testcases"),
-            target: "testcases"
-          });
-        }
         if (!o.testCases) {
           info("noTestCases", t("attention.noTestCases"), t("action.testcases"), "testcases");
         }

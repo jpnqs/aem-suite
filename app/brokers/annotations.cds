@@ -179,13 +179,8 @@ annotate service.BrokerDailyStats with @(
   UI.LineItem           : [
     {Value: day},
     {Value: messages},
-    {
-      Value      : passRate,
-      Criticality: criticality
-    },
+    {Value: passed},
     {Value: ackAvgMs},
     {Value: ackMaxMs}
   ]
-) {
-  criticality @UI.Hidden;
-};
+);

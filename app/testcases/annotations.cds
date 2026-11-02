@@ -55,11 +55,6 @@ annotate service.TestCases with @(
       Value: lastResult.runAt,
       Label: '{i18n>LastRunAt}'
     },
-    {Value: lastResult.passRate},
-    {
-      Value      : lastResult.flaky,
-      Criticality: lastResult.flakyCriticality
-    },
     {Value: deliveryMode},
     {Value: createdBy},
     {Value: modifiedAt}
@@ -78,12 +73,7 @@ annotate service.TestCases with @(
     {Value: lastResult.runAt},
     {Value: lastResult.brokers},
     {Value: lastResult.message},
-    {Value: lastResult.history},
-    {Value: lastResult.passRate},
-    {
-      Value      : lastResult.flaky,
-      Criticality: lastResult.flakyCriticality
-    }
+    {Value: lastResult.history}
   ]},
   // description: the documentation, custom section "documentation" (see manifest)
   UI.FieldGroup #Advanced: {Data: [

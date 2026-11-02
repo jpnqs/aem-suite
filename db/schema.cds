@@ -251,10 +251,6 @@ entity TestCaseStats {
       message   : String(1000);
       /** outcomes of the last runs, oldest first: P passed, F failed, E error (lib/runs/trends.ts) */
       history   : String(20);
-      /** percent of the outcomes in history that passed */
-      passRate  : Integer;
-      /** passed and failed within the last 10 runs, changing at least twice */
-      flaky     : Boolean;
 }
 
 /** Messages and latencies per broker and day (UTC) - added when a run finishes (lib/runs/trends.ts). */
@@ -531,9 +527,7 @@ annotate TestCaseStats with {
   runAt   @title: '{i18n>RunAt}';
   brokers @title: '{i18n>Brokers}';
   message @title: '{i18n>Problems}';
-  history  @title: '{i18n>History}'  @Common.QuickInfo: '{i18n>InfoHistory}';
-  passRate @title: '{i18n>PassRate}'  @Common.QuickInfo: '{i18n>InfoPassRate}';
-  flaky    @title: '{i18n>Flaky}'  @Common.QuickInfo: '{i18n>InfoFlaky}';
+  history @title: '{i18n>History}'  @Common.QuickInfo: '{i18n>InfoHistory}';
 };
 
 annotate BrokerDailyStats with {

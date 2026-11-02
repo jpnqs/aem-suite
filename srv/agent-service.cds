@@ -79,11 +79,7 @@ service TestAgentService {
       brokers,
       message,
       /** outcomes of the last runs, oldest first: P passed, F failed, E error */
-      history,
-      /** percent of these that passed */
-      passRate,
-      /** passes and fails alternately in the last 10 runs */
-      flaky
+      history
     };
 
   /**

@@ -34,8 +34,6 @@ service HomeService {
     /** results of the runs of the last 7 days */
     resultsPassed     : Integer;
     resultsFailed     : Integer;
-    /** passed results in percent, null without results */
-    passRate          : Integer;
     lastRuns          : many RecentRun;
     /** active brokers and their last connection test */
     brokers           : Integer;
@@ -47,8 +45,6 @@ service HomeService {
     savedMessages     : Integer;
     /** live subscriptions of this user */
     liveSubscriptions : Integer;
-    /** test cases that passed and failed in their last runs (TestCaseStats.flaky) */
-    flakyTestCases    : Integer;
     // ---- role Admin
     system            : SystemStatus;
   }
