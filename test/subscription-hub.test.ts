@@ -86,7 +86,7 @@ describe('subscription hub (live view)', () => {
       const id = await start()
       sessions[0].deliver({ payload: 'abcdéf' }) // é takes bytes 5 and 6
       await settle()
-      expect(messagesOf(id)[0].data.payload).toBe('abcd\n... [truncated]')
+      expect(messagesOf(id)[0].data).toMatchObject({ payload: 'abcd\n... [truncated]', truncated: true })
     }))
 
   it('throttles busy subscriptions and tells the client', async () =>

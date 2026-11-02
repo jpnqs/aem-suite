@@ -110,7 +110,7 @@ describe('AEM test suite services', () => {
   it('saves a destination broker whose connection test fails, with a warning', () =>
     withDestinations([{ name: 'aem-down', url: 'https://down.example', username: 'du', password: 'dp', msgVpn: 'dvpn' }], async () => {
       // the fake broker refuses connections to brokers named "unreachable"
-      const res = await draft.save(POST, 'admin', 'Brokers', { name: 'unreachable', credentialMode: 'DESTINATION', destinationName: 'aem-down' }, admin)
+      const res = await draft.save(POST, 'admin', 'Brokers', { name: 'unreachable (destination)', credentialMode: 'DESTINATION', destinationName: 'aem-down' }, admin)
       try {
         expect(res.status).toBe(201)
         expect(res.data).toMatchObject({ lastConnectionStatus: 'ERROR', lastConnectionMessage: 'Connect failed: Unauthorized' })
@@ -130,6 +130,12 @@ describe('AEM test suite services', () => {
     expect(await messages({ name: 'broken', credentialMode: 'DESTINATION' })).toEqual(['in/destinationName: Destination name is required'])
     expect(await messages({ name: 'broken', credentialMode: 'DIRECT' })).toEqual(['in/url: URL is required', 'in/msgVpn: Message VPN is required'])
     expect((await messages({ name: 'broken', credentialMode: 'DIRECT', url: 'ftp://x.example', msgVpn: 'v' })).join()).toMatch(/^in\/url: .*ftp/)
+  })
+
+  it('refuses a second broker of the same name (any case)', async () => {
+    const res = await draft.save(POST, 'admin', 'Brokers', { name: 'DEV', credentialMode: 'DIRECT', url: 'other.example', msgVpn: 'v', username: 'u' }, admin)
+    expect(res.status).toBe(409)
+    expect(JSON.stringify(res.data)).toMatch(/Broker \\"DEV\\" already exists|Broker \\"DEV\\"/)
   })
 
   it('checks broker variable names like test case variables', async () => {
@@ -418,6 +424,10 @@ describe('AEM test suite services', () => {
     const url = (id: string) => `/odata/v4/subscribe/ReceivedMessages(${id})`
     // everybody sees all saved messages and can make a test case of any
     expect((await GET(url(ofAdmin.ID), tester)).status).toBe(200)
+    // the list offers Delete only where it works: own messages (administrators: all)
+    expect((await GET(`${url(ofAdmin.ID)}?$select=deletable`, tester)).data.deletable).toBe(false)
+    expect((await GET(`${url(ofTester.ID)}?$select=deletable`, tester)).data.deletable).toBe(true)
+    expect((await GET(`${url(ofTester.ID)}?$select=deletable`, admin)).data.deletable).toBe(true)
     expect((await POST(`${url(ofAdmin.ID)}/SubscribeService.createTestCase`, {}, tester)).status).toBe(200)
     expect((await PATCH(url(ofTester.ID), { topic: 'changed' }, tester)).status).toBe(405)
     expect((await PATCH(url(ofTester.ID), { topic: 'changed' }, admin)).status).toBe(405)

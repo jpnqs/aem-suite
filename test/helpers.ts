@@ -136,7 +136,7 @@ export function fakeBroker(latencyMs = 1) {
     setConnector(async (conn) => {
       broker.connectedAs[conn.brokerName] = conn.userName
       broker.connectedWith[conn.brokerName] = conn.password
-      if (conn.brokerName === 'unreachable') throw new Error('Connect failed: Unauthorized')
+      if (conn.brokerName.startsWith('unreachable')) throw new Error('Connect failed: Unauthorized')
       return {
         publish: async (spec) => {
           broker.published.push({ broker: conn.brokerName, spec })

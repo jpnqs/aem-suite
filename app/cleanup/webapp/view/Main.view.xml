@@ -52,10 +52,10 @@
                 <headerToolbar>
                   <OverflowToolbar style="Clear">
                     <core:Icon src="sap-icon://kpi-managing-my-area" class="sapUiTinyMarginEnd" />
-                    <Title text="{i18n>category.RUNS}" />
+                    <Title id="titleRUNS" text="{i18n>category.RUNS}" />
                     <Text text="{i18n>category.RUNS.info}" class="aemHint sapUiSmallMarginBegin" />
                     <ToolbarSpacer />
-                    <Switch state="{state>enabled}" />
+                    <Switch state="{state>enabled}" ariaLabelledBy="titleRUNS" tooltip="{i18n>category.RUNS}" />
                   </OverflowToolbar>
                 </headerToolbar>
                 <VBox visible="{state>enabled}">
@@ -68,10 +68,10 @@
                 <headerToolbar>
                   <OverflowToolbar style="Clear">
                     <core:Icon src="sap-icon://document-text" class="sapUiTinyMarginEnd" />
-                    <Title text="{i18n>category.RUN_PAYLOADS}" />
+                    <Title id="titleRUN_PAYLOADS" text="{i18n>category.RUN_PAYLOADS}" />
                     <Text text="{i18n>category.RUN_PAYLOADS.info}" class="aemHint sapUiSmallMarginBegin" />
                     <ToolbarSpacer />
-                    <Switch state="{state>enabled}" />
+                    <Switch state="{state>enabled}" ariaLabelledBy="titleRUN_PAYLOADS" tooltip="{i18n>category.RUN_PAYLOADS}" />
                   </OverflowToolbar>
                 </headerToolbar>
                 <VBox visible="{state>enabled}">
@@ -84,10 +84,10 @@
                 <headerToolbar>
                   <OverflowToolbar style="Clear">
                     <core:Icon src="sap-icon://inbox" class="sapUiTinyMarginEnd" />
-                    <Title text="{i18n>category.MESSAGES}" />
+                    <Title id="titleMESSAGES" text="{i18n>category.MESSAGES}" />
                     <Text text="{i18n>category.MESSAGES.info}" class="aemHint sapUiSmallMarginBegin" />
                     <ToolbarSpacer />
-                    <Switch state="{state>enabled}" />
+                    <Switch state="{state>enabled}" ariaLabelledBy="titleMESSAGES" tooltip="{i18n>category.MESSAGES}" />
                   </OverflowToolbar>
                 </headerToolbar>
                 <l:Grid defaultSpan="XL3 L3 M6 S12" hSpacing="1" vSpacing="0.5" containerQuery="true" visible="{state>enabled}" class="aemCriteria">
@@ -128,10 +128,10 @@
                 <headerToolbar>
                   <OverflowToolbar style="Clear">
                     <core:Icon src="sap-icon://bookmark" class="sapUiTinyMarginEnd" />
-                    <Title text="{i18n>category.PRESETS}" />
+                    <Title id="titlePRESETS" text="{i18n>category.PRESETS}" />
                     <Text text="{i18n>category.PRESETS.info}" class="aemHint sapUiSmallMarginBegin" />
                     <ToolbarSpacer />
-                    <Switch state="{state>enabled}" />
+                    <Switch state="{state>enabled}" ariaLabelledBy="titlePRESETS" tooltip="{i18n>category.PRESETS}" />
                   </OverflowToolbar>
                 </headerToolbar>
                 <l:Grid defaultSpan="XL3 L3 M6 S12" hSpacing="1" vSpacing="0.5" containerQuery="true" visible="{state>enabled}" class="aemCriteria">

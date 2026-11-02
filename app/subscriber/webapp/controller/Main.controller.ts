@@ -97,6 +97,10 @@ interface LiveMessage {
   deliveryMode: string;
   size: string;
   savedId?: string;
+  /** the test case made from this message (once), so "Save as Test Case" does not make another one */
+  testCaseId?: string;
+  /** the server cut the payload at its limit: saving it would save a broken message */
+  truncated?: boolean;
   /** the row is selected (bound two-way to the table row) */
   selected?: boolean;
 }
@@ -520,15 +524,21 @@ export default class Main extends Controller {
       const others = list.filter((s) => s.subscriptionId !== current);
       const stopOthers = this.t("active.stopOthers");
       const text = list
-        .map((s) => this.t(s.subscriptionId === current ? "active.lineThisPage" : "active.line", [s.brokerName, s.sourceType, s.source, s.messageCount]))
+        .map((s) => this.t(s.subscriptionId === current ? "active.lineThisPage" : "active.line", [s.brokerName, this.t("sourceType." + s.sourceType), s.source, s.messageCount]))
         .join("\n");
       MessageBox.information(text, {
         title: this.t("active.title"),
         actions: others.length ? [stopOthers, MessageBox.Action.CLOSE] : [MessageBox.Action.CLOSE],
         onClose: async (action: string | null) => {
           if (action !== stopOthers) return;
-          for (const s of others) await invokeAction(this.odata(), "/stop(...)", { subscriptionId: s.subscriptionId }).catch(() => undefined);
-          MessageToast.show(others.length === 1 ? this.t("active.stoppedOne") : this.t("active.stoppedMany", [others.length]));
+          let stopped = 0;
+          for (const s of others) {
+            await invokeAction(this.odata(), "/stop(...)", { subscriptionId: s.subscriptionId }).then(
+              () => stopped++,
+              () => undefined
+            );
+          }
+          MessageToast.show(stopped === others.length ? (stopped === 1 ? this.t("active.stoppedOne") : this.t("active.stoppedMany", [stopped])) : this.t("active.stoppedSome", [stopped, others.length]));
         }
       });
     } catch (e) {
@@ -556,6 +566,7 @@ export default class Main extends Controller {
         userProperties: String(data.userProperties ?? "{}"),
         correlationId: (data.correlationId as string) ?? null,
         deliveryMode: String(data.deliveryMode ?? ""),
+        truncated: data.truncated === true,
         size: formatSize(new Blob([payload]).size)
       });
       this.state.setProperty("/received", (this.state.getProperty("/received") as number) + 1);
@@ -565,7 +576,7 @@ export default class Main extends Controller {
         MessageToast.show(String(data.message));
       } else {
         this.session.ended();
-        this.markStopped(`${status}: ${data.message}`);
+        this.markStopped(`${this.t("status." + status)}: ${data.message}`);
         if (status === "DOWN") MessageBox.warning(this.t("status.lost", [data.message]));
       }
     }
@@ -614,11 +625,24 @@ export default class Main extends Controller {
     MessageToast.show(this.t("message.copied"));
   }
 
+  /** a save (or the test case made of it) is under way: a second click does not start another */
+  private saving = false;
+
+  /** asks; resolves true on the yes */
+  private confirmCut(): Promise<boolean> {
+    const yes = this.t("message.saveCut");
+    return new Promise((resolve) =>
+      MessageBox.warning(this.t("message.cutWarning"), { actions: [yes, MessageBox.Action.CANCEL], emphasizedAction: MessageBox.Action.CANCEL, onClose: (action: string | null) => resolve(action === yes) })
+    );
+  }
+
   /** Persists the selected message (once); returns the ID of the saved entity. */
   private async save(): Promise<string | undefined> {
     const sel = this.state.getProperty("/selected") as SelectedMessage | null;
     if (!sel) return undefined;
     if (sel.savedId) return sel.savedId;
+    // the payload was cut at the limit of the live view (cds.aemSuite.subscriptions.maxPayloadBytes)
+    if (sel.truncated && !(await this.confirmCut())) return undefined;
 
     // the subscription the message came from - the form may show another one by now
     const list = this.odata().bindList("/ReceivedMessages");
@@ -658,35 +682,49 @@ export default class Main extends Controller {
   }
 
   public async onSave(): Promise<void> {
+    if (this.saving) return;
+    this.saving = true;
     try {
-      await this.save();
-      MessageToast.show(this.t("message.saved"));
+      if (await this.save()) MessageToast.show(this.t("message.saved"));
     } catch (e) {
       MessageBox.error(errorText(e));
+    } finally {
+      this.saving = false;
     }
   }
 
   public async onSaveAsTestCase(): Promise<void> {
+    if (this.saving) return;
+    this.saving = true;
     try {
       const id = await this.save();
       if (!id) return;
-      const message = this.odata().bindContext(`/ReceivedMessages(${id})`);
-      let testCaseId: string;
-      try {
-        ({ ID: testCaseId } = await invokeAction<{ ID: string }>(this.odata(), "SubscribeService.createTestCase(...)", {}, message.getBoundContext() as Context));
-      } finally {
-        message.destroy();
+      let testCaseId = (this.state.getProperty("/selected") as SelectedMessage).testCaseId;
+      if (!testCaseId) {
+        const message = this.odata().bindContext(`/ReceivedMessages(${id})`);
+        try {
+          ({ ID: testCaseId } = await invokeAction<{ ID: string }>(this.odata(), "SubscribeService.createTestCase(...)", {}, message.getBoundContext() as Context));
+        } finally {
+          message.destroy();
+        }
+        // one test case per message: the next click offers this one again
+        this.state.setProperty("/selected/testCaseId", testCaseId);
+        const row = (this.state.getProperty("/messages") as LiveMessage[]).find((m) => m.savedId === id);
+        if (row) row.testCaseId = testCaseId;
       }
+      const made = testCaseId;
       const openAction = this.t("message.openTestCase");
       MessageBox.success(this.t("message.testCaseCreated"), {
         actions: [openAction, MessageBox.Action.CLOSE],
         emphasizedAction: openAction,
         onClose: (action: string | null) => {
-          if (action === openAction) openTestCase(testCaseId);
+          if (action === openAction) openTestCase(made);
         }
       });
     } catch (e) {
       MessageBox.error(errorText(e));
+    } finally {
+      this.saving = false;
     }
   }
 }

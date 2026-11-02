@@ -252,7 +252,10 @@ export default class Main extends Controller {
 
   private async execute(categories: CategoryResult[]): Promise<void> {
     const request = this.request();
-    const ruleName = this.selectedRule()?.getProperty("name") as string | undefined;
+    // the rule's name only if what is deleted IS the rule: after a change of the selection the log would name a rule
+    // (and stamp its "last run") that was not what ran
+    const rule = this.selectedRule();
+    const ruleName = rule && rule.getProperty("request") === JSON.stringify(request) ? (rule.getProperty("name") as string) : undefined;
     try {
       const result = await this.busy(() =>
         invokeAction<{ totalCount: number }>(this.odata(), "/execute(...)", {
@@ -324,10 +327,21 @@ export default class Main extends Controller {
     dialog.open();
   }
 
-  /** same name as a saved rule: that one is updated */
+  /** asks; resolves true on the yes */
+  private confirm(message: string, yes: string): Promise<boolean> {
+    return new Promise((resolve) =>
+      MessageBox.warning(message, { title: this.text("rule.saveAs"), actions: [yes, MessageBox.Action.CANCEL], emphasizedAction: MessageBox.Action.CANCEL, onClose: (action: string | null) => resolve(action === yes) })
+    );
+  }
+
+  /** same name as a saved rule: that one is updated (after a yes - it is replaced, also its automatic setting) */
   private async saveRule(name: string, description: string, automatic: boolean): Promise<void> {
     const request = JSON.stringify(this.request());
     const existing = (this.rules().getCurrentContexts() as Context[]).find((c) => (c.getProperty("name") as string).toLowerCase() === name.toLowerCase());
+    const yes = this.text("rule.save");
+    if (existing && existing !== this.selectedRule() && !(await this.confirm(this.text("rule.overwrite", [name]), yes))) return;
+    // from now on the server deletes this selection every day, without asking and without a preview
+    if (automatic && !existing?.getProperty("automatic") && !(await this.confirm(this.text("rule.automatic.confirm", [name]), yes))) return;
     try {
       if (existing) {
         await Promise.all([existing.setProperty("request", request), existing.setProperty("description", description), existing.setProperty("automatic", automatic)]);

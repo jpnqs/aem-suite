@@ -16,6 +16,8 @@ service LiveService {
     brokerId       : UUID;
     topic          : String;
     payload        : LargeString;
+    /** the payload was cut at the limit (cds.aemSuite.subscriptions.maxPayloadBytes): saving it would save a broken message */
+    truncated      : Boolean;
     contentType    : String;
     userProperties : LargeString;
     correlationId  : String;

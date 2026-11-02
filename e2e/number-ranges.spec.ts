@@ -46,7 +46,9 @@ test.describe('Number Ranges', () => {
     await visible('CU-0009')
     await visible('CU-0008')
 
+    // Count Down asks first: it can hand out a number a run already sent
     await page.getByRole('button', { name: 'Count Down' }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'OK' }).click()
     await visible('CU-0007')
     const { current } = await (await page.request.get(rangeUrl(range.ID))).json()
     expect(Number(current)).toBe(7)

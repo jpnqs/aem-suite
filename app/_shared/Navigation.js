@@ -102,7 +102,11 @@ sap.ui.define(["module", "./Apps"], function (module, Apps) {
         inShell(target);
         return;
       }
-      window.open(standaloneUrl(target.app, target.path), "_blank", "noopener");
+      if (target.newTab) {
+        window.open(standaloneUrl(target.app, target.path), "_blank", "noopener");
+      } else {
+        window.location.assign(standaloneUrl(target.app, target.path));
+      }
     },
 
     /**

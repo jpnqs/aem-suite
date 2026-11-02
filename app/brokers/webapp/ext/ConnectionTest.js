@@ -98,11 +98,18 @@ sap.ui.define(
             broker.credentialMode === "DESTINATION" ? Promise.resolve({}) : askCredentials(broker, t);
           return credentials.then(function (params) {
             if (!params) return undefined;
-            return Actions.invokeAction(api.getModel(), "AdminService.testConnection(...)", params, context).then(
+            // the connect can take up to the timeout of the broker: the page is busy meanwhile (no second click)
+            return Actions.busy(Actions.invokeAction(api.getModel(), "AdminService.testConnection(...)", params, context)).then(
               function (check) {
                 context.requestSideEffects(STATUS_PROPERTIES);
-                if (check.ok) MessageToast.show(t("connection.ok", [broker.name, check.latencyMs]));
-                else MessageBox.error(t("connection.failed", [broker.name, check.message]));
+                if (check.ok) {
+                  MessageToast.show(t("connection.ok", [broker.name, check.latencyMs]));
+                  return undefined;
+                }
+                // the next broker is tested once this message was read (its password dialog would open on top of it)
+                return new Promise(function (resolve) {
+                  MessageBox.error(t("connection.failed", [broker.name, check.message]), { onClose: resolve });
+                });
               }
             );
           });

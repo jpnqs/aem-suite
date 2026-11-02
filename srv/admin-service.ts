@@ -18,6 +18,7 @@ const AUTO_CHECK_TIMEOUT_MS = 5000
 
 interface BrokerData {
   ID?: string
+  name?: string
   credentialMode?: string
   destinationName?: string | null
   url?: string | null
@@ -59,7 +60,16 @@ export default class AdminService extends cds.ApplicationService {
       const { nextNumber } = req.data as { nextNumber?: number | string | null }
       const range = (await SELECT.one.from(NumberRangeRows).where({ ID })) as NumberRangeRow | undefined
       if (!range) return req.reject(404, 'Number range not found')
-      if (nextNumber !== undefined && nextNumber !== null && BigInt(nextNumber) < 0n) return req.reject(400, 'The next number must not be negative')
+      if (nextNumber !== undefined && nextNumber !== null) {
+        const next = BigInt(nextNumber)
+        const start = BigInt(range.start ?? 1)
+        const max = range.maximum === null || range.maximum === undefined ? null : BigInt(range.maximum)
+        const digits = range.length && range.length > 0 ? range.length : null
+        if (next < 0n) return req.reject(400, 'The next number must not be negative')
+        if (next < start) return req.reject(400, `The next number must not be below the start of the range (${start})`)
+        if (max !== null && next > max) return req.reject(400, `The next number must not be above the maximum of the range (${max})`)
+        if (digits && String(next).length > digits) return req.reject(400, `The next number ${next} does not fit into the ${digits} digits of the range`)
+      }
       // empty: back to the start of the range
       const current = nextNumber === undefined || nextNumber === null ? null : currentForNext(range, nextNumber)
       // by name: cds-typer types Integer64 as number, `current` is written as text (no precision lost)
@@ -99,9 +109,11 @@ export default class AdminService extends cds.ApplicationService {
     })
 
     // ---------------------------------------------------------------- save (draft activation)
-    this.before(['CREATE', 'UPDATE'], Brokers, (req) => {
+    this.before(['CREATE', 'UPDATE'], Brokers, async (req) => {
       const d = req.data as BrokerData
       if (d.url) d.url = normalizeBrokerUrl(d.url)
+      // two brokers of one name look the same in the Run dialog, the subscriber, the results and Runs per Day
+      if (d.name !== undefined && (await nameTaken('Brokers', d.name ?? '', d.ID ?? idOf(req)))) req.error(409, `Broker "${d.name}" already exists`, 'in/name')
 
       checkBroker(d, req.event === 'CREATE' ? 'CREATE' : 'UPDATE', (status, message, target) => req.error(status, message, target))
     })

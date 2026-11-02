@@ -132,6 +132,13 @@
                   "tableSettings": {
                     "type": "ResponsiveTable",
                     "selectionMode": "Multi"
+                  },
+                  "actions": {
+                    "createTestCase": {
+                      "press": "com.aem.suite.messages.ext.MessageActions.createFromSelection",
+                      "text": "{{action.createTestCase}}",
+                      "requiresSelection": true
+                    }
                   }
                 }
               }
@@ -148,6 +155,10 @@
               "content": {
                 "header": {
                   "actions": {
+                    "createTestCase": {
+                      "press": "com.aem.suite.messages.ext.MessageActions.createFromPage",
+                      "text": "{{action.createTestCase}}"
+                    },
                     "help": {
                       "press": "com.aem.suite.messages.shared.Help.open",
                       "text": "{{action.help}}"

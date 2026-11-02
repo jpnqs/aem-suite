@@ -29,18 +29,9 @@ annotate service.ReceivedMessages with @(
     {Value: source},
     {Value: sourceType},
     {Value: deliveryMode},
-    {Value: createdBy},
-    {
-      $Type : 'UI.DataFieldForAction',
-      Action: 'SubscribeService.createTestCase',
-      Label : '{i18n>CreateTestCase}'
-    }
+    {Value: createdBy}
   ],
-  UI.Identification    : [{
-    $Type : 'UI.DataFieldForAction',
-    Action: 'SubscribeService.createTestCase',
-    Label : '{i18n>CreateTestCase}'
-  }],
+  // "Create Test Case" is a custom action (ext/MessageActions.js): it offers to open the result
   UI.FieldGroup #Message: {Data: [
     {Value: brokerName},
     {Value: topic},

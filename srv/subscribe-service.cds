@@ -37,7 +37,12 @@ service SubscribeService {
     }
   ]
   @Capabilities.UpdateRestrictions.Updatable: false
-  entity ReceivedMessages as projection on db.ReceivedMessages
+  @Capabilities.DeleteRestrictions.Deletable: deletable
+  entity ReceivedMessages as projection on db.ReceivedMessages {
+    *,
+    // the messages the user may delete (own ones, administrators all) - srv/subscribe-service.ts
+    virtual null as deletable : Boolean
+  }
     actions {
       /** Creates a new test case from this message (topic, payload, user properties). */
       action createTestCase() returns TestCaseRef;

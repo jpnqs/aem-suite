@@ -194,6 +194,15 @@ describe('number ranges (service and runs)', () => {
     expect(negative.data.error.message).toBe('The next number must not be negative')
   })
 
+  it('reset refuses a next number the range could not issue (not only when a run fails with "exhausted")', async () => {
+    const small = await create({ name: 'RESETCHK', length: 3, start: 10, maximum: 500 })
+    const reset = async (nextNumber: number) => POST(`${rangeUrl(small.ID)}/AdminService.reset`, { nextNumber }, admin)
+    expect((await reset(5)).data.error.message).toBe('The next number must not be below the start of the range (10)')
+    expect((await reset(501)).data.error.message).toBe('The next number must not be above the maximum of the range (500)')
+    expect((await reset(1000)).status).toBe(400)
+    expect((await reset(250)).status).toBeLessThan(300)
+  })
+
   it('reports an unknown range in the preview', async () => {
     const tc = await createActive(POST, 'test', 'TestCases', { name: 'unknown', topic: 'u/{{numberRange.MISSING}}', payload: '{}', deliveryMode: 'PERSISTENT' })
     const { data } = await POST(`/odata/v4/test/TestCases(ID=${tc.ID},IsActiveEntity=true)/TestService.preview`, {}, tester)

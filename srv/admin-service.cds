@@ -80,14 +80,19 @@ service AdminService {
        * Sets the range back (or forward): the number given is the next one issued. Empty = the start of the range.
        */
       @Core.OperationAvailable: in.IsActiveEntity
+      @Common.IsActionCritical
       action reset(nextNumber : Integer64);
 
       /** Issues the next number, as a run does - to try the range out. */
       @Core.OperationAvailable: in.IsActiveEntity
       action countUp();
 
-      /** Gives the last issued number back: the next number issued is that one again. */
+      /**
+       * Gives the last issued number back: the next number issued is that one again. Asks first (a number a run
+       * already sent would be issued a second time).
+       */
       @Core.OperationAvailable: in.IsActiveEntity
+      @Common.IsActionCritical
       action countDown();
     };
 

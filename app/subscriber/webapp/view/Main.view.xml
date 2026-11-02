@@ -122,8 +122,9 @@
               </Select>
             </VBox>
             <VBox visible="{state>/needsUsername}">
-              <Label text="{i18n>view.username}" required="true" tooltip="{i18n>view.notMaintainedOnTheBroker}" />
+              <Label text="{i18n>view.username}" labelFor="enteredUsername" required="true" tooltip="{i18n>view.notMaintainedOnTheBroker}" />
               <Input
+                id="enteredUsername"
                 width="100%"
                 value="{state>/enteredUsername}"
                 placeholder="{i18n>view.notMaintainedOnTheBroker}"
@@ -131,8 +132,9 @@
                 submit=".onStart" />
             </VBox>
             <VBox visible="{state>/needsPassword}">
-              <Label text="{= ${state>/username} ? ${i18n>view.passwordFor} + ' ' + ${state>/username} : ${i18n>view.password} }" required="true" />
+              <Label text="{= ${state>/username} ? ${i18n>view.passwordFor} + ' ' + ${state>/username} : ${i18n>view.password} }" labelFor="subscriberPassword" required="true" />
               <Input
+                id="subscriberPassword"
                 type="Password"
                 width="100%"
                 value="{state>/password}"

@@ -258,7 +258,8 @@ function forward(sub: Subscription, m: solace.Message, deferrable = false): 'sen
     return 'dropped'
   }
   let payload = msg.payload
-  if (Buffer.byteLength(payload) > maxPayloadBytes)
+  const truncated = Buffer.byteLength(payload) > maxPayloadBytes
+  if (truncated)
     // cut at the byte limit; a multi-byte character split there becomes U+FFFD, so drop it
     payload = Buffer.from(payload).subarray(0, maxPayloadBytes).toString('utf8').replace(/�$/, '') + '\n... [truncated]'
 
@@ -267,6 +268,7 @@ function forward(sub: Subscription, m: solace.Message, deferrable = false): 'sen
     brokerId: sub.brokerId,
     topic: msg.topic,
     payload,
+    truncated,
     contentType: msg.contentType,
     userProperties: JSON.stringify(msg.userProperties),
     correlationId: msg.correlationId,

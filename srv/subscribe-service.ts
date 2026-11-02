@@ -68,6 +68,18 @@ export default class SubscribeService extends cds.ApplicationService {
 
     this.on('activeSubscriptions', (req) => listSubscriptions(req.user.id))
 
+    // Delete is offered for the messages the user may delete: their own (administrators: all)
+    this.before('READ', ReceivedMessages, (req) => {
+      const columns = (req.query as { SELECT?: { columns?: { ref?: string[] }[] } }).SELECT?.columns
+      const has = (name: string) => columns?.some((c) => c.ref?.length === 1 && c.ref[0] === name)
+      if (columns && has('deletable') && !has('createdBy')) columns.push({ ref: ['createdBy'] })
+    })
+    this.after('READ', ReceivedMessages, (rows, req) => {
+      const admin = req.user.is('Admin')
+      for (const row of (Array.isArray(rows) ? rows : [rows]) as ({ createdBy?: string; deletable?: boolean } | undefined)[])
+        if (row && typeof row === 'object' && row.createdBy !== undefined) row.deletable = admin || row.createdBy === req.user.id
+    })
+
     this.before('CREATE', ReceivedMessages, async (req) => {
       const d = req.data as { broker_ID?: string; brokerName?: string; receivedAt?: string }
       if (d.broker_ID && !d.brokerName) {
@@ -82,7 +94,7 @@ export default class SubscribeService extends cds.ApplicationService {
       const m = (await SELECT.one.from(ReceivedMessageRows, idOf(req))) as ReceivedMessage | null
       if (!m) return req.reject(404, 'Message not found')
       const { ID } = await createNode(testCaseFrom(m))
-      req.info(200, 'Test case created')
+      req.info(200, `Test case "${m.topic}" created`)
       return { ID }
     })
 
@@ -112,7 +124,8 @@ function testCaseFrom(m: ReceivedMessage): NodeData {
     topic: m.topic,
     payload,
     contentType: m.contentType || detectContentType(payload),
-    deliveryMode: m.deliveryMode === 'DIRECT' ? 'DIRECT' : 'PERSISTENT',
+    // a topic subscription always receives Direct messages (whatever the sender used): the test case keeps the safe default
+    deliveryMode: 'PERSISTENT',
     correlationId: m.correlationId,
     userProperties: Object.entries(props).map(([name, value]) => ({
       name,

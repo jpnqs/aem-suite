@@ -461,7 +461,7 @@ A number range hands out numbers like SAP document numbers (`SO-4500000001`, `SO
 | **Reset** | set the next number (empty = back to the first number), e.g. for a new test series |
 
 - Every message takes **its own** number: a test case run twice, or on two brokers, uses 42, 43, …; within **one** message the same expression is the same number.
-- A number is never handed out twice – also not when the broker later rejects the message. **Preview** shows the next number without using it up.
+- A number is never handed out twice – also not when the broker later rejects the message. Only **Count Down** and **Reset** can hand one out again (they ask first): use them on ranges you are trying out. **Preview** shows the next number without using it up.
 - **Temporary variables** with `as` reuse one number or take a second one:
 
   ```
