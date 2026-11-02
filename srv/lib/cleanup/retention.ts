@@ -2,6 +2,7 @@ import cds from '@sap/cds'
 import { execute, preview } from './cleanup'
 import type { CleanupRequest } from './categories'
 import { errMsg } from '../core/errors'
+import { config } from '../core/config'
 
 const LOG = cds.log('aem-retention')
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -19,7 +20,10 @@ let timer: NodeJS.Timeout | undefined
  */
 export function startRetention(): void {
   if (timer) return
-  const run = () => void applyAutomaticRules().catch((e) => LOG.error('Automatic cleanup failed', e))
+  const run = () => {
+    void applyAutomaticRules().catch((e) => LOG.error('Automatic cleanup failed', e))
+    void trimAuditLog().catch((e) => LOG.error('Audit log retention failed', e))
+  }
   timer = setTimeout(() => {
     run()
     timer = setInterval(run, DAY_MS)
@@ -62,4 +66,17 @@ export async function applyAutomaticRules(now = new Date()): Promise<number> {
     }
   }
   return total
+}
+
+/**
+ * The audit log keeps `audit.retentionDays` (365): older entries are removed once a day - it would grow for ever
+ * (every save, run and subscription adds a row). Not a cleanup category: an administrator cannot delete audit entries.
+ */
+export async function trimAuditLog(now = new Date()): Promise<number> {
+  const days = config().audit.retentionDays
+  if (!(days > 0)) return 0
+  const cutoff = new Date(now.getTime() - days * DAY_MS).toISOString()
+  const removed = (await cds.tx({ user: new cds.User(RETENTION_USER) }, () => DELETE.from('aem.suite.AuditLog').where({ at: { '<': cutoff } }))) as number
+  if (removed) LOG.info(`Audit log: ${removed} entries older than ${days} days removed`)
+  return removed
 }

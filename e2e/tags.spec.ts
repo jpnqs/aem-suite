@@ -6,6 +6,8 @@ import { apps, expectAppOpen, openApp, testCaseUrl } from './launchpad'
 // use are suggested and can be picked from a value help.
 
 test.describe('tags', () => {
+  // one after the other: they work on the same list (rows are selected by their position in it)
+  test.describe.configure({ mode: 'serial' })
   const track = deleteAfterEach()
 
   async function createTestCase(request: APIRequestContext, name: string, tags?: string): Promise<{ ID: string }> {
@@ -118,25 +120,32 @@ test.describe('tags', () => {
     const other = uniqueName('E2E_TAGS_OUT')
     await createTestCase(page.request, tagged, `${tag}, smoke`)
     await createTestCase(page.request, other, 'smoke')
+    // "contains" would find this one for the tag: the filter matches whole tags
+    const longer = uniqueName('E2E_TAGS_LONGER')
+    await createTestCase(page.request, longer, `${tag}-longer`)
 
     await openApp(page, apps.testCases)
     await expectAppOpen(page, apps.testCases)
     await page.getByRole('option', { name: 'All Test Cases' }).click()
     // the list loaded (it takes the focus when it is done)
-    await expect(page.getByRole('row').filter({ hasText: other })).toBeVisible()
-    const field = page.locator('[id*="FilterField::tags"]')
+    await expect(page.getByText('Ping', { exact: true }).first()).toBeVisible()
+    // and nothing is loading any more: a list that finishes while a tag is typed takes the focus, which makes
+    // the typed text a pill (the change event) - a half typed tag
+    await page.waitForLoadState('networkidle')
+    const field = page.locator('[id*="FilterField::tagKey"]')
     const filter = field.getByRole('textbox')
     await filter.click()
     // a whole tag and a comma (suggestions: see the test above)
-    await filter.pressSequentially(`${tag},`)
+    await filter.fill(`${tag},`)
     await expect(field.locator('.aemTag')).toHaveText([tag])
     await expect(filter).toHaveValue('')
     // the request: "contains" per tag
-    const list = page.waitForRequest((r) => decodeURIComponent(r.postData() ?? '').includes(`contains(tags,'${tag}')`))
+    const list = page.waitForRequest((r) => decodeURIComponent(r.postData() ?? '').includes(`contains(tagKey,'#${tag}#')`))
     await page.getByRole('button', { name: 'Go', exact: true }).click()
     await list
     await expect(page.getByRole('row').filter({ hasText: tagged })).toBeVisible()
     await expect(page.getByRole('row').filter({ hasText: other })).toHaveCount(0)
+    await expect(page.getByRole('row').filter({ hasText: longer })).toHaveCount(0)
     await page.screenshot({ path: test.info().outputPath('tags-filter.png') })
   })
 })

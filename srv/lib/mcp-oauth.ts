@@ -20,7 +20,10 @@ import { publicBase } from './core/public-url'
  *   approuter's own logins stay out of reach.
  *
  * XSUAA still checks the redirect URI against `oauth2-configuration.redirect-uris` (mta.yaml) and the user gets
- * their own roles. Without XSUAA credentials (local development with mocked auth) nothing is advertised.
+ * their own roles. Those tokens are the user's normal tokens (XSUAA cannot issue a narrower one for the same
+ * client), so the proxy remembers the ones it hands out and every other path refuses them (`agentOnly`): an AI
+ * client's token works for /mcp only, not for the OData services the browser apps use. Kept in memory (one
+ * instance): tokens issued before a restart are not known until they expire. Without XSUAA credentials (local development with mocked auth) nothing is advertised.
  */
 
 const PROTECTED_RESOURCE = '/.well-known/oauth-protected-resource'
@@ -91,6 +94,41 @@ function authorizationServer(req: Request, res: Response) {
   })
 }
 
+/** Access tokens handed out by the token proxy: jti -> expiry (ms). They work for /mcp only. */
+const issued = new Map<string, number>()
+
+/** The `jti` and `exp` claims of a JWT (not verified: the token comes from XSUAA, or it is only looked up). */
+function claimsOf(jwt: string | undefined): { jti?: string; exp?: number } {
+  const payload = jwt?.split('.')[1]
+  if (!payload) return {}
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { jti?: unknown; exp?: unknown }
+    return { jti: typeof claims.jti === 'string' ? claims.jti : undefined, exp: typeof claims.exp === 'number' ? claims.exp : undefined }
+  } catch {
+    return {}
+  }
+}
+
+/** Remembers the access token of an XSUAA token response (and forgets the expired ones). */
+function remember(body: string) {
+  const now = Date.now()
+  for (const [jti, expires] of issued) if (expires < now) issued.delete(jti)
+  try {
+    const { jti, exp } = claimsOf((JSON.parse(body) as { access_token?: string }).access_token)
+    if (jti) issued.set(jti, exp ? exp * 1000 : now + 12 * 60 * 60 * 1000)
+  } catch {
+    /* not a token response */
+  }
+}
+
+/** Tokens of AI clients are for the MCP endpoint (and the discovery documents) only. */
+function agentOnly(req: Request, res: Response, next: NextFunction) {
+  if (req.path.startsWith('/mcp/') || req.path.startsWith('/.well-known/')) return next()
+  const { jti } = claimsOf(/^Bearer (.+)$/i.exec(req.headers.authorization ?? '')?.[1])
+  if (jti && issued.has(jti)) return res.status(403).json({ error: { code: '403', message: 'This token is for the AI assistant endpoint (/mcp/agent) only' } })
+  next()
+}
+
 const oauthError = (res: Response, status: number, error: string, description?: string) =>
   res.status(status).set('Cache-Control', 'no-store').json({ error, ...(description && { error_description: description }) })
 
@@ -148,11 +186,13 @@ async function token(req: Request, res: Response) {
       headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
       body: forward
     })
+    const text = await answer.text()
+    if (answer.ok) remember(text)
     res
       .status(answer.status)
       .set('Cache-Control', 'no-store')
       .type(answer.headers.get('content-type') ?? 'application/json')
-      .send(await answer.text())
+      .send(text)
   } catch (e) {
     cds.log('mcp-oauth').error('token request to XSUAA failed:', e)
     oauthError(res, 502, 'temporarily_unavailable')
@@ -174,6 +214,7 @@ function challenge(req: Request, res: Response, next: NextFunction) {
 }
 
 export function registerMcpOAuth(app: Application) {
+  app.use(agentOnly)
   // clients ask for the path-specific document first (RFC 9728), then the root one
   app.get([PROTECTED_RESOURCE, `${PROTECTED_RESOURCE}/mcp/agent`], protectedResource)
   app.get(AUTHORIZATION_SERVER, authorizationServer)

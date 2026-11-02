@@ -39,6 +39,8 @@ type Entry = { user: string; action: string; target: string | null; targetId: st
 
 function entryOf(srv: cds.Service, req: cds.Request, result: unknown): Entry | undefined {
   const event = req.event
+  // the cleanup writes its own entry (also for automatic, failed and partly done cleanups): lib/cleanup/cleanup.ts
+  if (srv.name === 'CleanupService' && event === 'execute') return
   const target = req.target as { name?: string; actions?: Record<string, { kind?: string }> } | undefined
   const targetName = target?.name?.split('.').pop() ?? null
   // drafts are not saved yet: their activation is the CREATE / UPDATE of the active entity

@@ -168,6 +168,7 @@ annotate service.TestCases with @(
                   ![@UI.TextArrangement]: #TextOnly
                 };
   kindText      @UI.Hidden;
+  tagKey        @UI.Hidden;
   sortOrder     @UI.Hidden;
   parent        @UI.Hidden;
   description   @UI.MultiLineText;

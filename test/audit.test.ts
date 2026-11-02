@@ -1,5 +1,5 @@
 import cds from '@sap/cds'
-import { applyAutomaticRules, RETENTION_USER } from '../srv/lib/cleanup/retention'
+import { applyAutomaticRules, RETENTION_USER, trimAuditLog } from '../srv/lib/cleanup/retention'
 import { masked } from '../srv/lib/core/errors'
 import { setConnector } from '../srv/lib/solace/connector'
 import { createActive, fakeBroker, mcpRpc, resetDatabase, runAndWait, startServer, users } from './helpers'
@@ -126,8 +126,35 @@ describe('audit log, production brokers, secrets, retention', () => {
       const after = Number((await SELECT.one.from('aem.suite.ReceivedMessages').columns('count(1) as n')).n)
       expect(before - after).toBeGreaterThanOrEqual(1)
       expect(await SELECT.one.from('aem.suite.ReceivedMessages').where({ topic: 'new/1' })).toBeTruthy()
+      // the audit log has it too: who (the server), which rule, what came out
+      expect(await auditOf(`action eq 'execute' and name eq 'old messages'`)).toEqual([
+        expect.objectContaining({ user: RETENTION_USER, target: 'CleanupLogs', details: expect.stringMatching(/^DONE: \d+ rows - Saved messages/) })
+      ])
       const log = await SELECT.one.from('aem.suite.CleanupLogs').where({ ruleName: 'old messages' })
       expect(log).toMatchObject({ status: 'DONE', createdBy: RETENTION_USER })
+    })
+
+    it('logs a manual cleanup that ran (also written for failed and partly done ones), a refused one leaves nothing', async () => {
+      const res = await POST('/odata/v4/cleanup/execute', { request: { messages: { age: { value: 30, unit: 'DAYS' } } }, expected: [] }, admin)
+      expect(res.status).toBe(400)
+      expect(await auditOf(`action eq 'execute' and user eq 'admin'`)).toEqual([])
+      // a cleanup that ran is in it, with its outcome
+      await INSERT.into('aem.suite.ReceivedMessages').entries({ ID: cds.utils.uuid(), topic: 'old/2', payload: '{}', receivedAt: '2020-01-01T00:00:00Z' })
+      const request = { messages: { age: { value: 30, unit: 'DAYS' } } }
+      const { data: counts } = await POST('/odata/v4/cleanup/preview', { request }, admin)
+      const expected = counts.value.map((c: { category: string; count: number }) => ({ category: c.category, count: c.count }))
+      expect((await POST('/odata/v4/cleanup/execute', { request, expected }, admin)).status).toBe(200)
+      expect(await auditOf(`action eq 'execute' and user eq 'admin'`)).toEqual([expect.objectContaining({ target: 'CleanupLogs', details: expect.stringMatching(/^DONE: 1 rows/) })])
+    })
+
+    it('removes audit entries older than the retention period', async () => {
+      await INSERT.into('aem.suite.AuditLog').entries([
+        { ID: cds.utils.uuid(), at: '2020-01-01T00:00:00Z', user: 'old', action: 'CREATE', target: 'Brokers', service: 'AdminService' },
+        { ID: cds.utils.uuid(), at: new Date().toISOString(), user: 'new', action: 'CREATE', target: 'Brokers', service: 'AdminService' }
+      ])
+      expect(await trimAuditLog()).toBe(1)
+      expect(await auditOf(`user eq 'old'`)).toEqual([])
+      expect(await auditOf(`user eq 'new'`)).toHaveLength(1)
     })
   })
 })

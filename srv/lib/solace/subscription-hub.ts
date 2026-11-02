@@ -154,14 +154,7 @@ async function open(req: StartRequest, sources: string[]): Promise<string> {
       sub.flow = browser
     } else {
       const consumer = await session.createQueueConsumer(sources[0])
-      consumer.on(s.MessageConsumerEventName.MESSAGE, (m: solace.Message) => {
-        forward(sub, m)
-        try {
-          m.acknowledge()
-        } catch (e) {
-          LOG.warn('acknowledge failed', e)
-        }
-      })
+      consumer.on(s.MessageConsumerEventName.MESSAGE, (m: solace.Message) => consume(sub, m))
       consumer.on(s.MessageConsumerEventName.DOWN_ERROR, () => void drop(sub, 'Queue consumer went down'))
       sub.flow = consumer
     }
@@ -209,9 +202,30 @@ export async function stopAll(): Promise<void> {
   sweeper = undefined
 }
 
-function forward(sub: Subscription, m: solace.Message) {
+/**
+ * Queue consumer: a message is acknowledged - removed from the queue - only once it was shown. Above the rate limit
+ * it waits (unacknowledged, so the broker holds it) for the next second instead of being dropped; a message that
+ * arrives after the subscription ended stays on the queue.
+ */
+function consume(sub: Subscription, m: solace.Message) {
+  if (!subscriptions.has(sub.id)) return
+  const outcome = forward(sub, m, true)
+  if (outcome === 'deferred') {
+    const wait = Math.max(50, THROTTLE_WINDOW_MS - (Date.now() - sub.windowStart))
+    setTimeout(() => consume(sub, m), wait).unref()
+    return
+  }
+  // a message that cannot be read is acknowledged too (it would be redelivered for ever); the log says so
+  try {
+    m.acknowledge()
+  } catch (e) {
+    LOG.warn('acknowledge failed', e)
+  }
+}
+
+/** `deferrable` (queue consumer): above the rate limit nothing is dropped, the caller tries again later. */
+function forward(sub: Subscription, m: solace.Message, deferrable = false): 'sent' | 'deferred' | 'dropped' {
   const { maxMessagesPerSecond, maxPayloadBytes } = cfg()
-  sub.messageCount++
 
   const now = Date.now()
   if (now - sub.windowStart >= THROTTLE_WINDOW_MS) {
@@ -220,20 +234,28 @@ function forward(sub: Subscription, m: solace.Message) {
     sub.windowCount = 0
     sub.throttled = false
   }
-  if (++sub.windowCount > maxMessagesPerSecond) {
+  if (sub.windowCount >= maxMessagesPerSecond) {
     if (!sub.throttled) {
       sub.throttled = true
-      void status(sub, 'THROTTLED', `More than ${maxMessagesPerSecond} msg/s - not all messages are shown`)
+      void status(
+        sub,
+        'THROTTLED',
+        deferrable ? `More than ${maxMessagesPerSecond} msg/s - consuming is slowed down` : `More than ${maxMessagesPerSecond} msg/s - not all messages are shown`
+      )
     }
-    return
+    if (deferrable) return 'deferred'
+    sub.messageCount++
+    return 'dropped'
   }
+  sub.windowCount++
+  sub.messageCount++
 
   let msg
   try {
     msg = readMessage(m)
   } catch (e) {
     LOG.warn('Cannot read message', e)
-    return
+    return 'dropped'
   }
   let payload = msg.payload
   if (Buffer.byteLength(payload) > maxPayloadBytes)
@@ -252,6 +274,7 @@ function forward(sub: Subscription, m: solace.Message) {
     receivedAt: msg.receivedAt.toISOString(),
     seq: sub.messageCount
   })
+  return 'sent'
 }
 
 async function drop(sub: Subscription, reason: string) {
@@ -278,9 +301,11 @@ function status(sub: Subscription, state: string, message: string) {
 function ensureSweeper() {
   if (sweeper) return
   sweeper = setInterval(() => {
-    const { idleTimeoutMs } = cfg()
+    const { idleTimeoutMs, consumeIdleTimeoutMs } = cfg()
     for (const sub of subscriptions.values()) {
-      if (Date.now() - sub.lastHeartbeat > idleTimeoutMs) void close(sub, 'STOPPED', 'No heartbeat from client (idle timeout)')
+      // a consumer removes messages from the queue: it stops soon after the page is gone
+      const limit = sub.sourceType === 'QUEUE_CONSUME' ? Math.min(consumeIdleTimeoutMs, idleTimeoutMs) : idleTimeoutMs
+      if (Date.now() - sub.lastHeartbeat > limit) void close(sub, 'STOPPED', 'No heartbeat from client (idle timeout)')
     }
     if (!subscriptions.size && sweeper) {
       clearInterval(sweeper)

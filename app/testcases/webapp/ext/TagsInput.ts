@@ -30,6 +30,8 @@ import type ResourceBundle from "sap/base/i18n/ResourceBundle";
 const TAG = /^[a-z0-9][a-z0-9._-]*$/;
 const SEPARATOR = /[,;\s]/;
 const COLORS = 8;
+/** suggestions asked for within this time before a tag became a pill are dropped */
+const SETTLE_MS = 500;
 
 /** "Smoke,  regression smoke" -> ["regression", "smoke"] */
 export function tagsOf(text: string | null | undefined): string[] {
@@ -102,12 +104,15 @@ export default class TagsInput extends MultiInput {
   declare getInvalidText: () => string;
 
   private dialog?: SelectDialog;
+  /** when a typed tag last became a pill: the suggestions that were asked for before must not reopen the list */
+  private committedAt = 0;
 
   init(): void {
     super.init();
     this.addStyleClass("aemTags");
     this.setShowSuggestion(true);
-    this.setStartSuggestion(0);
+    // from the first typed character: an empty field that opens a list on every click (and again after each pill) covers the page
+    this.setStartSuggestion(1);
     this.setMaxSuggestionWidth("20rem");
     // a picked suggestion becomes a pill here (with its color), not by the MultiInput
     this.addValidator(() => undefined as unknown as Token);
@@ -178,7 +183,12 @@ export default class TagsInput extends MultiInput {
   /** The tags in use as suggestions, without the ones already there; the typed text filters them. */
   private async loadSuggestions(): Promise<void> {
     const current = new Set(this.currentTags());
+    const asked = Date.now();
     const tags = (await this.known()).filter((t) => !current.has(t.tag));
+    if (this.committedAt >= asked - SETTLE_MS && !this.getValue()) {
+      this.closeSuggestions();
+      return;
+    }
     if (tags.map((t) => t.tag).join() !== this.getSuggestionItems().map((i) => i.getKey()).join()) {
       this.destroySuggestionItems();
       for (const t of tags) {
@@ -244,6 +254,7 @@ export default class TagsInput extends MultiInput {
     if (valid.length) {
       this.store([...this.currentTags(), ...valid]);
       // typing again suggests again
+      this.committedAt = Date.now();
       this.closeSuggestions();
     }
     // the words that are no tags stay to be corrected

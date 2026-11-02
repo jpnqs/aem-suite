@@ -22,6 +22,9 @@ service TestService {
       // the quick variant "My Test Cases" of the list (a selection variant cannot name the logged-in user)
       @title: '{i18n>CreatedByMe}'
       case when createdBy = $user then true else false end         as createdByMe : Boolean,
+      // the tags with a delimiter around each ("#eu#smoke#"): the Tags filter finds whole tags (contains "#eu#"),
+      // not "europe" for "eu" (db.TestCases.tags: "eu, smoke"; a tag has no "#")
+      case when tags is null then null else '#' || replace(tags, ', ', '#') || '#' end as tagKey : String(600),
       // navigation target (launchpad intent) of the name column of the folder contents
       '#AEMSuiteTestCases-manage&/TestCases(ID=' || ID || ',IsActiveEntity=true)' as nodeLink : String,
       // the documentation (description, Markdown) as HTML for the rich text editor - converted both ways by srv/test-service.ts

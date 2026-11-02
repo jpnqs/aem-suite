@@ -173,6 +173,23 @@ describe('MCP OAuth discovery', () => {
       expect(forwarded().body).toEqual({ grant_type: 'refresh_token', refresh_token: 'r1' })
     }))
 
+    it('lets the tokens it hands out work for /mcp only, not for the OData services', () => xsuaa(async () => {
+      const jwt = (claims: object) => ['e30', Buffer.from(JSON.stringify(claims)).toString('base64url'), 'sig'].join('.')
+      const agent = jwt({ jti: 'agent-1', exp: Math.floor(Date.now() / 1000) + 3600 })
+      uaaAnswer = () => new Response(JSON.stringify({ access_token: agent, token_type: 'bearer' }), { status: 200, headers: { 'content-type': 'application/json' } })
+      expect((await form({ grant_type: 'refresh_token', refresh_token: 'r1' })).status).toBe(200)
+      const bearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } })
+      // the same token at the OData services and the admin service: refused; at the MCP endpoint: not refused here
+      for (const url of ['/odata/v4/test/TestCases', '/odata/v4/admin/Brokers', '/odata/v4/cleanup/CleanupLogs']) {
+        const res = await GET(url, bearer(agent))
+        expect([url, res.status]).toEqual([url, 403])
+        expect(res.data.error.message).toMatch(/AI assistant endpoint/)
+      }
+      expect((await POST('/mcp/agent', { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }, { headers: { ...MCP_HEADERS, Authorization: `Bearer ${agent}` } })).status).not.toBe(403)
+      // a token it did not hand out (a browser login) is not touched by this
+      expect((await GET('/odata/v4/test/TestCases', bearer(jwt({ jti: 'browser-1' })))).status).not.toBe(403)
+    }))
+
     it('passes XSUAA errors on', () => xsuaa(async () => {
       uaaAnswer = () => new Response('{"error":"invalid_grant"}', { status: 400, headers: { 'content-type': 'application/json' } })
       const res = await form({ grant_type: 'refresh_token', refresh_token: 'expired' })

@@ -118,6 +118,36 @@ describe('subscription hub (live view)', () => {
     expect(sessions[1].closed).toBe(true)
   })
 
+  it('consumes at the rate limit without losing messages: only what was shown is acknowledged', async () =>
+    withAemSuiteConfig({ subscriptions: { maxMessagesPerSecond: 2 } }, async () => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] })
+      const consume = await start({ sourceType: 'QUEUE_CONSUME', queue: 'orders' })
+      for (let i = 0; i < 5; i++) sessions[0].flow.deliver(sol().MessageConsumerEventName.MESSAGE)
+      await settle()
+      // 2 shown and acknowledged, 3 wait on the queue (unacknowledged)
+      expect(messagesOf(consume)).toHaveLength(2)
+      expect(sessions[0].flow.acknowledged).toBe(2)
+      expect(statusOf(consume)).toEqual([expect.objectContaining({ data: expect.objectContaining({ status: 'THROTTLED', message: expect.stringMatching(/slowed down/) }) })])
+      jest.advanceTimersByTime(1100)
+      await settle()
+      expect(messagesOf(consume)).toHaveLength(4)
+      jest.advanceTimersByTime(1100)
+      await settle()
+      expect(messagesOf(consume)).toHaveLength(5)
+      expect(sessions[0].flow.acknowledged).toBe(5)
+    }))
+
+  it('closes a queue consumer sooner than other subscriptions when the page is gone', async () =>
+    withAemSuiteConfig({ subscriptions: { idleTimeoutMs: 300_000, consumeIdleTimeoutMs: 50_000 } }, async () => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] })
+      const consume = await start({ sourceType: 'QUEUE_CONSUME', queue: 'orders' })
+      const topic = await start()
+      jest.advanceTimersByTime(65_000)
+      await settle()
+      expect(listSubscriptions('alice').map((s) => s.subscriptionId)).toEqual([topic])
+      expect(statusOf(consume)).toEqual([expect.objectContaining({ data: expect.objectContaining({ status: 'STOPPED' }) })])
+    }))
+
   it('validates the input before connecting', async () => {
     await expect(start({ topics: [' '] })).rejects.toMatchObject({ status: 400, message: 'Enter at least one topic subscription' })
     await expect(start({ sourceType: 'QUEUE_BROWSE', queue: '' })).rejects.toMatchObject({ status: 400 })

@@ -1,6 +1,7 @@
 import cds from '@sap/cds'
 import { applyTo, CATEGORY_LABELS, CategoryId, CleanupRequest, Selection, selectionsOf } from './categories'
 import { errMsg, httpError, truncate } from '../core/errors'
+import { columnLength } from '../core/model'
 
 /** rows per statement - keeps the IN lists of the deletes small */
 export const CHUNK_SIZE = 500
@@ -60,6 +61,8 @@ export async function execute(
   ruleName?: string | null,
   now = new Date()
 ): Promise<ExecuteResult> {
+  // who did it: the transactions below are root transactions, the audit entry is written in one of them
+  const user = cds.context?.user?.id ?? 'unknown'
   // every statement runs in an own root transaction (none in the request's): the categories commit one by one,
   // the log is written also after an error - and SQLite (one connection) does not wait for the request's
   const { selections, counts } = await cds.tx(async () => {
@@ -91,11 +94,13 @@ export async function execute(
 
   const totalCount = done.reduce((n, c) => n + c.count, 0)
   const logId = cds.utils.uuid()
+  const status = !error ? 'DONE' : done.length ? 'PARTIAL' : 'FAILED'
+  const summary = truncate(done.map((c) => `${CATEGORY_LABELS[c.category]} ${c.count}`).join(', ') || 'Nothing cleaned up', 500)
   await cds.tx(async () => {
     await INSERT.into('aem.suite.CleanupLogs').entries({
       ID: logId,
-      summary: truncate(done.map((c) => `${CATEGORY_LABELS[c.category]} ${c.count}`).join(', ') || 'Nothing cleaned up', 500),
-      status: !error ? 'DONE' : done.length ? 'PARTIAL' : 'FAILED',
+      summary,
+      status,
       request: JSON.stringify(request),
       counts: JSON.stringify(selections.map((s, i) => ({ category: s.category, count: done[i]?.count ?? 0, cutoff: s.cutoff?.toISOString() ?? null }))),
       totalCount,
@@ -104,6 +109,17 @@ export async function execute(
       errorMessage: error ? truncate(errMsg(error), 1000) : null
     })
     if (ruleName) await UPDATE('aem.suite.CleanupRules').set({ lastRunAt: now.toISOString() }).where({ name: ruleName })
+    // the audit log: every cleanup, the automatic ones and the failed or partly done ones too (a request that fails
+    // leaves no entry of the generic audit hook, srv/lib/core/audit.ts)
+    await INSERT.into('aem.suite.AuditLog').entries({
+      user,
+      action: 'execute',
+      target: 'CleanupLogs',
+      targetId: logId,
+      name: ruleName ? truncate(ruleName, columnLength('AuditLog', 'name')) : null,
+      details: truncate(`${status}: ${totalCount} rows - ${summary}${error ? ` - ${errMsg(error)}` : ''}`, columnLength('AuditLog', 'details')),
+      service: 'CleanupService'
+    })
   })
   if (error) {
     const partly = done.length ? ` (partly done: ${done.map((c) => `${CATEGORY_LABELS[c.category]} ${c.count}`).join(', ')})` : ''

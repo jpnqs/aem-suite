@@ -1,6 +1,6 @@
 sap.ui.define(
-  ["sap/ui/model/Filter", "sap/ui/model/Sorter", "sap/ui/model/json/JSONModel", "com/aem/suite/runs/shared/Actions"],
-  function (Filter, Sorter, JSONModel, Actions) {
+  ["sap/m/MessageBox", "sap/m/MessageToast", "sap/ui/model/Filter", "sap/ui/model/Sorter", "sap/ui/model/json/JSONModel", "com/aem/suite/runs/shared/Actions"],
+  function (MessageBox, MessageToast, Filter, Sorter, JSONModel, Actions) {
     "use strict";
 
     /** how many earlier runs the compare dialog offers */
@@ -8,6 +8,32 @@ sap.ui.define(
     var STATES = { BROKEN: "Error", FIXED: "Success", NEW: "Information", GONE: "Warning", STILL_FAILING: "Error", STILL_PASSING: "None" };
 
     return {
+      /**
+       * Header action of a run in progress: stops it (messages not sent yet are skipped). The page reads the run
+       * again meanwhile (ext/RunPageExt.controller.js). `this` is the extension API of the object page.
+       */
+      stop: function (context) {
+        var api = this;
+        var texts = api.getModel("i18n").getResourceBundle();
+        var stopText = texts.getText("action.stop");
+        MessageBox.confirm(texts.getText("stop.confirm"), {
+          title: stopText,
+          actions: [stopText, MessageBox.Action.CANCEL],
+          emphasizedAction: stopText,
+          onClose: function (action) {
+            if (action !== stopText) {
+              return;
+            }
+            Actions.invokeAction(api.getModel(), "/cancelRun(...)", { runId: context.getProperty("ID") })
+              .then(function () {
+                MessageToast.show(texts.getText("stop.done"));
+                return api.refresh();
+              })
+              .catch(Actions.showError);
+          }
+        });
+      },
+
       /**
        * Header action of a run: compares it with an earlier run (the one before it preselected) per test case and
        * broker - what broke, what was fixed, what is new or gone. `this` is the extension API of the object page.

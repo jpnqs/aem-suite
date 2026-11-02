@@ -19,6 +19,12 @@ test.describe('authorization (tester)', () => {
     })
   }
 
+  test('the launchpad shows the tiles of the tester apps only', async ({ page }) => {
+    await page.goto('/launchpad.html')
+    for (const app of [apps.home, apps.testCases, apps.runs, apps.subscriber, apps.messages, apps.help]) await expect(page.getByText(app.title, { exact: true })).toBeVisible()
+    for (const app of [apps.brokers, apps.variables, apps.numberRanges, apps.cleanup, apps.auditLog]) await expect(page.getByText(app.title, { exact: true })).toBeHidden()
+  })
+
   test('admin service is forbidden', async ({ request }) => {
     expect((await request.get('/odata/v4/admin/Brokers')).status()).toBe(403)
   })

@@ -111,11 +111,77 @@
   <script>
     sap.ui.require(["sap/ui/core/Core"], function (Core) {
       Core.ready(function () {
+        // behind the approuter: "Sign Out" ends the XSUAA session (the sandbox only reloads the page)
+        if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+          sap.ushell.Container.attachLogoutEvent(function () {
+            location.href = location.origin + "/do/logout";
+          });
+        }
         sap.ushell.Container.createRenderer(true).then(function (renderer) {
           renderer.placeAt("content");
+          hideTilesWithoutRole();
         });
       });
     });
+
+    /**
+     * Only the tiles of apps the user may open (app/_shared/Apps.js: role of an app): a tester does not see the admin
+     * apps, whose service would answer 403. The navigation targets stay (a link still gets the app's own error).
+     * Roles come from the Home app's overview(); if they cannot be read every tile stays.
+     */
+    var ROLE_OF = {
+      "AEMSuiteTestCases-manage": "tester",
+      "AEMSuiteTestRuns-display": "tester",
+      "AEMSuiteSubscriber-display": "tester",
+      "AEMSuiteSavedMessages-display": "tester",
+      "AEMSuiteBrokers-manage": "admin",
+      "AEMSuiteVariables-manage": "admin",
+      "AEMSuiteNumberRanges-manage": "admin",
+      "AEMSuiteCleanup-manage": "admin",
+      "AEMSuiteAuditLog-display": "admin"
+    };
+    var TITLE_OF = {};
+    Object.keys(window["sap-ushell-config"].applications).forEach(function (intent) {
+      TITLE_OF[intent] = { title: window["sap-ushell-config"].applications[intent].title };
+    });
+    function hideTilesWithoutRole() {
+      fetch("../comaemsuitehome/odata/v4/home/overview()", { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (response) {
+          return response.ok ? response.json() : null;
+        })
+        .then(function (overview) {
+          if (!overview) {
+            return;
+          }
+          // the shell moves the applications of the config into its services
+          var apps = TITLE_OF;
+          var hidden = Object.keys(ROLE_OF)
+            .filter(function (intent) {
+              return !overview[ROLE_OF[intent]];
+            })
+            .map(function (intent) {
+              return apps[intent].title;
+            });
+          if (!hidden.length) {
+            return;
+          }
+          var hide = function () {
+            document.querySelectorAll(".sapMGT").forEach(function (tile) {
+              var title = tile.textContent || "";
+              if (hidden.some(function (h) { return title.indexOf(h) >= 0; })) {
+                (tile.closest(".sapUshellTile") || tile).style.display = "none";
+              }
+            });
+          };
+          hide();
+          // tiles are rendered (and re-rendered) after this
+          new MutationObserver(hide).observe(document.body, { childList: true, subtree: true });
+        })
+        .catch(function (e) {
+          // every tile stays
+          console.warn("[aem-suite] tiles by role not applied", e);
+        });
+    }
   </script>
 </head>
 <body class="sapUiBody" id="content"></body>

@@ -38,6 +38,12 @@ describe('app catalog and launchpad tiles', () => {
     expect({ title, description }).toEqual({ title: texts.appTitle, description: texts.appDescription })
   })
 
+  it('hides tiles by the roles of the catalog (the role map of the launchpad page)', () => {
+    const map = Object.fromEntries([...html.matchAll(/"(\w+-\w+)": "(tester|admin)"/g)].map(([, intent, role]) => [intent, role]))
+    const expected = Object.fromEntries(Object.values(catalog).filter((a) => a.role).map((a) => [a.intent, a.role]))
+    expect(map).toEqual(expected)
+  })
+
   it.each(apps)('%s: the manifest has the intent of the catalog', (app) => {
     const manifest = JSON.parse(fs.readFileSync(path.join(appDir, app, 'webapp', 'manifest.json'), 'utf8'))
     const [semanticObject, action] = catalog[app].intent.split('-')

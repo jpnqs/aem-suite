@@ -139,9 +139,9 @@
               "controlConfiguration": {
                 "@com.sap.vocabularies.UI.v1.SelectionFields": {
                   "filterFields": {
-                    "tags": {
+                    "tagKey": {
                       "label": "{{filter.tags}}",
-                      "property": "tags",
+                      "property": "tagKey",
                       "template": "com.aem.suite.testcases.ext.TagsFilter",
                       "position": {
                         "placement": "After",

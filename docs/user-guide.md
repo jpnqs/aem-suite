@@ -294,7 +294,7 @@ Every save keeps a **version** (section *Versions* at the bottom of the page): w
 
    ![A finished run (here without a reachable broker, so every message ended with an error)](images/guides/run-3-finished.png)
 
-You can close the dialog at any time – the run goes on. **Stop run** ends it early.
+You can close the dialog at any time – the run goes on. **Stop run** ends it early. The run's page in **Test Runs** follows a run in progress by itself (it reads the results again every few seconds) and has **Stop Run** in its header as long as the run is running, so you can stop it from there too.
 
 ### Advanced settings
 
@@ -592,5 +592,5 @@ When you save a rule, tick **Apply automatically every day**: the server then cl
 | **Run…** is disabled | Save your draft, or select at least one row. |
 | I don't see the test cases or runs of colleagues | Test cases: switch to **All Test Cases**. Runs: remove the filter *Started By*. |
 | *WebSocket offline* in the Live Subscriber | The connection to the server dropped; it reconnects – reload the page if it stays. |
-| A run stays *RUNNING* | A broker that does not answer is given up after its connect timeout; look again later or **Stop run**. |
+| A run stays *RUNNING* | A broker that does not answer is given up after its connect timeout; look again later or stop it (**Stop run** in the dialog, **Stop Run** on the run's page in Test Runs). |
 | The app looks old after an update | Reload without cache: **Ctrl+F5** (Mac: **Cmd+Shift+R**). |

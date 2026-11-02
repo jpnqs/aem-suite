@@ -9,6 +9,8 @@ export interface AemSuiteConfig {
     maxPerUser: number
     /** close subscriptions without heartbeat */
     idleTimeoutMs: number
+    /** the same for queue consumers (they remove messages from the queue): shorter */
+    consumeIdleTimeoutMs: number
     /** forwarding limit per subscription */
     maxMessagesPerSecond: number
     /** truncation of payloads in the live view */
@@ -41,6 +43,10 @@ export interface AemSuiteConfig {
     /** size of a resolved payload that is still sent (and of a payload template that can be saved) */
     maxPayloadBytes: number
   }
+  audit: {
+    /** the audit log keeps entries this many days (older ones are removed once a day) */
+    retentionDays: number
+  }
   faker: {
     /** language of {{faker...}} test data: en, de, fr, es, en_GB, ... (the locales of faker.js) */
     locale: string
@@ -57,10 +63,11 @@ export interface AemSuiteConfig {
 
 export const DEFAULTS: AemSuiteConfig = {
   autoTestConnection: true,
-  subscriptions: { maxPerUser: 5, idleTimeoutMs: 5 * 60 * 1000, maxMessagesPerSecond: 100, maxPayloadBytes: 512 * 1024 },
+  subscriptions: { maxPerUser: 5, idleTimeoutMs: 5 * 60 * 1000, consumeIdleTimeoutMs: 150 * 1000, maxMessagesPerSecond: 100, maxPayloadBytes: 512 * 1024 },
   help: { file: 'docs/user-guide.md' },
   agent: { maxRunResults: 100, maxActiveRuns: 2, maxRunsPerHour: 30 },
   runs: { maxRepetitions: 1000, maxDelayMs: 60_000, maxResults: 5000, maxActivePerUser: 5, maxActive: 20, maxPayloadBytes: 1024 * 1024 },
+  audit: { retentionDays: 365 },
   faker: { locale: 'en' },
   mcp: {}
 }
@@ -76,6 +83,7 @@ export function config(): AemSuiteConfig {
     help: { ...DEFAULTS.help, ...own.help },
     agent: { ...DEFAULTS.agent, ...own.agent },
     runs: { ...DEFAULTS.runs, ...own.runs },
+    audit: { ...DEFAULTS.audit, ...own.audit },
     faker: { ...DEFAULTS.faker, ...own.faker },
     mcp: { ...DEFAULTS.mcp, ...own.mcp }
   }
