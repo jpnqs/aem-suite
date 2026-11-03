@@ -63,14 +63,16 @@ test.describe('tags', () => {
     await page.getByRole('button', { name: 'Edit Selected…' }).click()
     const dialog = page.getByRole('dialog')
     const [add, remove] = [dialog.getByRole('textbox').nth(0), dialog.getByRole('textbox').nth(1)]
-    // the dialog loads the tags in use for the suggestions: letters typed before they arrive are lost, so wait for the field and type slowly
+    // a dialog that is still opening moves the focus into itself and selects the text of the field when it is open:
+    // letters typed before are overwritten. Typing starts when it is open and has taken the focus.
+    await expect(dialog).toBeVisible()
+    await expect.poll(() => dialog.evaluate((el) => (window as any).sap.ui.getCore().byId(el.id)?.isOpen?.() === true)).toBe(true)
+    await expect(dialog.locator(':focus')).toHaveCount(1)
     await add.click()
-    await expect(add).toBeFocused()
-    await add.pressSequentially('regression ', { delay: 40 })
+    await add.pressSequentially('regression ')
     await expect(dialog.locator('.aemTag')).toHaveText(['regression'])
     await remove.click()
-    await expect(remove).toBeFocused()
-    await remove.pressSequentially('eu,', { delay: 40 })
+    await remove.pressSequentially('eu,')
     await expect(dialog.locator('.aemTag')).toHaveText(['regression', 'eu'])
     await page.screenshot({ path: test.info().outputPath('tags-bulk.png') })
     await dialog.getByRole('button', { name: 'Apply' }).click()
