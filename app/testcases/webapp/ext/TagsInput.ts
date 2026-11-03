@@ -72,6 +72,8 @@ function knownTags(model: ODataModel): Promise<TagCount[]> {
   return tags;
 }
 
+const partOfTag = (term?: string, item?: { getText(): string }): boolean => !!item?.getText().includes((term ?? "").trim().toLowerCase());
+
 /** The same color for the same tag, everywhere: 1..COLORS */
 export function colorOf(tag: string): number {
   let hash = 0;
@@ -114,6 +116,8 @@ export default class TagsInput extends MultiInput {
     // from the first typed character: an empty field that opens a list on every click (and again after each pill) covers the page
     this.setStartSuggestion(1);
     this.setMaxSuggestionWidth("20rem");
+    // a part of a tag finds it, not only its start
+    this.setFilterFunction(partOfTag);
     // a picked suggestion becomes a pill here (with its color), not by the MultiInput
     this.addValidator(() => undefined as unknown as Token);
     this.attachSuggestionItemSelected((event) => {
@@ -195,7 +199,10 @@ export default class TagsInput extends MultiInput {
         this.addSuggestionItem(new ListItem({ key: t.tag, text: t.tag, additionalText: String(t.count) }));
       }
     }
-    this.setFilterFunction((term, item) => !!item?.getText().includes((term ?? "").trim().toLowerCase()));
+    // the tags arrived after the typing: show the list for what is in the field now
+    if (this.getValue() && this.getSuggestionItems().length) {
+      this.showItems(partOfTag);
+    }
   }
 
   /** All tags in use (and the ones of this field) to tick; the ticked ones are the new tags. */

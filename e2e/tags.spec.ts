@@ -63,10 +63,14 @@ test.describe('tags', () => {
     await page.getByRole('button', { name: 'Edit Selected…' }).click()
     const dialog = page.getByRole('dialog')
     const [add, remove] = [dialog.getByRole('textbox').nth(0), dialog.getByRole('textbox').nth(1)]
+    // the dialog loads the tags in use for the suggestions: letters typed before they arrive are lost, so wait for the field and type slowly
     await add.click()
-    await add.pressSequentially('regression ')
+    await expect(add).toBeFocused()
+    await add.pressSequentially('regression ', { delay: 40 })
+    await expect(dialog.locator('.aemTag')).toHaveText(['regression'])
     await remove.click()
-    await remove.pressSequentially('eu,')
+    await expect(remove).toBeFocused()
+    await remove.pressSequentially('eu,', { delay: 40 })
     await expect(dialog.locator('.aemTag')).toHaveText(['regression', 'eu'])
     await page.screenshot({ path: test.info().outputPath('tags-bulk.png') })
     await dialog.getByRole('button', { name: 'Apply' }).click()
