@@ -26,11 +26,6 @@ async function open(page: Page, hash: string) {
 
 test.describe.configure({ mode: 'serial' })
 
-test('home', async ({ page }) => {
-  await open(page, 'AEMSuiteHome-display')
-  await page.screenshot({ path: out('home') })
-})
-
 test('test cases tree', async ({ page }) => {
   await open(page, 'AEMSuiteTestCases-manage')
   await expect(page.getByText('Orders', { exact: true }).first()).toBeVisible()
